@@ -22,7 +22,7 @@ fi
 [ -x "$CHROME" ] || { echo "chrome not found; pass a path: sh tools/genicons.sh /path/to/chrome" >&2; exit 1; }
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-OUT=$ROOT/assets
+OUT=$ROOT/extension/assets
 TMP=${TMPDIR:-/tmp}/archer-icons.$$
 mkdir -p "$OUT" "$TMP"
 trap 'rm -rf "$TMP"' EXIT
