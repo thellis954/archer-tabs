@@ -18,7 +18,7 @@ extension/   everything Chrome loads — this is what you point "Load unpacked" 
   src/       classify.js (the URL-vs-prompt decision) + the generated TLD list
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
 docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
-tools/       lint.js, genicons.sh — dependency-free, run with node/sh
+tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs (need playwright)
 test/        *.test.js run by `npm test`; e2e.mjs drives a real browser
 ```
 
@@ -46,13 +46,22 @@ There is nothing to build or install. To run it:
 |---|---|
 | `npm test` | 47 unit cases for the classifier, on node's built-in runner. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
-| `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright; see the header of `test/e2e.mjs`. |
+| `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
+| `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
 | `npm run check` | lint + test — what CI runs. |
 
+`e2e`, `shots` and `icons` all need Playwright on the module path:
+
+```sh
+mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright
+```
+
 CI runs lint and unit tests only: the repo installs nothing, and `e2e` needs a browser.
 **`npm run e2e` is the check that matters before shipping a routing change** — it exercises
-`chrome.search` and real navigation, which unit tests cannot.
+`chrome.search` and real navigation, which unit tests cannot. **And look at `npm run shots` before
+shipping a UI change** — the suggestion-row misalignment and the sub-AA `--muted` were both
+invisible in the source and obvious in a render.
 
 ## Architecture
 
@@ -61,20 +70,23 @@ Everything else is reached from that page. Adding a new page or a background ser
 registering it in the manifest; a file that isn't referenced from `newtab.html` or the manifest is
 dead weight.
 
-**`newtab.js` is the only logic in the extension.** It owns a single decision: on form submit, does
-the input look like a URL or a search query? `looksLikeURL()` is the heuristic — explicit
-`http(s)://` scheme, a `localhost[:port]` prefix, or any whitespace-free string containing a dot.
-Anything else falls through to a Google search URL. Navigation is done by assigning
-`window.location.href`, so the new tab page replaces itself rather than opening a tab.
+**`newtab.js` is the only logic in the extension.** It owns a single decision: on submit, is the
+input a URL or a prompt? That decision lives in `src/classify.js` — a pure, total function with 47
+unit cases behind it. A URL verdict is navigated with `window.location.assign`; a prompt verdict
+goes to `chrome.search.query()`, which routes to the user's own default engine. **Only `http(s)` is
+ever navigable** — `javascript:`, `data:` and `file:` are classified as prompts, because this page
+runs in a privileged extension origin.
 
-Two things in the UI are **currently decorative** — know this before "fixing" what looks broken:
+Some of the UI is **still decorative** — know this before "fixing" what looks broken:
 
-- The `.plus`, `.mic`, `.mode` and sidebar buttons are `type="button"` with no listeners.
+- The `.plus`, `.mode` and sidebar buttons are `type="button"` with no listeners. Roadmap Phase 2
+  wires `.mode`, Phase 5 wires `.plus`.
 - The three `.suggestion` rows are placeholder copy. Roadmap Phase 3 replaces them with real recent
   conversations; when it does, render that text with `textContent`, never `innerHTML` — page titles
   are attacker-influenceable.
 
-Wiring them up is real work, not a bug fix.
+Wiring them up is real work, not a bug fix. The send button (`#send`) is *not* decorative: it
+submits, and it stays `disabled` until the input has content.
 
 `newtab.css` is a token system: every color is a custom property on `:root`, redefined once under
 `prefers-color-scheme: dark`. Add colors as tokens, never as literals in a rule — a hard-coded hex
@@ -93,7 +105,10 @@ is restricted to the mark, focus, and hover.
 - The search box and suggestion list are capped at `795px` / `760px` but fluid below that. Keep the
   pair proportional — the rows are meant to sit visually inside the box's width.
 - **`assets/icon-*.png` are generated, not hand-drawn.** Edit the mark geometry in `docs/BRAND.md` +
-  `tools/genicons.sh`, then re-run `sh tools/genicons.sh`. Editing the PNGs directly gets overwritten.
+  `tools/genicons.mjs`, then re-run `npm run icons`. Editing the PNGs directly gets overwritten.
+  Generation is on Playwright rather than `chrome --screenshot` for a reason: headless Chromium
+  clips its paint to *(window height − 88px)* but writes a screenshot the full window height, which
+  silently shipped ~60% transparent icons. `npm run lint` reads the pixels back so it can't recur.
 - Bump `version` in `manifest.json` for any change intended to ship — Chrome refuses to update an
   unpacked or packed extension without a version increase.
 

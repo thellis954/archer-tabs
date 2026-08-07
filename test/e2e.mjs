@@ -140,7 +140,121 @@ check("Escape clears the input", (await page.inputValue("#query")) === "");
 r = await submit("   ");
 check("whitespace-only submit does nothing", r.length === 0, JSON.stringify(r));
 
+// --- the send control --------------------------------------------------------
+
+await page.fill("#query", "");
+check("send is inert with an empty box", await page.locator("#send").isDisabled());
+
+await page.fill("#query", "   ");
+check("send stays inert for whitespace only", await page.locator("#send").isDisabled());
+
+await page.fill("#query", "example.com");
+check("send arms once there is something to send", await page.locator("#send").isEnabled());
+
+nav.length = 0;
+await page.locator("#send").click();
+await page.waitForTimeout(250);
+check("clicking send routes the same as Enter", nav[0]?.startsWith("https://example.com"), JSON.stringify(nav));
+
+await page.fill("#query", "gone");
+await page.locator("#query").press("Escape");
+check("Escape disarms send as well as clearing", await page.locator("#send").isDisabled());
+
+// --- reaching the input without clicking it (§2.4) ---------------------------
+
+async function typeAtPage(key) {
+  await page.fill("#query", "");
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press(key);
+  await page.waitForTimeout(80);
+  return {
+    focused: await page.evaluate(() => document.activeElement?.id),
+    value: await page.inputValue("#query"),
+  };
+}
+
+let t = await typeAtPage("k");
+check("a printable key focuses the input and lands in it", t.focused === "query" && t.value === "k", JSON.stringify(t));
+
+t = await typeAtPage("/");
+check("slash focuses the input without typing itself", t.focused === "query" && t.value === "", JSON.stringify(t));
+
+t = await typeAtPage("Tab");
+check("a non-printable key does not hijack focus", t.focused !== "query", JSON.stringify(t));
+
+// --- accessibility -----------------------------------------------------------
+
+// The description text and the placeholder are normal-size body copy, so they
+// owe WCAG AA (4.5:1). This is computed from what the browser actually painted,
+// which is the only way to catch a token that regressed in one theme only.
+const contrastProbe = () => {
+  const luminance = (rgb) => {
+    const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).slice(0, 3).map((v) => {
+      const c = Number(v) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [luminance(a), luminance(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const bg = getComputedStyle(document.body).backgroundColor;
+  return {
+    description: ratio(getComputedStyle(document.querySelector(".description")).color, bg),
+    title: ratio(getComputedStyle(document.querySelector(".title")).color, bg),
+  };
+};
+
+let contrast = await page.evaluate(contrastProbe);
+check(
+  "light: row descriptions meet AA against the page",
+  contrast.description >= 4.5,
+  `${contrast.description.toFixed(2)}:1`,
+);
+check("light: row titles meet AA against the page", contrast.title >= 4.5, `${contrast.title.toFixed(2)}:1`);
+
+check(
+  "the big page mark is hidden from assistive tech",
+  (await page.locator(".logo[aria-hidden=true]").count()) === 1,
+);
+check("the suggestion list is labelled", (await page.locator(".suggestions[aria-label]").count()) === 1);
+
+const unlabelled = await page.evaluate(() =>
+  [...document.querySelectorAll("button")].filter(
+    (b) => !b.getAttribute("aria-label") && !b.textContent.trim(),
+  ).length,
+);
+check("every icon-only button has an aria-label", unlabelled === 0, `${unlabelled} without one`);
+
 await ctx.close();
+
+// --- dark mode ---------------------------------------------------------------
+// A second context, because colorScheme is fixed when the context is created.
+// Dark is where a missing token hides: the page still renders, just wrongly.
+
+const darkCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  colorScheme: "dark",
+  args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, "--no-sandbox"],
+});
+const darkPage = await darkCtx.newPage();
+await darkPage.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+await darkPage.waitForTimeout(200);
+
+const darkBg = await darkPage.evaluate(() => getComputedStyle(document.body).backgroundColor);
+check("dark: the ink ground is applied", darkBg === "rgb(20, 20, 22)", darkBg);
+
+contrast = await darkPage.evaluate(contrastProbe);
+check(
+  "dark: row descriptions meet AA against the page",
+  contrast.description >= 4.5,
+  `${contrast.description.toFixed(2)}:1`,
+);
+check("dark: row titles meet AA against the page", contrast.title >= 4.5, `${contrast.title.toFixed(2)}:1`);
+
+await darkCtx.close();
 
 const failed = results.filter((x) => !x.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

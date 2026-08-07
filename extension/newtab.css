@@ -4,11 +4,13 @@
 :root {
   --bg:        #FBF7F0;   /* cream — warm, not Atlas's clinical white */
   --surface:   #FFFFFF;
+  --pressed:   #F1EBE1;   /* the :active fill, one step past hover */
   --border:    #E8E2D9;
   --text:      #141416;   /* ink */
-  --muted:     #8A8178;
+  --muted:     #78706A;   /* 4.6:1 on cream — descriptions are body text */
   --faint:     #D9D2C7;   /* the oversized page mark */
-  --accent:    #B45309;   /* brass — 4.9:1 on cream, passes AA */
+  --accent:    #B45309;   /* brass — 4.7:1 on cream, passes AA */
+  --onAccent:  #FBF7F0;   /* the glyph inside a brass fill */
   --ring:      #B4530933;
 
   --shadow: 0 1px 2px rgb(20 20 22 / .04), 0 4px 14px rgb(20 20 22 / .06);
@@ -18,14 +20,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg:      #141416;
-    --surface: #1D1D20;
-    --border:  #2C2C30;
-    --text:    #F2EFEA;
-    --muted:   #948D84;
-    --faint:   #292927;
-    --accent:  #F59E0B;   /* brass lifts to amber so it holds on ink */
-    --ring:    #F59E0B3D;
+    --bg:       #141416;
+    --surface:  #1D1D20;
+    --pressed:  #26262A;
+    --border:   #2C2C30;
+    --text:     #F2EFEA;
+    --muted:    #948D84;   /* 5.6:1 on ink */
+    --faint:    #292927;
+    --accent:   #F59E0B;   /* brass lifts to amber so it holds on ink */
+    --onAccent: #141416;
+    --ring:     #F59E0B3D;
 
     --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 14px rgb(0 0 0 / .35);
   }
@@ -89,7 +93,8 @@ body {
 }
 
 .mode svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.mode:hover { background: var(--surface); color: var(--text); }
+.mode:hover  { background: var(--surface); color: var(--text); }
+.mode:active { background: var(--pressed); }
 
 .iconBtn {
   display: grid;
@@ -103,7 +108,8 @@ body {
 }
 
 .iconBtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
-.iconBtn:hover { background: var(--surface); color: var(--text); }
+.iconBtn:hover  { background: var(--surface); color: var(--text); }
+.iconBtn:active { background: var(--pressed); }
 
 /* ---------- page ---------- */
 
@@ -162,7 +168,7 @@ body {
 
 .searchBox input::placeholder { color: var(--muted); }
 
-.plus, .mic {
+.plus, .send {
   flex: none;
   display: grid;
   place-items: center;
@@ -172,9 +178,10 @@ body {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
 }
 
-.plus svg, .mic svg {
+.plus svg, .send svg {
   width: 20px; height: 20px;
   fill: none;
   stroke: currentColor;
@@ -183,13 +190,32 @@ body {
   stroke-linejoin: round;
 }
 
-.plus:hover, .mic:hover { background: var(--bg); color: var(--text); }
+.plus:hover  { background: var(--bg); color: var(--text); }
+.plus:active { background: var(--pressed); }
+
+/* Brass on the send control is deliberate: it is the page's primary action, and
+   an outlined glyph there reads as another piece of decoration. See the accent
+   discipline note in docs/BRAND.md. */
+.send:not([disabled]) {
+  background: var(--accent);
+  color: var(--onAccent);
+}
+
+.send[disabled] {
+  cursor: default;
+  opacity: .55;
+}
+
+.send:not([disabled]):hover  { filter: brightness(1.08); }
+.send:not([disabled]):active { filter: brightness(.94); }
 
 /* ---------- suggestions ---------- */
 
 .suggestions {
-  width: min(760px, 100%);
-  margin: 22px auto 0;
+  /* Same width as the search box so the rows line up under it rather than
+     floating inside it at a different inset. */
+  width: min(795px, 100%);
+  margin: 20px auto 0;
   padding: 0;
   list-style: none;
 }
@@ -201,7 +227,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 12px;
+  /* Puts the row text on the same vertical line as the input text, which sits
+     past the 42px `+` button. */
+  padding: 0 21px;
 
   border: none;
   border-radius: 10px;
@@ -214,7 +242,8 @@ body {
   cursor: pointer;
 }
 
-.suggestion:hover { background: var(--surface); }
+.suggestion:hover  { background: var(--surface); }
+.suggestion:active { background: var(--pressed); }
 
 .dot {
   flex: none;
@@ -223,18 +252,29 @@ body {
   background: var(--border);
 }
 
-/* Brass is reserved for the mark, focus, and hover. A whole column of accent
-   titles out-shouts the search box, which is the actual subject of the page. */
+/* Brass is reserved for the mark, focus, hover, and the send control. A whole
+   column of accent titles out-shouts the search box, which is the actual
+   subject of the page. */
 .title {
-  flex: none;
+  /* Shrinkable but not greedy: a long conversation title gives way to its
+     description rather than pushing it off the row entirely. */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
   color: var(--text);
   font-weight: 500;
 }
 
 .suggestion:hover .title { color: var(--accent); }
 
-/* Long conversation titles truncate rather than wrap the row. */
+/* Long descriptions truncate rather than wrap the row. */
 .description {
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--muted);
   overflow: hidden;
   white-space: nowrap;
