@@ -209,6 +209,62 @@ for (const size of ICON_SIZES) {
   if (brass === 0) fail(rel, "no brass pixels — the mark's bowstring did not draw");
 }
 
+// --- 8. the site runs the shipped classifier, not a copy of it ---------------
+// web/index.html claims the demo is the real thing. Vercel only deploys web/,
+// so the modules have to physically live there, which is exactly the setup that
+// silently drifts. Pin them: if extension/src/ changes and web/vendor/ does not,
+// the site is lying and this fails.
+
+const VENDORED = ["classify.js", "router.js", "tlds.js"];
+
+for (const f of VENDORED) {
+  const src = join(ROOT, "extension/src", f);
+  const copy = join(ROOT, "web/vendor", f);
+  if (!existsSync(copy)) {
+    fail(`web/vendor/${f}`, `missing — copy it from extension/src/${f}`);
+    continue;
+  }
+  if (readFileSync(src).equals(readFileSync(copy))) continue;
+  fail(
+    `web/vendor/${f}`,
+    `has drifted from extension/src/${f} — the site demo would no longer match ` +
+      `what ships. Re-copy it: cp extension/src/${f} web/vendor/${f}`,
+  );
+}
+
+// --- 9. the site's own invariants -------------------------------------------
+// Same no-innerHTML rule as the extension: the demo echoes whatever a reader
+// types back into the page.
+
+for (const f of ["web/app.js"]) {
+  if (!existsSync(join(ROOT, f))) {
+    fail(f, "missing");
+    continue;
+  }
+  try {
+    execFileSync(process.execPath, ["--check", join(ROOT, f)], { stdio: "pipe" });
+  } catch (e) {
+    fail(f, `syntax error\n${e.stderr?.toString().trim()}`);
+  }
+  read(f)
+    .split("\n")
+    .forEach((line, i) => {
+      if (line.trimStart().startsWith("//")) return;
+      const hit = line.match(SINKS);
+      if (hit) fail(f, `line ${i + 1}: ${hit[1]} — use textContent instead`);
+    });
+}
+
+// The site is one page and it references its own assets by absolute path.
+if (existsSync(join(ROOT, "web/index.html"))) {
+  const site = read("web/index.html");
+  for (const m of site.matchAll(/(?:src|href)="\/([^"]+)"/g)) {
+    if (!existsSync(join(ROOT, "web", m[1]))) {
+      fail("web/index.html", `references missing file: /${m[1]}`);
+    }
+  }
+}
+
 // --- report ------------------------------------------------------------------
 
 if (problems.length) {

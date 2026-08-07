@@ -76,6 +76,25 @@ for (const scheme of ["light", "dark"]) {
     await page.close();
   }
 
+  // The marketing site ships one of these as web/assets/newtab-<scheme>.png, so
+  // generate it here rather than by hand: the version that shipped before this
+  // was from Phase 1 and still showed placeholder rows that had been replaced
+  // by real ones two phases earlier.
+  //
+  // Filled rather than at rest, because a screenshot of an empty text box does
+  // not show anyone what the product does. Clipped to the content, because the
+  // page is a full viewport tall and the bottom half of it is empty.
+  const site = await ctx.newPage();
+  await site.setViewportSize({ width: 1280, height: 800 });
+  await site.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+  await site.waitForTimeout(200);
+  await site.fill("#query", "what is a nock");
+  await site.waitForTimeout(150);
+  const sitePath = join(ROOT, "web", "assets", `newtab-${scheme}.png`);
+  await site.screenshot({ path: sitePath, clip: { x: 0, y: 0, width: 1280, height: 460 } });
+  console.log(sitePath);
+  await site.close();
+
   const options = await ctx.newPage();
   await options.setViewportSize({ width: 900, height: 800 });
   await options.goto(`chrome-extension://${extensionId(EXT)}/options.html`, { waitUntil: "domcontentloaded" });
