@@ -37,7 +37,12 @@ const server = createServer((req, res) => {
   const url = decodeURIComponent(new URL(req.url, "http://x").pathname);
   // normalize collapses any ../ before it can escape web/.
   const rel = normalize(url === "/" ? "/index.html" : url).replace(/^(\.\.[/\\])+/, "");
-  const file = join(WEB, rel);
+  let file = join(WEB, rel);
+
+  // vercel.json sets cleanUrls, so /privacy is served by privacy.html. Mirror
+  // that here, or these shots would exercise a routing the deployed site does
+  // not have.
+  if (!extname(file) && existsSync(`${file}.html`)) file = `${file}.html`;
 
   if (!file.startsWith(WEB) || !existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404).end("not found");
@@ -61,6 +66,8 @@ mkdirSync(OUT, { recursive: true });
 
 const SHOTS = [
   { name: "full", width: 1440, height: 900, fullPage: true },
+  { name: "privacy", width: 1440, height: 900, path: "privacy", fullPage: true },
+  { name: "privacy-narrow", width: 420, height: 900, path: "privacy", fullPage: true },
   { name: "hero", width: 1440, height: 900 },
   { name: "narrow", width: 420, height: 900, fullPage: true },
   {
@@ -121,7 +128,8 @@ const SHOTS = [
     },
   },
   {
-    name: "privacy",
+    // The landing page's permissions section, not the /privacy document above.
+    name: "privacy-section",
     width: 1440,
     height: 900,
     async prepare(page) {
@@ -150,7 +158,7 @@ for (const scheme of ["light", "dark"]) {
       deviceScaleFactor: 2,
     });
     const page = await ctx.newPage();
-    await page.goto(BASE, { waitUntil: "networkidle" });
+    await page.goto(BASE + (shot.path ?? ""), { waitUntil: "networkidle" });
     await page.waitForTimeout(300);
 
     if (shot.fullPage) {

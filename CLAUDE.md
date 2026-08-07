@@ -155,9 +155,18 @@ is restricted to the mark, focus, and hover.
 
 ## The site
 
-`web/` is one page, built the same way the extension is: native CSS, ES modules, no framework and
-no build step. `vercel.json` sets `outputDirectory: "web"`, so what is in that folder is what is
-served.
+`web/` is the landing page plus `/privacy`, built the same way the extension is: native CSS, ES
+modules, no framework and no build step. `vercel.json` sets `outputDirectory: "web"`, so what is in
+that folder is what is served, and `cleanUrls` is why `privacy.html` answers at `/privacy`.
+
+**`vercel.json`'s CSP is load-bearing and `npm run lint` checks it.** It shipped `script-src 'none'`
+at one point, which would have left the live demos dead on the deployed site while every local
+render looked perfect. Nothing else in this repo could have caught that.
+
+**`/privacy` is the Web Store's required hosted policy URL.** `docs/PRIVACY.md` is the canonical
+text and `web/privacy.html` renders it; lint checks that the two agree on the date and that every
+optional permission the manifest declares is explained on the page, so adding a capability without
+saying why fails the build. Keep both in step.
 
 **The two demos on the page run the extension's real classifier.** `web/vendor/` holds
 byte-identical copies of `extension/src/{classify,router,tlds}.js`, and **`npm run lint` fails if

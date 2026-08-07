@@ -9,7 +9,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve, join } from "node:path";
+import { dirname, resolve, join, extname } from "node:path";
 import { readPNG, pixelAt } from "./png.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -279,9 +279,90 @@ if (existsSync(join(ROOT, "web/index.html"))) {
     }
   }
 
+  // vercel.json sets cleanUrls, so an extensionless link like /privacy is served
+  // by privacy.html. Resolve both shapes before calling a link broken.
+  const servable = (rel) =>
+    existsSync(join(ROOT, "web", rel)) ||
+    (!extname(rel) && existsSync(join(ROOT, "web", `${rel}.html`)));
+
   for (const rel of referenced) {
-    if (!existsSync(join(ROOT, "web", rel))) {
-      fail("web/index.html", `references missing file: /${rel}`);
+    if (!servable(rel)) fail("web/index.html", `references missing file: /${rel}`);
+  }
+}
+
+// --- 10. the hosted privacy policy stays true --------------------------------
+// The Web Store needs a hosted policy URL, and web/privacy.html is it. A policy
+// that quietly falls behind the extension it describes is worse than none, so
+// check the two things that actually rot: the date against docs/PRIVACY.md, and
+// whether every permission the manifest declares is named on the page.
+
+if (existsSync(join(ROOT, "web/privacy.html"))) {
+  const page = read("web/privacy.html");
+  const doc = read("docs/PRIVACY.md");
+
+  const docDate = doc.match(/Last updated:\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+  const pageDate = page.match(/Last updated\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+
+  if (!pageDate) {
+    fail("web/privacy.html", "no 'Last updated <date>' line — it is the only signal a reader has");
+  } else if (docDate && docDate !== pageDate) {
+    fail(
+      "web/privacy.html",
+      `says ${pageDate} but docs/PRIVACY.md says ${docDate} — the canonical text moved and the page did not`,
+    );
+  }
+
+  if (manifest) {
+    // Host permissions are named without the scheme or the trailing glob.
+    const hosts = (manifest.optional_host_permissions ?? []).map((h) =>
+      h.replace(/^https?:\/\//, "").replace(/\/\*$/, ""),
+    );
+    const named = [...(manifest.optional_permissions ?? []), ...hosts];
+
+    for (const p of named) {
+      if (!page.includes(p)) {
+        fail(
+          "web/privacy.html",
+          `never mentions the optional permission "${p}" — the manifest asks for it, so the policy has to say why`,
+        );
+      }
+    }
+  }
+
+  // /privacy is a document. If it ever grows a script it stops being one, and
+  // the CSP in vercel.json is not a per-page thing.
+  if (/<script/i.test(page)) {
+    fail("web/privacy.html", "has a <script> — the policy page is static on purpose");
+  }
+}
+
+// --- 11. the deployed CSP does not block the site's own script ---------------
+// vercel.json shipped `script-src 'none'` at one point, which would have left
+// the live demos dead on the deployed site while working perfectly in every
+// local render. Nothing else in this repo would have caught that.
+
+if (existsSync(join(ROOT, "vercel.json"))) {
+  let vercel;
+  try {
+    vercel = JSON.parse(read("vercel.json"));
+  } catch (e) {
+    fail("vercel.json", `invalid JSON: ${e.message}`);
+  }
+
+  const csp = vercel?.headers
+    ?.flatMap((h) => h.headers ?? [])
+    .find((h) => h.key?.toLowerCase() === "content-security-policy")?.value;
+
+  if (csp && read("web/index.html").includes("<script")) {
+    const scriptSrc = csp.match(/script-src ([^;]+)/)?.[1]?.trim();
+    if (scriptSrc && !/'self'/.test(scriptSrc)) {
+      fail(
+        "vercel.json",
+        `CSP script-src is "${scriptSrc}", but web/index.html loads /app.js — the demos would be dead on the deployed site`,
+      );
+    }
+    if (!/font-src[^;]*'self'/.test(csp) && !/default-src[^;]*'self'/.test(csp)) {
+      fail("vercel.json", "CSP allows no self-hosted fonts, but the site self-hosts Geist");
     }
   }
 }
