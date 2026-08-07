@@ -13,8 +13,15 @@ import {
   saveLibrary,
   readLaunches,
   clearLaunches,
+  readWeatherSettings,
+  saveWeatherSettings,
+  saveWeatherCache,
+  loadSettings,
+  saveMode,
 } from "./src/settings.js";
 import { listModels, estimateCost, API_ORIGIN } from "./src/answer.js";
+
+import { findPlace, fetchWeather, WEATHER_ORIGINS } from "./src/weather.js";
 import { variableNames } from "./src/library.js";
 import { summarise, toMarkdown } from "./src/analytics.js";
 
@@ -49,6 +56,71 @@ function render() {
 function say(node, message, isError = false) {
   node.textContent = message;
   node.classList.toggle("isError", isError);
+}
+
+// --- default destination -------------------------------------------------------------
+
+const defaultMode = $("defaultMode");
+defaultMode.value = (await loadSettings()).mode;
+
+defaultMode.addEventListener("change", async () => {
+  await saveMode(defaultMode.value);
+  const label = defaultMode.selectedOptions[0]?.textContent ?? defaultMode.value;
+  say($("modeStatus"), `New tabs will use ${label.split(" — ")[0]}.`);
+});
+
+// --- weather ----------------------------------------------------------------------
+
+const weather = await readWeatherSettings();
+$("place").value = weather.place?.name ?? "";
+$("unit").value = weather.unit;
+
+$("savePlace").addEventListener("click", async () => {
+  const query = $("place").value.trim();
+  if (!query) {
+    say($("placeStatus"), "Type a town or city first.", true);
+    return;
+  }
+
+  // Inside the click: Chrome refuses a permission request without a gesture.
+  const granted = await requestWeatherAccess();
+  if (!granted) {
+    say($("placeStatus"), "Archer needs permission to reach Open-Meteo before it can show weather.", true);
+    return;
+  }
+
+  say($("placeStatus"), "Looking that up…");
+  try {
+    const unit = $("unit").value;
+    const place = await findPlace(query);
+    // Fetched before saving, so a place that resolves but has no forecast never
+    // becomes a permanently blank card on the new tab.
+    const reading = await fetchWeather({ ...place, unit });
+
+    await saveWeatherSettings({ place, unit });
+    await saveWeatherCache(reading);
+    $("place").value = place.name;
+    say($("placeStatus"), `Showing weather for ${place.name}.`);
+  } catch (error) {
+    say($("placeStatus"), error.message, true);
+  }
+});
+
+$("clearPlace").addEventListener("click", async () => {
+  await saveWeatherSettings({ place: null });
+  await saveWeatherCache(null);
+  $("place").value = "";
+  say($("placeStatus"), "Weather turned off. The card disappears from the new tab.");
+});
+
+async function requestWeatherAccess() {
+  if (!globalThis.chrome?.permissions?.request) return true; // plain-file dev
+  try {
+    if (await chrome.permissions.contains({ origins: WEATHER_ORIGINS })) return true;
+    return await chrome.permissions.request({ origins: WEATHER_ORIGINS });
+  } catch {
+    return false;
+  }
 }
 
 // --- saved prompts --------------------------------------------------------------

@@ -28,6 +28,7 @@ import {
 } from "./src/browsing.js";
 import { renderRows, setActiveRow } from "./src/rows.js";
 import { findTemplates, nextPlaceholder, parseSlash } from "./src/library.js";
+import { startClock, refreshWeather, renderFavourites, wireFavouriteForm } from "./src/dashboard.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
@@ -51,6 +52,7 @@ const menu = createModeMenu({
   onSelect(next) {
     mode = next;
     saveMode(next);
+    syncTargets();
     // Picking a mode that needs setting up should take you to the setting up,
     // not silently do something else.
     if (next === "answer" && !canAnswer) {
@@ -67,6 +69,7 @@ const menu = createModeMenu({
 const ready = Promise.all([loadSettings(), loadAnswerSettings()]).then(([settings, answer]) => {
   mode = settings.mode;
   menu.setMode(settings.mode);
+  syncTargets();
   nudge.hidden = settings.nudgeDismissed;
 
   canAnswer = Boolean(answer.apiKey && answer.model);
@@ -86,6 +89,40 @@ let visible = [];
 
 // Not awaited: the listeners below must be attached before history resolves.
 refreshRows();
+
+// --- dashboard -------------------------------------------------------------------
+
+startClock();
+refreshWeather();
+renderFavourites({ onNavigate: navigate });
+wireFavouriteForm({ onNavigate: navigate });
+
+document.getElementById("openSettings").addEventListener("click", () => {
+  globalThis.chrome?.runtime?.openOptionsPage?.();
+});
+
+document.getElementById("weather").addEventListener("click", () => {
+  globalThis.chrome?.runtime?.openOptionsPage?.();
+});
+
+// --- the target pills ---------------------------------------------------------------
+
+const targets = [...document.querySelectorAll(".target")];
+
+for (const pill of targets) {
+  pill.addEventListener("click", () => {
+    mode = pill.dataset.mode;
+    menu.setMode(mode);
+    saveMode(mode);
+    syncTargets();
+    input.focus();
+  });
+}
+
+/** Keeps the pills and the top-bar menu showing the same one mode. */
+function syncTargets() {
+  for (const pill of targets) pill.setAttribute("aria-pressed", String(pill.dataset.mode === mode));
+}
 
 async function refreshRows() {
   const [granted, tiles, closedTabs] = await Promise.all([
@@ -330,6 +367,7 @@ function cycleMode(delta) {
   mode = next;
   menu.setMode(next);
   saveMode(next);
+  syncTargets();
 }
 
 function moveActive(delta) {
