@@ -24,7 +24,14 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
 // Shipped = loaded by the extension page. Tooling is checked for syntax but is
 // exempt from the browser-facing rules below, since it never runs in a page.
-const SHIPPED_JS = ["extension/newtab.js", "extension/src/classify.js", "extension/src/tlds.js"];
+const SHIPPED_JS = [
+  "extension/newtab.js",
+  "extension/src/classify.js",
+  "extension/src/modemenu.js",
+  "extension/src/router.js",
+  "extension/src/settings.js",
+  "extension/src/tlds.js",
+];
 const JS_FILES = [...SHIPPED_JS, "tools/lint.js", "tools/png.js", "tools/genicons.mjs"];
 
 for (const f of JS_FILES) {
@@ -129,7 +136,6 @@ const ICON_SIZES = [16, 32, 48, 128];
 const near = ([r, g, b], [tr, tg, tb], slack = 40) =>
   Math.abs(r - tr) <= slack && Math.abs(g - tg) <= slack && Math.abs(b - tb) <= slack;
 
-const INK = [20, 20, 22];      // the tile
 const CREAM = [251, 247, 240]; // the legs
 const BRASS = [245, 158, 11];  // the bow
 

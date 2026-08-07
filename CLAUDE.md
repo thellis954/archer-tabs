@@ -15,7 +15,7 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 
 ```
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
-  src/       classify.js (the URL-vs-prompt decision) + the generated TLD list
+  src/       classify.js, router.js, settings.js, modemenu.js + the generated TLD list
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
 docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
 tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs (need playwright)
@@ -44,7 +44,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 47 unit cases for the classifier, on node's built-in runner. No install needed. |
+| `npm test` | 76 unit cases (classifier + router), on node's built-in runner. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
@@ -70,17 +70,26 @@ Everything else is reached from that page. Adding a new page or a background ser
 registering it in the manifest; a file that isn't referenced from `newtab.html` or the manifest is
 dead weight.
 
-**`newtab.js` is the only logic in the extension.** It owns a single decision: on submit, is the
-input a URL or a prompt? That decision lives in `src/classify.js` — a pure, total function with 47
-unit cases behind it. A URL verdict is navigated with `window.location.assign`; a prompt verdict
-goes to `chrome.search.query()`, which routes to the user's own default engine. **Only `http(s)` is
-ever navigable** — `javascript:`, `data:` and `file:` are classified as prompts, because this page
-runs in a privileged extension origin.
+**The decisions live in pure functions; `newtab.js` only wires the DOM.**
+
+- `src/classify.js` — is this string a URL or a prompt? Total, no I/O, 47 unit cases.
+- `src/router.js` — that verdict plus the routing mode plus any modifier key → one of
+  `none` / `navigate` / `search` / `ask`. Also pure, 29 unit cases.
+- `src/settings.js` — the only thing that touches `chrome.storage`.
+- `src/modemenu.js` — the `Auto ⌄` listbox.
+
+**Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
+this page runs in a privileged extension origin — a `javascript:` URL would execute *here*. A unit
+test asserts no mode/modifier combination can produce a non-`http(s)` URL; keep it that way.
+
+Navigation goes through `chrome.tabs.update`, which **does not need the `tabs` permission** — that
+permission gates reading a tab's url/title. Don't add it "for correctness"; its install prompt reads
+"Read your browsing history".
 
 Some of the UI is **still decorative** — know this before "fixing" what looks broken:
 
-- The `.plus`, `.mode` and sidebar buttons are `type="button"` with no listeners. Roadmap Phase 2
-  wires `.mode`, Phase 5 wires `.plus`.
+- The `.plus` and sidebar buttons are `type="button"` with no listeners. Roadmap Phase 5 wires
+  `.plus`. The `.mode` button is real as of Phase 2.
 - The three `.suggestion` rows are placeholder copy. Roadmap Phase 3 replaces them with real recent
   conversations; when it does, render that text with `textContent`, never `innerHTML` — page titles
   are attacker-influenceable.
@@ -98,10 +107,12 @@ is restricted to the mark, focus, and hover.
 - **MV3 content security policy forbids inline script and inline event handlers on extension pages.**
   Keep JS in `newtab.js` (or another external file) and attach listeners with `addEventListener` —
   an `onclick=` attribute will silently fail to fire.
-- **No remote code and no network fetches are set up.** There are no `host_permissions` and no
-  `permissions` in the manifest. Anything beyond same-page navigation (search suggestions, favicons,
-  history/topSites access) requires adding the relevant permission and will change the extension's
-  install-time consent prompt.
+- **No remote code and no network fetches.** The manifest asks for `search` and `storage`, and no
+  `host_permissions` at all. Anything more (favicons, history, topSites) changes the install-time
+  consent prompt, so **request a permission in the phase that needs it, never earlier** — the
+  roadmap's permissions ledger is the record. `npm run e2e` asserts the current set, so an
+  accidental addition fails a test rather than shipping.
+- **Nothing leaves the device.** `chrome.storage.local` only; no server, no telemetry, no proxy.
 - The search box and suggestion list are capped at `795px` / `760px` but fluid below that. Keep the
   pair proportional — the rows are meant to sit visually inside the box's width.
 - **`assets/icon-*.png` are generated, not hand-drawn.** Edit the mark geometry in `docs/BRAND.md` +

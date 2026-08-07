@@ -95,6 +95,46 @@ body {
 .mode svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .mode:hover  { background: var(--surface); color: var(--text); }
 .mode:active { background: var(--pressed); }
+.mode[aria-expanded="true"] { background: var(--surface); color: var(--text); }
+.mode[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+/* ---------- mode menu ---------- */
+
+.modeWrap { position: relative; }
+
+.modeMenu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(340px, calc(100vw - 36px));
+
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modeMenu [role="option"] {
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.modeMenu [role="option"]:hover { background: var(--bg); }
+
+.modeName { font-size: 14px; font-weight: 500; }
+.modeHint { font-size: 12px; color: var(--muted); }
+
+/* The selected row is marked by the accent on its name rather than a check
+   column, which would misalign the two lines of every other row. */
+.modeMenu [aria-selected="true"] .modeName { color: var(--accent); }
 
 .iconBtn {
   display: grid;
@@ -280,6 +320,49 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ---------- default-engine hint ---------- */
+
+.nudge {
+  width: min(795px, 100%);
+  margin: 18px auto 0;
+  padding: 10px 8px 10px 21px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* One inline run, so the link and the full stop sit together — as flex items
+   they were separated by the row gap. */
+.nudgeText { min-width: 0; }
+
+.nudge a { color: var(--accent); }
+.nudge a:hover { text-decoration-thickness: 2px; }
+
+.dismiss {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  margin-left: auto;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dismiss svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.dismiss:hover  { background: var(--surface); color: var(--text); }
+.dismiss:active { background: var(--pressed); }
+
+/* `hidden` must win over the display above, or a dismissed hint stays visible. */
+[hidden] { display: none !important; }
 
 /* ---------- focus ---------- */
 

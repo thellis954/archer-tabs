@@ -227,6 +227,149 @@ const unlabelled = await page.evaluate(() =>
 );
 check("every icon-only button has an aria-label", unlabelled === 0, `${unlabelled} without one`);
 
+// --- the mode menu -----------------------------------------------------------
+
+const modeButton = page.locator("#modeButton");
+const modeMenu = page.locator("#modeMenu");
+
+check("the menu starts closed", await modeMenu.isHidden());
+check("the mode button declares its popup", (await modeButton.getAttribute("aria-haspopup")) === "listbox");
+
+await modeButton.click();
+check("clicking the mode button opens the menu", await modeMenu.isVisible());
+check("open is announced", (await modeButton.getAttribute("aria-expanded")) === "true");
+check(
+  "the selected option is focused on open",
+  await page.evaluate(() => document.activeElement?.dataset.mode) === "auto",
+);
+
+await page.keyboard.press("ArrowDown");
+check(
+  "ArrowDown walks the options",
+  await page.evaluate(() => document.activeElement?.dataset.mode) === "chatgpt",
+);
+
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("ArrowUp");
+check(
+  "ArrowUp wraps to the last option",
+  await page.evaluate(() => document.activeElement?.dataset.mode) === "search",
+);
+
+await page.keyboard.press("Escape");
+check("Escape closes the menu", await modeMenu.isHidden());
+check("Escape returns focus to the button", await modeButton.evaluate((b) => b === document.activeElement));
+
+// --- routing per mode --------------------------------------------------------
+
+async function chooseMode(mode) {
+  await modeButton.click();
+  await page.locator(`[role=option][data-mode="${mode}"]`).click();
+  await page.waitForTimeout(120);
+}
+
+await chooseMode("chatgpt");
+check("the button label follows the selection", (await page.locator("#modeLabel").innerText()).trim() === "ChatGPT");
+check(
+  "the chosen option is the only one marked selected",
+  (await page.locator('[role=option][aria-selected="true"]').count()) === 1 &&
+    (await page.locator('[role=option][data-mode="chatgpt"]').getAttribute("aria-selected")) === "true",
+);
+
+r = await submit("what is a nock");
+check(
+  "ChatGPT mode sends a prompt to chatgpt.com with the query prefilled",
+  r[0] === "https://chatgpt.com/?q=what%20is%20a%20nock",
+  JSON.stringify(r),
+);
+
+r = await submit("example.com");
+check("ChatGPT mode still opens a URL as a URL", r[0]?.startsWith("https://example.com"), JSON.stringify(r));
+
+await chooseMode("search");
+r = await submit("example.com");
+check("Search mode searches for something that parses as a URL", isSearchFor(r, "example.com"), JSON.stringify(r));
+
+r = await submit("example.com", ["Shift"]);
+check("Shift+Enter still overrides Search mode", r[0]?.startsWith("https://example.com"), JSON.stringify(r));
+
+await chooseMode("auto");
+r = await submit("example.com");
+check("Auto mode navigates again", r[0]?.startsWith("https://example.com"), JSON.stringify(r));
+
+// --- persistence -------------------------------------------------------------
+
+await chooseMode("chatgpt");
+const reloaded = await ctx.newPage();
+await reloaded.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+await reloaded.waitForTimeout(400);
+check(
+  "the mode survives a new tab",
+  (await reloaded.locator("#modeLabel").innerText()).trim() === "ChatGPT",
+);
+
+// --- the launch log (ROADMAP §3.3 Source B) ----------------------------------
+
+const readLog = (target) =>
+  target.evaluate(() => chrome.storage.local.get({ launches: [] }).then((r) => r.launches));
+
+let log = await readLog(reloaded);
+check(
+  "prompts launched through the page are logged",
+  log.some((e) => e.text === "what is a nock"),
+  JSON.stringify(log.slice(-3)),
+);
+check("each log entry carries a timestamp", log.every((e) => typeof e.at === "number" && e.at > 0));
+await reloaded.close();
+
+// A navigate verdict is not a prompt and must never reach the log. Note the
+// converse is not "URLs are never logged": in Search mode, and under ⌘+Enter,
+// `example.com` *is* a prompt — the user said so — and logging it is right.
+await chooseMode("auto");
+await submit("never-logged-nav.com");
+log = await readLog(page);
+check(
+  "a navigated URL is never logged",
+  !log.some((e) => e.text.includes("never-logged")),
+  JSON.stringify(log.slice(-3)),
+);
+
+await chooseMode("search");
+await submit("logged-as-a-query.com");
+log = await readLog(page);
+check(
+  "the same string in Search mode is logged, because there it is a query",
+  log.some((e) => e.text === "logged-as-a-query.com"),
+  JSON.stringify(log.slice(-3)),
+);
+await chooseMode("auto");
+
+// --- the default-engine hint -------------------------------------------------
+
+check("the hint is shown before it is dismissed", await page.locator("#engineNudge").isVisible());
+await page.locator("#dismissNudge").click();
+await page.waitForTimeout(150);
+check("dismissing hides it", await page.locator("#engineNudge").isHidden());
+
+const afterDismiss = await ctx.newPage();
+await afterDismiss.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+await afterDismiss.waitForTimeout(400);
+check("the dismissal sticks across tabs", await afterDismiss.locator("#engineNudge").isHidden());
+await afterDismiss.close();
+
+// --- permissions -------------------------------------------------------------
+
+// chrome.tabs.update works on the current tab without the `tabs` permission,
+// which gates *reading* a tab's url/title. Navigation above proves the call
+// lands; this proves we did not pay for it. See the ledger in docs/ROADMAP.md.
+const manifest = await page.evaluate(() => chrome.runtime.getManifest());
+check(
+  "the manifest asks for no more than search + storage",
+  JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(["search", "storage"]),
+  JSON.stringify(manifest.permissions),
+);
+check("no host permissions are requested", !manifest.host_permissions?.length);
+
 await ctx.close();
 
 // --- dark mode ---------------------------------------------------------------
