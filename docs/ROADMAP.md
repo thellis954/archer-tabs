@@ -413,13 +413,50 @@ It is the most brittle code in the whole plan — it breaks whenever OpenAI resh
 and §0.5 makes it unnecessary for the common case. **Build it only if that mode proves popular, and
 always fall back to leaving text in the composer rather than a dead button.**
 
-### Phase 3 — History & recall (~3 days) 🟡 the biggest gap vs. Atlas
-Where the suggestion rows become real, and where you start to exceed the original.
-- Recent conversations from `chrome.history` + local launch log (§3.3), `textContent` only
-- Local prompt history with fuzzy search — type to filter, ↑/↓ to select, Enter to relaunch
-- Pin conversations to the top; dismiss rows
-- **Onboarding row** mirroring Atlas's "Import from another browser"
-- A real empty state for first run
+### Phase 3 — History & recall ✅ **done**
+- ✅ Recent conversations from `chrome.history` + local launch log (§3.3), `textContent` only
+- ✅ Local prompt history with fuzzy search — type to filter, ↑/↓ to select, Enter to relaunch
+- ✅ Pin conversations to the top; dismiss rows
+- ✅ Onboarding row mirroring Atlas's "Import from another browser"
+- ✅ A real empty state for first run
+
+**`history` ships as an `optional_permission`, which pulls Phase 6's per-permission opt-in forward.**
+It costs nothing to do now and it means the install-time prompt never says "Read your browsing
+history" — the user is asked at the moment they click *Show your recent conversations*, which is the
+only moment the answer means anything. Phase 6 keeps the plain-language rationale copy; the mechanism
+is already here.
+
+**Binding launches to conversations is order-preserving, not nearest-in-time.** §3.3 says "when a
+launch is followed by a visit to a `/c/<uuid>` URL, bind them", which is ambiguous when more than one
+launch is in flight. The first implementation took *the closest launch preceding each conversation*,
+and a render immediately showed it pairing three conversations with three prompts **exactly
+backwards**: prompts fired a few milliseconds apart carry no signal in their timestamps and all of it
+in their order. The n-th conversation now gets the n-th launch still in play. Both rules agree on the
+normal rhythm — ask, land, ask, land — and differ only where order is the only evidence left.
+
+The bind window came down from 10 minutes to **2**: the site mints the `/c/<uuid>` URL within seconds
+of a prompt, and every extra minute lets another unrelated launch compete to explain a row.
+
+**Deviations from the plan, deliberately:**
+- **Prompt rows are a first-class row kind, not just a search index.** A launch that never became a
+  visible conversation — asked in Search mode, asked before the permission was granted, asked on a
+  day Chrome has since forgotten — still renders, as *"— ask again"*. It re-asks through whatever
+  mode is current, because the destination is a live setting rather than something frozen at the time
+  of the first ask. This is also what makes the page useful **before** `history` is granted, which
+  the "grant nothing" path otherwise leaves empty.
+- **Row markup comes from a `<template>` in `newtab.html`, never from a string in JS.** `src/rows.js`
+  has no code path that can turn text into an element — it clones and assigns `textContent`. Given
+  conversation titles are attacker-influenceable, "we remembered to escape it" is a weaker guarantee
+  than "there is nothing here that could fail to". An e2e case feeds
+  `<img src=x onerror=alert(1)>` through the launch log and asserts zero elements come out.
+- **The conversation URL is rebuilt from the parsed UUID**, not passed through from history, so no
+  query or fragment on a history entry can ride along into a row's link target. The host match is
+  anchored — `chatgpt.com.evil.com/c/<uuid>` is not a conversation.
+- **`chrome.permissions.request()` cannot be granted in headless Chromium** — the native dialog never
+  resolves. The granted path is covered by an e2e fixture: the same `extension/` directory, copied,
+  with `history` moved into `permissions` so it is granted at install. Same source, same real
+  `chrome.history`, real page titles recorded by real navigations; only the consent click is skipped,
+  and that click is asserted separately.
 
 ### Phase 4 — Inline answers (~3 days) 🟡 exceeds Atlas
 - BYO Platform API key, stored locally, never proxied (§3.4)
@@ -455,7 +492,10 @@ MV3 pages). ~~**Vitest** at Phase 0~~ (node's built-in runner instead — zero d
 |---|---|
 | `src/classify.js` | URL vs prompt. Pure, total, 47 cases |
 | `src/router.js` | mode + modifier + verdict → one instruction. Pure, 29 cases |
-| `src/settings.js` | `chrome.storage.local`: mode, hint dismissal, launch log |
+| `src/conversations.js` | history + launch log → rows: collapse, bind, pin, filter. Pure, 39 cases |
+| `src/settings.js` | `chrome.storage.local`: mode, hint dismissal, launch log, pins, dismissals |
+| `src/history.js` | the only caller of `chrome.history` and `chrome.permissions` |
+| `src/rows.js` | paints rows from a `<template>`, `textContent` only |
 | `src/modemenu.js` | the `Auto ⌄` listbox |
 | `newtab.js` | DOM wiring, and nothing else |
 
@@ -467,7 +507,7 @@ Each one costs install-time trust; add only when its phase needs it.
 | `search` | 0 | Respect the user's default engine |
 | `storage` | 2 | Mode, launch log, preferences |
 | ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
-| `history` | 3 | Recent ChatGPT conversations |
+| `history` *(optional)* | 3 | Recent ChatGPT conversations. Requested at the click that turns them on, never at install — so it is absent from the install prompt entirely |
 | `topSites`, `sessions` | 5 | Tiles, recently-closed |
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
 
