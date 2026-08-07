@@ -9,8 +9,21 @@ ask-or-navigate search page, in the spirit of the (now retired) ChatGPT Atlas ne
 dependencies, no build step, no test suite — the source *is* the shipped artifact, and the browser
 loads these files verbatim.
 
-The repo directory is still `atlas-new-tab` for historical reasons; the product is Archer. Don't
-reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — see `docs/BRAND.md`.
+Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — see `docs/BRAND.md`.
+
+## Layout
+
+```
+extension/   everything Chrome loads — this is what you point "Load unpacked" at
+  src/       classify.js (the URL-vs-prompt decision) + the generated TLD list
+web/         the archertabs.app marketing site, deployed to Vercel from this folder
+docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
+tools/       lint.js, genicons.sh — dependency-free, run with node/sh
+test/        *.test.js run by `npm test`; e2e.mjs drives a real browser
+```
+
+Nothing outside `extension/` ships to users. `vercel.json` at the root sets
+`outputDirectory: "web"`, so the site deploys from a repo whose main product is the extension.
 
 **Read `docs/ROADMAP.md` before making substantive changes.** It carries the audit of the current
 build (including known bugs in the URL/prompt classifier), the constraints that bound the design —
@@ -23,13 +36,23 @@ OpenAI's own "ChatGPT search" extension, not by this one.
 
 There is nothing to build or install. To run it:
 
-1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the repo root.
+1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the **`extension`
+   folder** (not the repo root — the root holds the site and tooling too).
 2. Open a new tab to see the page.
 3. After editing `newtab.html`/`newtab.css`/`newtab.js`, just open a new tab — the page reloads from
    disk. Only `manifest.json` changes require hitting **Reload** on the extension card.
 
-Verification is manual: exercise the omnibox by hand (a bare domain, a full URL, `localhost:3000`, a
-plain search phrase) and check the resulting navigation. There is no linter or CI.
+| Command | What it does |
+|---|---|
+| `npm test` | 47 unit cases for the classifier, on node's built-in runner. No install needed. |
+| `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
+| `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright; see the header of `test/e2e.mjs`. |
+| `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
+| `npm run check` | lint + test — what CI runs. |
+
+CI runs lint and unit tests only: the repo installs nothing, and `e2e` needs a browser.
+**`npm run e2e` is the check that matters before shipping a routing change** — it exercises
+`chrome.search` and real navigation, which unit tests cannot.
 
 ## Architecture
 
