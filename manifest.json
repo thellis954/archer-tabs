@@ -1,9 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Atlas New Tab",
+  "name": "Archer",
   "version": "1.0.0",
-  "description": "Atlas-style New Tab page for Chrome",
+  "description": "A calm new tab page. Ask a question or type a URL — Archer works out which you meant.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
   }
 }

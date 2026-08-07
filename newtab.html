@@ -1,56 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
   <title>New Tab</title>
   <link rel="stylesheet" href="newtab.css">
 </head>
 
 <body>
 
+  <header class="bar">
+    <button type="button" class="iconBtn" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M3 5h14M3 10h9M3 15h14"/>
+      </svg>
+    </button>
+
+    <span class="brand">
+      <svg class="brandMark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+        <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+      </svg>
+      <span class="brandName">Archer</span>
+    </span>
+
+    <button type="button" class="mode" aria-label="Routing mode: Auto">
+      Auto
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 8.5l4 4 4-4"/></svg>
+    </button>
+  </header>
+
   <main class="page">
 
-    <div class="logo">◎</div>
+    <svg class="logo" viewBox="0 0 32 32" role="img" aria-label="Archer">
+      <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+      <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+    </svg>
 
-    <form id="searchForm">
+    <form id="searchForm" role="search">
+      <label class="visuallyHidden" for="query">Ask a question or enter a URL</label>
+
       <div class="searchBox">
 
-        <button type="button" class="plus">+</button>
+        <button type="button" class="plus" aria-label="Add context">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M10 4v12M4 10h12"/>
+          </svg>
+        </button>
 
         <input
           id="query"
           type="text"
-          placeholder="Ask ChatGPT or type a URL"
+          placeholder="Ask or type a URL"
           autocomplete="off"
+          spellcheck="false"
           autofocus
         >
 
-        <button type="button" class="mic">♩</button>
+        <button type="button" class="mic" aria-label="Voice input">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <rect x="7.75" y="2.5" width="4.5" height="9" rx="2.25"/>
+            <path d="M4.75 9.25a5.25 5.25 0 0 0 10.5 0M10 14.5V17"/>
+          </svg>
+        </button>
 
       </div>
     </form>
 
-    <div class="suggestions">
+    <!--
+      Placeholder rows. Phase 3 of docs/ROADMAP.md replaces these with the user's
+      recent ChatGPT conversations, sourced from chrome.history + a local launch
+      log. Render that text with textContent, never innerHTML — page titles are
+      attacker-influenceable.
+    -->
+    <ul class="suggestions">
 
-      <button class="suggestion">
-        <span>📌</span>
-        <strong>ChatGPT</strong>
-        <span class="description">— Open ChatGPT</span>
-      </button>
+      <li><button class="suggestion" type="button">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="title">Your recent conversations land here</span>
+        <span class="description">— once history is wired up in Phase 3</span>
+      </button></li>
 
-      <button class="suggestion">
-        <span>🔭</span>
-        <strong>GitHub</strong>
-        <span class="description">— Open GitHub</span>
-      </button>
+      <li><button class="suggestion" type="button">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="title">Ask anything</span>
+        <span class="description">— type above and press Enter to send it on</span>
+      </button></li>
 
-      <button class="suggestion">
-        <span>📁</span>
-        <strong>Notion</strong>
-        <span class="description">— Open Notion</span>
-      </button>
+      <li><button class="suggestion" type="button">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="title">Or just go somewhere</span>
+        <span class="description">— type a domain and Archer navigates instead</span>
+      </button></li>
 
-    </div>
+    </ul>
 
   </main>
 

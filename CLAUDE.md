@@ -4,25 +4,76 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Atlas New Tab is a Chrome Manifest V3 extension that overrides the browser's New Tab page (`chrome_url_overrides.newtab`) with a custom Atlas-style search page. It is plain static HTML/CSS/JS — no build step, no bundler, no package manager, no tests, no dependencies.
+**Archer** — a Chrome Manifest V3 extension that replaces the browser's New Tab page with a calm
+ask-or-navigate search page, in the spirit of the (now retired) ChatGPT Atlas new tab. No
+dependencies, no build step, no test suite — the source *is* the shipped artifact, and the browser
+loads these files verbatim.
 
-## Running / testing
+The repo directory is still `atlas-new-tab` for historical reasons; the product is Archer. Don't
+reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — see `docs/BRAND.md`.
 
-There is no build or test command. To load and test:
+**Read `docs/ROADMAP.md` before making substantive changes.** It carries the audit of the current
+build (including known bugs in the URL/prompt classifier), the constraints that bound the design —
+Chrome Web Store search policy, OpenAI trademark, and the fact that no sanctioned API exposes ChatGPT
+conversation history — and the phased plan. The scope decision that matters most: **this extension
+owns the new tab page only.** Making ChatGPT the address-bar default search engine is handled by
+OpenAI's own "ChatGPT search" extension, not by this one.
 
-1. Open `chrome://extensions`, enable Developer mode.
-2. "Load unpacked" → select this repo's root directory.
-3. Open a new tab to see `newtab.html`. After editing files, click the reload icon on the extension card (or reopen the new tab) to pick up changes.
+## Development loop
 
-Because it's static, you can also open `newtab.html` directly in a browser for quick markup/style iteration — but the extension context (new-tab override) only exists when loaded as an unpacked extension.
+There is nothing to build or install. To run it:
+
+1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the repo root.
+2. Open a new tab to see the page.
+3. After editing `newtab.html`/`newtab.css`/`newtab.js`, just open a new tab — the page reloads from
+   disk. Only `manifest.json` changes require hitting **Reload** on the extension card.
+
+Verification is manual: exercise the omnibox by hand (a bare domain, a full URL, `localhost:3000`, a
+plain search phrase) and check the resulting navigation. There is no linter or CI.
 
 ## Architecture
 
-Three files render the page; `manifest.json` wires it up:
+`manifest.json` declares exactly one entry point — `chrome_url_overrides.newtab` → `newtab.html`.
+Everything else is reached from that page. Adding a new page or a background service worker means
+registering it in the manifest; a file that isn't referenced from `newtab.html` or the manifest is
+dead weight.
 
-- `manifest.json` — MV3 manifest; the only key that matters is `chrome_url_overrides.newtab → newtab.html`. Bump `version` here when publishing.
-- `newtab.html` — the page: a logo, a search form (`#searchForm` wrapping `#query`), and a static list of `.suggestion` buttons. Loads `newtab.css` then `newtab.js`.
-- `newtab.css` — all styling. Fixed pixel widths (search box `795px`, suggestions `760px`) — this is a centered fixed-width layout, not responsive.
-- `newtab.js` — the only behavior. On form submit it reads `#query`, and via `looksLikeURL()` decides between navigating to a URL (prepending `https://` if no scheme) vs. redirecting to a Google search. The `.plus`, `.mic`, and `.suggestion` buttons are currently decorative (`type="button"`, no handlers).
+**`newtab.js` is the only logic in the extension.** It owns a single decision: on form submit, does
+the input look like a URL or a search query? `looksLikeURL()` is the heuristic — explicit
+`http(s)://` scheme, a `localhost[:port]` prefix, or any whitespace-free string containing a dot.
+Anything else falls through to a Google search URL. Navigation is done by assigning
+`window.location.href`, so the new tab page replaces itself rather than opening a tab.
 
-Key detail: element IDs (`searchForm`, `query`) are the contract between `newtab.html` and `newtab.js` — keep them in sync when editing either file.
+Two things in the UI are **currently decorative** — know this before "fixing" what looks broken:
+
+- The `.plus`, `.mic`, `.mode` and sidebar buttons are `type="button"` with no listeners.
+- The three `.suggestion` rows are placeholder copy. Roadmap Phase 3 replaces them with real recent
+  conversations; when it does, render that text with `textContent`, never `innerHTML` — page titles
+  are attacker-influenceable.
+
+Wiring them up is real work, not a bug fix.
+
+`newtab.css` is a token system: every color is a custom property on `:root`, redefined once under
+`prefers-color-scheme: dark`. Add colors as tokens, never as literals in a rule — a hard-coded hex
+is invisible in one of the two themes. `docs/BRAND.md` explains what each token is for and why brass
+is restricted to the mark, focus, and hover.
+
+## Constraints worth knowing
+
+- **MV3 content security policy forbids inline script and inline event handlers on extension pages.**
+  Keep JS in `newtab.js` (or another external file) and attach listeners with `addEventListener` —
+  an `onclick=` attribute will silently fail to fire.
+- **No remote code and no network fetches are set up.** There are no `host_permissions` and no
+  `permissions` in the manifest. Anything beyond same-page navigation (search suggestions, favicons,
+  history/topSites access) requires adding the relevant permission and will change the extension's
+  install-time consent prompt.
+- The search box and suggestion list are capped at `795px` / `760px` but fluid below that. Keep the
+  pair proportional — the rows are meant to sit visually inside the box's width.
+- **`assets/icon-*.png` are generated, not hand-drawn.** Edit the mark geometry in `docs/BRAND.md` +
+  `tools/genicons.sh`, then re-run `sh tools/genicons.sh`. Editing the PNGs directly gets overwritten.
+- Bump `version` in `manifest.json` for any change intended to ship — Chrome refuses to update an
+  unpacked or packed extension without a version increase.
+
+## License
+
+GPL-3.0. New source files should be compatible with that.
