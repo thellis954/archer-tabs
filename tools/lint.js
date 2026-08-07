@@ -9,7 +9,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve, join } from "node:path";
+import { dirname, resolve, join, extname } from "node:path";
 import { readPNG, pixelAt } from "./png.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -212,6 +212,159 @@ for (const size of ICON_SIZES) {
   }
   if (cream === 0) fail(rel, "no cream pixels — the mark's legs did not draw");
   if (brass === 0) fail(rel, "no brass pixels — the mark's bowstring did not draw");
+}
+
+// --- 8. the site runs the shipped classifier, not a copy of it ---------------
+// web/index.html claims the demo is the real thing. Vercel only deploys web/,
+// so the modules have to physically live there, which is exactly the setup that
+// silently drifts. Pin them: if extension/src/ changes and web/vendor/ does not,
+// the site is lying and this fails.
+
+const VENDORED = ["classify.js", "router.js", "tlds.js"];
+
+for (const f of VENDORED) {
+  const src = join(ROOT, "extension/src", f);
+  const copy = join(ROOT, "web/vendor", f);
+  if (!existsSync(copy)) {
+    fail(`web/vendor/${f}`, `missing — copy it from extension/src/${f}`);
+    continue;
+  }
+  if (readFileSync(src).equals(readFileSync(copy))) continue;
+  fail(
+    `web/vendor/${f}`,
+    `has drifted from extension/src/${f} — the site demo would no longer match ` +
+      `what ships. Re-copy it: cp extension/src/${f} web/vendor/${f}`,
+  );
+}
+
+// --- 9. the site's own invariants -------------------------------------------
+// Same no-innerHTML rule as the extension: the demo echoes whatever a reader
+// types back into the page.
+
+for (const f of ["web/app.js"]) {
+  if (!existsSync(join(ROOT, f))) {
+    fail(f, "missing");
+    continue;
+  }
+  try {
+    execFileSync(process.execPath, ["--check", join(ROOT, f)], { stdio: "pipe" });
+  } catch (e) {
+    fail(f, `syntax error\n${e.stderr?.toString().trim()}`);
+  }
+  read(f)
+    .split("\n")
+    .forEach((line, i) => {
+      if (line.trimStart().startsWith("//")) return;
+      const hit = line.match(SINKS);
+      if (hit) fail(f, `line ${i + 1}: ${hit[1]} — use textContent instead`);
+    });
+}
+
+// The site is one page and it references its own assets by absolute path.
+//
+// srcset is checked as well as src/href, and it is the case that actually
+// matters: every dark-theme asset on the page (the arc render, the product
+// screenshot) is reachable *only* from a <source srcset>, so a check that read
+// src alone would pass a site with no dark imagery at all.
+if (existsSync(join(ROOT, "web/index.html"))) {
+  const site = read("web/index.html");
+
+  const referenced = new Set();
+  for (const m of site.matchAll(/(?:src|href)="\/([^"]+)"/g)) referenced.add(m[1]);
+  for (const m of site.matchAll(/srcset="([^"]+)"/g)) {
+    // "a.webp 1x, b.webp 2x" -> the url is the first token of each candidate.
+    for (const candidate of m[1].split(",")) {
+      const url = candidate.trim().split(/\s+/)[0];
+      if (url.startsWith("/")) referenced.add(url.slice(1));
+    }
+  }
+
+  // vercel.json sets cleanUrls, so an extensionless link like /privacy is served
+  // by privacy.html. Resolve both shapes before calling a link broken.
+  const servable = (rel) =>
+    existsSync(join(ROOT, "web", rel)) ||
+    (!extname(rel) && existsSync(join(ROOT, "web", `${rel}.html`)));
+
+  for (const rel of referenced) {
+    if (!servable(rel)) fail("web/index.html", `references missing file: /${rel}`);
+  }
+}
+
+// --- 10. the hosted privacy policy stays true --------------------------------
+// The Web Store needs a hosted policy URL, and web/privacy.html is it. A policy
+// that quietly falls behind the extension it describes is worse than none, so
+// check the two things that actually rot: the date against docs/PRIVACY.md, and
+// whether every permission the manifest declares is named on the page.
+
+if (existsSync(join(ROOT, "web/privacy.html"))) {
+  const page = read("web/privacy.html");
+  const doc = read("docs/PRIVACY.md");
+
+  const docDate = doc.match(/Last updated:\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+  const pageDate = page.match(/Last updated\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+
+  if (!pageDate) {
+    fail("web/privacy.html", "no 'Last updated <date>' line — it is the only signal a reader has");
+  } else if (docDate && docDate !== pageDate) {
+    fail(
+      "web/privacy.html",
+      `says ${pageDate} but docs/PRIVACY.md says ${docDate} — the canonical text moved and the page did not`,
+    );
+  }
+
+  if (manifest) {
+    // Host permissions are named without the scheme or the trailing glob.
+    const hosts = (manifest.optional_host_permissions ?? []).map((h) =>
+      h.replace(/^https?:\/\//, "").replace(/\/\*$/, ""),
+    );
+    const named = [...(manifest.optional_permissions ?? []), ...hosts];
+
+    for (const p of named) {
+      if (!page.includes(p)) {
+        fail(
+          "web/privacy.html",
+          `never mentions the optional permission "${p}" — the manifest asks for it, so the policy has to say why`,
+        );
+      }
+    }
+  }
+
+  // /privacy is a document. If it ever grows a script it stops being one, and
+  // the CSP in vercel.json is not a per-page thing.
+  if (/<script/i.test(page)) {
+    fail("web/privacy.html", "has a <script> — the policy page is static on purpose");
+  }
+}
+
+// --- 11. the deployed CSP does not block the site's own script ---------------
+// vercel.json shipped `script-src 'none'` at one point, which would have left
+// the live demos dead on the deployed site while working perfectly in every
+// local render. Nothing else in this repo would have caught that.
+
+if (existsSync(join(ROOT, "vercel.json"))) {
+  let vercel;
+  try {
+    vercel = JSON.parse(read("vercel.json"));
+  } catch (e) {
+    fail("vercel.json", `invalid JSON: ${e.message}`);
+  }
+
+  const csp = vercel?.headers
+    ?.flatMap((h) => h.headers ?? [])
+    .find((h) => h.key?.toLowerCase() === "content-security-policy")?.value;
+
+  if (csp && read("web/index.html").includes("<script")) {
+    const scriptSrc = csp.match(/script-src ([^;]+)/)?.[1]?.trim();
+    if (scriptSrc && !/'self'/.test(scriptSrc)) {
+      fail(
+        "vercel.json",
+        `CSP script-src is "${scriptSrc}", but web/index.html loads /app.js — the demos would be dead on the deployed site`,
+      );
+    }
+    if (!/font-src[^;]*'self'/.test(csp) && !/default-src[^;]*'self'/.test(csp)) {
+      fail("vercel.json", "CSP allows no self-hosted fonts, but the site self-hosts Geist");
+    }
+  }
 }
 
 // --- report ------------------------------------------------------------------

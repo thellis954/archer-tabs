@@ -20,8 +20,14 @@ extension/   everything Chrome loads — this is what you point "Load unpacked" 
              browsing.js, settings.js, modemenu.js + the generated TLD list
   options.*  the settings page — API key, model, budget
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
+  app.js     wires the two live demos; imports from vendor/
+  vendor/    classify.js, router.js, tlds.js — byte-identical copies of
+             extension/src/, pinned by tools/lint.js. See "The site" below
+  assets/    the Blender renders, the fonts, the generated screenshots + OG card
 docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
-tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs (need playwright)
+tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs,
+             siteshots.mjs, ogcard.mjs, towebp.mjs (need playwright);
+             render-arc.py (needs Blender)
 test/        *.test.js run by `npm test`; e2e.mjs drives a real browser
 ```
 
@@ -50,7 +56,9 @@ There is nothing to build or install. To run it:
 | `npm test` | 188 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
-| `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
+| `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
+| `npm run siteshots` | Renders the marketing site to `shots/site/` — both themes, three widths, and the demo/scrollytell/lab mid-interaction. |
+| `npm run og` | Regenerates `web/assets/og.png`, the social card. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
 | `npm run store` | Regenerates the Web Store screenshots and promo tiles into `store/`. |
 | `npm run live` | A **headed** Chromium on a real X display, photographed whole — browser chrome included. |
@@ -144,6 +152,50 @@ way; `npm run lint` fails the build on `innerHTML` anywhere under `extension/`.
 `prefers-color-scheme: dark`. Add colors as tokens, never as literals in a rule — a hard-coded hex
 is invisible in one of the two themes. `docs/BRAND.md` explains what each token is for and why brass
 is restricted to the mark, focus, and hover.
+
+## The site
+
+`web/` is the landing page plus `/privacy`, built the same way the extension is: native CSS, ES
+modules, no framework and no build step. `vercel.json` sets `outputDirectory: "web"`, so what is in
+that folder is what is served, and `cleanUrls` is why `privacy.html` answers at `/privacy`.
+
+**`vercel.json`'s CSP is load-bearing and `npm run lint` checks it.** It shipped `script-src 'none'`
+at one point, which would have left the live demos dead on the deployed site while every local
+render looked perfect. Nothing else in this repo could have caught that.
+
+**`/privacy` is the Web Store's required hosted policy URL.** `docs/PRIVACY.md` is the canonical
+text and `web/privacy.html` renders it; lint checks that the two agree on the date and that every
+optional permission the manifest declares is explained on the page, so adding a capability without
+saying why fails the build. Keep both in step.
+
+**The two demos on the page run the extension's real classifier.** `web/vendor/` holds
+byte-identical copies of `extension/src/{classify,router,tlds}.js`, and **`npm run lint` fails if
+they drift** — Vercel only deploys `web/`, so the modules have to physically live there, which is
+exactly the arrangement that rots silently. The site claims "the same code Chrome runs"; the lint
+rule is what makes that claim true. After changing the classifier or the router:
+
+```sh
+cp extension/src/{classify,router,tlds}.js web/vendor/
+```
+
+The no-`innerHTML` rule extends to `web/app.js` for the same reason it exists in the extension: the
+demo echoes whatever a reader types back into the page.
+
+Design notes, so they are not re-litigated:
+
+- **The palette is `docs/BRAND.md`, unchanged.** Warm cream and brass are the shipped product's
+  tokens. The site adds exactly two of its own (`--raised`, `--scrim`) for section bands and
+  shadows, and they are mixed from the existing tokens rather than picked.
+- **Geist + Geist Mono**, self-hosted from `web/assets/fonts/` (SIL OFL, licence alongside them).
+  The *extension* deliberately uses the system stack, because a new tab page must paint instantly;
+  a marketing page has no such constraint. Mono carries every string the classifier judges.
+- **`assets/arc-*.webp` are generated**, by `tools/render-arc.py` (Blender) then `tools/towebp.mjs`.
+  They are an abstract study of the bowstring curve, not the mark in 3D — `docs/BRAND.md` forbids
+  rotating, filling or gradient-ing the mark, and that applies to renders of it.
+- **No scroll listeners.** The scrollytelling in "How it decides" is an IntersectionObserver; the
+  section reveals are CSS `animation-timeline: view()` behind an `@supports` guard. An earlier
+  observer-driven reveal set `opacity: 0` and waited, and stranded four whole sections when the
+  observer never reported. Anything that hides content must fail toward *visible*.
 
 ## Constraints worth knowing
 

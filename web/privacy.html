@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Privacy - Archer</title>
+<meta name="description" content="Archer has no server, no account, and no telemetry. What is stored, what leaves the device, and what each permission is for.">
+
+<meta property="og:title" content="Privacy - Archer">
+<meta property="og:description" content="Archer has no server, no account, and no telemetry.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://archertabs.app/privacy">
+<meta property="og:image" content="https://archertabs.app/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.css">
+</head>
+
+<!--
+  The Chrome Web Store requires a hosted policy URL, and this is it. The
+  canonical text is docs/PRIVACY.md; this page renders it. tools/lint.js checks
+  that the two agree on the date and that every permission the manifest declares
+  is accounted for here, because a policy that quietly falls behind the thing it
+  describes is worse than no policy at all.
+
+  cleanUrls in vercel.json serves this at /privacy.
+-->
+<body class="doc">
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/" aria-label="Archer, home">
+    <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+      <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+    </svg>
+    <span class="brandName">Archer</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="/#decision">How it decides</a>
+    <a href="/#modes">Modes</a>
+    <a class="navCta" href="/#install">Install</a>
+  </nav>
+</header>
+
+<main id="main" class="docBody">
+
+  <header class="docHead">
+    <h1>Privacy</h1>
+    <p class="docDate">Last updated 2026-08-07. Applies to the Archer Chrome extension, every version.</p>
+  </header>
+
+  <section class="docLead">
+    <p>
+      <strong>Archer has no server.</strong> There is no account, no sign-in, no
+      analytics, no telemetry, no crash reporting and no advertising. Nothing you
+      do in Archer is sent to the people who make it, because there is nowhere
+      for it to go. No such service was ever built.
+    </p>
+    <p>
+      Everything Archer remembers is in your own browser's extension storage, on
+      the device you are using. Uninstalling the extension deletes all of it.
+    </p>
+  </section>
+
+  <section>
+    <h2>What is stored, and where</h2>
+    <p>
+      All of this lives in <code>chrome.storage.local</code>: your browser, your
+      machine. None of it syncs, and none of it leaves the device except where
+      the next section says so.
+    </p>
+
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th scope="col">What</th><th scope="col">Why</th><th scope="col">Kept until</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Your chosen destination (Search, ChatGPT, Claude, Perplexity)</td>
+            <td>So a new tab opens the way you left it</td>
+            <td>You change it</td>
+          </tr>
+          <tr>
+            <td>Prompts you launch from the new tab</td>
+            <td>To offer them back as rows, and to label a conversation with the prompt that started it</td>
+            <td>The most recent 200. "Clear prompt history" in settings erases them</td>
+          </tr>
+          <tr>
+            <td>Pinned and dismissed rows</td>
+            <td>So the list stays the way you arranged it</td>
+            <td>You unpin, or dismiss again</td>
+          </tr>
+          <tr>
+            <td>Saved prompts</td>
+            <td>The <code>/slash</code> library</td>
+            <td>You delete them</td>
+          </tr>
+          <tr>
+            <td>Favourites</td>
+            <td>The tiles under the search box</td>
+            <td>You remove them</td>
+          </tr>
+          <tr>
+            <td>Your OpenAI API key, model and budget</td>
+            <td>To answer on the page, billed to your own OpenAI account</td>
+            <td>You clear it in settings</td>
+          </tr>
+          <tr>
+            <td>Weather place and last reading</td>
+            <td>To draw the weather card without refetching every tab</td>
+            <td>You turn weather off</td>
+          </tr>
+          <tr>
+            <td>Whether you dismissed the default-engine hint</td>
+            <td>So it stays dismissed</td>
+            <td>Reinstall</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="callout">
+      <strong>Archer never reads the contents of pages you visit.</strong> It has
+      no content scripts and no host permissions on any site you browse.
+    </p>
+  </section>
+
+  <section>
+    <h2>What leaves the device</h2>
+    <p>Only these, and only for the features you switch on.</p>
+
+    <dl class="docList">
+      <div>
+        <dt>Your search terms, to your own default search engine</dt>
+        <dd>
+          When a prompt is routed to Search, Archer calls Chrome's own
+          <code>chrome.search</code> API. Chrome sends the query to whatever
+          engine <em>you</em> have set as default. Archer does not choose the
+          engine, does not see the response, and has no search provider of its
+          own.
+        </dd>
+      </div>
+      <div>
+        <dt>Your prompt, to the site you picked</dt>
+        <dd>
+          Choosing ChatGPT, Claude or Perplexity navigates the tab to that site
+          with your prompt in the address, exactly as if you had typed it there.
+          Their privacy policies apply from that point, as they would anyway.
+        </dd>
+      </div>
+      <div>
+        <dt>Your prompt and your API key, to OpenAI</dt>
+        <dd>
+          Only if you have entered a key and chosen "Answer here". The request
+          goes from your browser straight to <code>api.openai.com</code>. It is
+          not proxied, mirrored or logged anywhere else, and the key is never
+          transmitted to anyone but OpenAI.
+          <a href="https://openai.com/policies/privacy-policy" rel="noreferrer">OpenAI's privacy policy</a>.
+        </dd>
+      </div>
+      <div>
+        <dt>A place name and its coordinates, to Open-Meteo</dt>
+        <dd>
+          Only if you have set a place for the weather card. Archer sends the
+          place name you typed to look up its coordinates, then the coordinates
+          to get a forecast. Nothing identifying you is sent, and
+          <strong>your browser is never asked for its location</strong>: Archer
+          does not request the <code>geolocation</code> permission at all.
+          <a href="https://open-meteo.com/en/terms" rel="noreferrer">Open-Meteo's privacy policy</a>.
+        </dd>
+      </div>
+    </dl>
+
+    <p class="callout">That is the complete list.</p>
+  </section>
+
+  <section>
+    <h2>Permissions, and what each is for</h2>
+    <p>Archer asks for two permissions when you install it.</p>
+
+    <dl class="docList">
+      <div>
+        <dt><code>search</code></dt>
+        <dd>
+          To hand a query to your default search engine through Chrome's own
+          API. This is also what the Chrome Web Store requires of a new tab
+          page, so that your choice of search provider is respected rather than
+          replaced.
+        </dd>
+      </div>
+      <div>
+        <dt><code>storage</code></dt>
+        <dd>Somewhere to keep the settings in the table above.</dd>
+      </div>
+    </dl>
+
+    <p>
+      <strong>Everything else is optional and off until you turn it on.</strong>
+      Chrome asks at the moment you enable the feature, and Archer's settings
+      page lists all of them with an on/off switch.
+    </p>
+
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Permission</th><th scope="col">Enabled by</th><th scope="col">Used for</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>history</code></td>
+            <td>"Show your recent conversations"</td>
+            <td>Finding <code>chatgpt.com</code> conversation addresses so they can be rows. Every other history entry is discarded before it is read</td>
+          </tr>
+          <tr>
+            <td><code>topSites</code></td>
+            <td>"Show top sites" in the plus menu</td>
+            <td>The sites you visit most, as rows</td>
+          </tr>
+          <tr>
+            <td><code>sessions</code> and <code>tabs</code></td>
+            <td>"Show recently closed tabs" in the plus menu</td>
+            <td>Reopening a tab you closed. Chrome will not reveal a closed tab's title without <code>tabs</code>, which is why this one asks for more</td>
+          </tr>
+          <tr>
+            <td><code>clipboardRead</code></td>
+            <td>"Paste" in the plus menu</td>
+            <td>Reading the clipboard at the moment you choose Paste, and at no other time</td>
+          </tr>
+          <tr>
+            <td><code>api.openai.com</code></td>
+            <td>Saving an API key</td>
+            <td>Streaming an answer onto the page</td>
+          </tr>
+          <tr>
+            <td><code>api.open-meteo.com</code>, <code>geocoding-api.open-meteo.com</code></td>
+            <td>Saving a weather place</td>
+            <td>The weather card</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Revoking any of them in Archer's settings turns off the feature and nothing else.</p>
+  </section>
+
+  <section>
+    <h2>Children</h2>
+    <p>Archer is not directed at children and collects nothing from anyone.</p>
+  </section>
+
+  <section>
+    <h2>Changes</h2>
+    <p>
+      Material changes will be noted here and in the extension's release notes,
+      with the date at the top of this page updated. The source is public: every
+      claim above is checkable at
+      <a href="https://github.com/thellis954/archer-tabs">github.com/thellis954/archer-tabs</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p>
+      Open an issue at
+      <a href="https://github.com/thellis954/archer-tabs/issues">github.com/thellis954/archer-tabs/issues</a>.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footInner">
+    <a class="brand" href="/" aria-label="Archer, home">
+      <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+        <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+      </svg>
+      <span class="brandName">Archer</span>
+    </a>
+    <p>
+      Free software under the GPL-3.0. Not affiliated with OpenAI, Google, or
+      Anthropic.
+    </p>
+    <p class="footLinks">
+      <a href="/">Home</a>
+      <a href="https://github.com/thellis954/archer-tabs">Source</a>
+      <a href="https://github.com/thellis954/archer-tabs/issues">Report a problem</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

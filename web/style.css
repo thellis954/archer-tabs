@@ -1,219 +1,987 @@
-/* archertabs.app — same tokens as the extension. See docs/BRAND.md. */
+/* archertabs.app
+ *
+ * Native CSS, no framework, no build step. That is not a shortcut: vercel.json
+ * sets outputDirectory to this folder, the repo installs nothing, and the site
+ * imports the extension's real classifier as an ES module. A bundler would sit
+ * between those two facts for no gain.
+ *
+ * Colors are the tokens in docs/BRAND.md, unchanged. Warm cream and brass are
+ * the shipped product's palette, so the site uses them for fidelity rather than
+ * for mood; the two site-only additions are marked below.
+ *
+ * Radius system, applied everywhere and nowhere else:
+ *   --r-pill  interactive things you can press or type into
+ *   --r-card  panels and figures
+ *   --r-sm    chips, code, inline fields
+ */
 
+/* ---------------------------------------------------------------- fonts -- */
+/* Geist + Geist Mono, SIL OFL 1.1. Self-hosted; see assets/fonts/OFL.txt.
+   Mono is not decoration here: every string the classifier judges is set in it,
+   so a typed URL looks like a typed URL. */
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/Geist-Variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono-Variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* --------------------------------------------------------------- tokens -- */
 :root {
   --bg: #FBF7F0;
   --surface: #FFFFFF;
+  --pressed: #F1EBE1;
   --border: #E8E2D9;
   --text: #141416;
-  --muted: #6F675E;
+  --muted: #78706A;
   --faint: #D9D2C7;
   --accent: #B45309;
-  --ring: #B4530933;
-  --shadow: 0 1px 2px rgb(20 20 22 / .04), 0 12px 40px rgb(20 20 22 / .08);
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --onAccent: #FBF7F0;
+
+  /* Site-only. The extension has no section-band or scrim, so these are not
+     in docs/BRAND.md; they are mixed from the tokens above rather than picked. */
+  --raised: #F5F0E7;
+  --scrim: rgb(20 20 22 / 0.06);
+
+  --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --r-pill: 999px;
+  --r-card: 18px;
+  --r-sm: 10px;
+
+  --nav: 64px;
+  --shell: 1240px;
+  --gutter: clamp(1.25rem, 5vw, 3.5rem);
+  --band: clamp(5.5rem, 11vw, 9.5rem);
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #141416;
     --surface: #1D1D20;
+    --pressed: #26262A;
     --border: #2C2C30;
     --text: #F2EFEA;
-    --muted: #A29A90;
+    --muted: #948D84;
     --faint: #292927;
     --accent: #F59E0B;
-    --ring: #F59E0B3D;
-    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 12px 40px rgb(0 0 0 / .5);
+    --onAccent: #141416;
+
+    --raised: #1A1A1D;
+    --scrim: rgb(0 0 0 / 0.28);
   }
 }
 
-* { box-sizing: border-box; }
+/* ---------------------------------------------------------------- reset -- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font);
+  font-family: var(--sans);
   font-size: 17px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Deliberately no overflow-x here. It computes overflow-y to auto, which
+     makes body a scroll container and breaks the sticky specimen panel in the
+     decision section. The only thing that bleeds is the hero render, so the
+     hero clips itself instead (overflow: clip, which creates no scroll box). */
 }
 
-a { color: var(--accent); }
+/* Anchored sections have to clear the sticky bar. */
+:target, [id] { scroll-margin-top: calc(var(--nav) + 1.5rem); }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.025em; line-height: 1.08; }
+p { margin: 0; }
+ol, ul { margin: 0; padding: 0; list-style: none; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
 
 code {
   font-family: var(--mono);
-  font-size: .88em;
-  padding: .12em .4em;
-  border-radius: 5px;
-  background: var(--surface);
+  font-size: 0.9em;
+  font-weight: 450;
+  background: var(--raised);
   border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.1em 0.4em;
+  white-space: nowrap;
 }
 
-.legs { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.bow { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
-/* ---------- bar ---------- */
+.visuallyHidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
 
+.skip {
+  position: absolute; left: 1rem; top: -4rem; z-index: 60;
+  background: var(--accent); color: var(--onAccent);
+  padding: 0.6rem 1rem; border-radius: var(--r-pill);
+  text-decoration: none; font-weight: 500;
+  transition: top 0.2s var(--ease);
+}
+.skip:focus { top: 1rem; }
+
+/* the mark, everywhere it appears */
+.brandMark { width: 26px; height: 26px; flex: none; }
+.brandMark .legs,
+.brandMark .bow { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.brandMark .legs { stroke: var(--text); }
+.brandMark .bow { stroke: var(--accent); }
+
+.brand {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  text-decoration: none; color: var(--text);
+}
+.brandName { font-weight: 600; font-size: 16px; letter-spacing: -0.015em; }
+
+/* ------------------------------------------------------------------ nav -- */
 .bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 20px 24px;
+  position: sticky; top: 0; z-index: 50;
+  height: var(--nav);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0 var(--gutter);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s var(--ease);
+}
+.bar.stuck { border-bottom-color: var(--border); }
+
+.bar nav { display: flex; align-items: center; gap: clamp(0.75rem, 2vw, 1.75rem); }
+.bar nav a {
+  text-decoration: none; color: var(--muted);
+  font-size: 14.5px; font-weight: 450; white-space: nowrap;
+  transition: color 0.18s var(--ease);
+}
+.bar nav a:hover { color: var(--text); }
+
+.navCta {
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0.4rem 1rem;
+  background: var(--surface);
+  font-weight: 500 !important;
+}
+.navCta:hover { border-color: var(--accent); color: var(--accent) !important; }
+
+@media (max-width: 640px) {
+  .bar nav a:not(.navCta) { display: none; }
 }
 
-.brand { display: flex; align-items: center; gap: 9px; color: var(--text); text-decoration: none; }
-.brandMark { width: 24px; height: 24px; }
-.brandName { font-size: 17px; font-weight: 600; letter-spacing: -.015em; }
-
-.bar nav { display: flex; gap: 22px; flex-wrap: wrap; }
-.bar nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
-.bar nav a:hover { color: var(--accent); }
-
-/* ---------- hero ---------- */
-
-main { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-
-.hero { padding: 72px 0 44px; max-width: 680px; }
-
+/* --------------------------------------------------------------- shared -- */
 .eyebrow {
-  margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
 }
 
-h1 {
-  margin: 0 0 20px;
-  font-size: clamp(44px, 8vw, 76px);
-  line-height: 1.02;
-  letter-spacing: -.035em;
-  font-weight: 600;
+.sectionLede {
+  color: var(--muted);
+  font-size: clamp(16px, 1.6vw, 18.5px);
+  max-width: 60ch;
+  margin-top: 1.1rem;
 }
 
-.lede { margin: 0; font-size: clamp(18px, 2.4vw, 21px); color: var(--muted); }
-
-.cta { display: flex; gap: 12px; flex-wrap: wrap; margin: 32px 0 16px; }
+h2 { font-size: clamp(2rem, 4.4vw, 3.35rem); max-width: 20ch; }
+h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 
 .btn {
-  display: inline-block;
-  padding: 12px 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 48px; padding: 0 1.6rem;
+  border-radius: var(--r-pill);
   border: 1px solid var(--border);
-  border-radius: 999px;
   background: var(--surface);
   color: var(--text);
-  font-size: 16px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: border-color .12s ease, transform .12s ease;
+  font: inherit; font-size: 15.5px; font-weight: 500;
+  text-decoration: none; white-space: nowrap;
+  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
+              background 0.18s var(--ease), box-shadow 0.18s var(--ease);
 }
-
 .btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); background: var(--pressed); }
 
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #FBF7F0; }
-.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--onAccent);
+  box-shadow: 0 1px 2px var(--scrim), 0 8px 24px -12px var(--accent);
+}
+.btn.primary:hover { box-shadow: 0 2px 4px var(--scrim), 0 14px 30px -12px var(--accent); }
 
-.note { margin: 0; font-size: 15px; color: var(--muted); }
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
-/* ---------- screenshot ---------- */
-
-.shot { margin: 20px 0 96px; }
-
-.shot img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
+/* ----------------------------------------------------------------- hero -- */
+.hero {
+  position: relative;
+  overflow: clip;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 5rem) var(--gutter) var(--band);
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
 }
 
-/* ---------- sections ---------- */
+/* Rendered in Blender: three passes of the bowstring curve in brass, the front
+   one drawn and sharp, the two behind it flattening as the string releases.
+   tools/render-arc.py builds the scene; there is a light and a dark cut, so the
+   PNG already carries the right accent and needs no blend mode to sit down.
+   Ambient only: it must never compete with the demo box beside it. */
+/* Placed in the open ground below and right of the demo card, which is the only
+   part of the hero with room for it. Two earlier positions put it behind the
+   card, where all that showed was a few stubs poking past the edge and reading
+   as a rendering fault. */
+.heroArc {
+  position: absolute;
+  right: -8%; bottom: -14%;
+  width: min(64%, 760px);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.7;
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 58% 48%, #000 38%, transparent 82%);
+          mask-image: radial-gradient(ellipse 78% 82% at 58% 48%, #000 38%, transparent 82%);
+}
+.heroArc img { width: 100%; }
 
-section { scroll-margin-top: 24px; }
-
-h2 {
-  margin: 0 0 28px;
-  font-size: clamp(28px, 4vw, 36px);
-  letter-spacing: -.025em;
-  font-weight: 600;
+@media (max-width: 900px) {
+  /* Below the split, the demo card owns the column. Keep the render as a faint
+     wash behind it rather than a second thing competing for the same space. */
+  .heroArc { right: -24%; bottom: -6%; width: 100%; opacity: 0.35; }
 }
 
-h3 { margin: 0 0 10px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.heroCopy, .heroDemo { position: relative; z-index: 1; }
 
-.how { padding-bottom: 88px; }
+.hero h1 {
+  font-size: clamp(3rem, 7.4vw, 5.4rem);
+  letter-spacing: -0.045em;
+  line-height: 0.94;
+}
 
-.cards { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.hero .lede {
+  margin-top: 1.4rem;
+  font-size: clamp(17px, 1.9vw, 21px);
+  color: var(--muted);
+  max-width: 34ch;
+  line-height: 1.5;
+}
 
-.cards article {
-  padding: 26px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+.hero .cta { margin-top: 2.2rem; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: 3rem; padding-top: 2rem; }
+  .hero .lede { max-width: 40ch; }
+}
+
+/* ---------------------------------------------------- the working demo --- */
+/* A real preview: the box below runs /vendor/router.js, which tools/lint.js
+   pins byte-for-byte to the module Chrome loads. */
+.demo {
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: clamp(1rem, 2.2vw, 1.5rem);
+  box-shadow: 0 1px 2px var(--scrim), 0 30px 60px -40px var(--scrim);
 }
 
-.cards p { margin: 0; color: var(--muted); font-size: 16px; }
+.demoChrome {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding-bottom: 1rem;
+}
+.demoMark { width: 20px; height: 20px; flex: none; }
+.demoMark .legs, .demoMark .bow {
+  fill: none; stroke-width: 2.9; stroke-linecap: round; stroke-linejoin: round;
+}
+.demoMark .legs { stroke: var(--text); }
+.demoMark .bow { stroke: var(--accent); }
+.demoName { font-size: 14px; font-weight: 600; letter-spacing: -0.015em; }
 
-/* ---------- keyboard ---------- */
+.demoModeLabel {
+  margin-left: auto;
+  font-size: 12px; color: var(--muted);
+  font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em;
+}
+/* The native control, restyled rather than replaced: a custom listbox here
+   would be a second implementation of the extension's own mode menu, with its
+   own keyboard handling to get wrong. The chevron is a background image so the
+   OS default arrow can be dropped. */
+.demoMode {
+  font: inherit; font-size: 13.5px; font-weight: 500;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0.32rem 1.9rem 0.32rem 0.75rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 1.05rem) 55%, calc(100% - 0.75rem) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.18s var(--ease);
+}
+.demoMode:hover { border-color: var(--accent); }
 
-.keys { padding-bottom: 88px; }
+.demoBox {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0.45rem 0.45rem 0.45rem 1.15rem;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.demoBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.demoBox input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 16px;
+  background: none; border: 0; color: var(--text);
+  padding: 0.55rem 0;
+}
+.demoBox input::placeholder { color: var(--muted); }
+.demoBox input:focus { outline: none; }
 
-.keys dl { margin: 0; display: grid; gap: 0; }
+.demoSend {
+  flex: none;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--accent);
+  cursor: pointer;
+  transition: opacity 0.2s var(--ease), transform 0.16s var(--ease);
+}
+.demoSend svg { width: 20px; height: 20px; }
+.demoSend path {
+  fill: none; stroke: var(--onAccent);
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.demoSend:disabled { opacity: 0.28; cursor: default; }
+.demoSend:not(:disabled):hover { transform: scale(1.06); }
+.demoSend:not(:disabled):active { transform: scale(0.95); }
 
-.keys dl > div {
+.demoVerdict {
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+  margin-top: 1rem;
+  padding: 0 0.35rem;
+  min-height: 2.4rem;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+.demoTag {
+  font-family: var(--mono);
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--raised);
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background 0.24s var(--ease), color 0.24s var(--ease),
+              border-color 0.24s var(--ease);
+}
+.demoWhat { flex: 1; min-width: 12ch; }
+.demoWhat b { font-weight: 500; color: var(--text); font-family: var(--mono); font-size: 13.5px; }
+
+/* Two verdicts, one accent. "Go" fills, "Ask" outlines. */
+.demoVerdict[data-state="url"] .demoTag {
+  background: var(--accent); border-color: var(--accent); color: var(--onAccent);
+}
+.demoVerdict[data-state="prompt"] .demoTag {
+  background: transparent; border-color: var(--accent); color: var(--accent);
+}
+
+.demoTries {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.demoTries button, .labChips button {
+  font: inherit; font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.16s var(--ease), border-color 0.16s var(--ease),
+              transform 0.16s var(--ease);
+}
+.demoTries button:hover, .labChips button:hover {
+  color: var(--accent); border-color: var(--accent); transform: translateY(-1px);
+}
+.demoTries button:active, .labChips button:active { transform: translateY(0); }
+
+/* ------------------------------------------------------ the decision ----- */
+.decision {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--band);
+}
+.decisionHead { max-width: 62ch; margin-bottom: clamp(3rem, 6vw, 5rem); }
+
+.decisionGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: start;
+}
+
+/* Centred in the viewport rather than pinned to its top: pinned, the panel sat
+   in the upper corner with two thirds of its column empty below it. */
+.specimenWrap {
+  position: sticky;
+  top: var(--nav);
+  height: calc(100vh - var(--nav));
   display: flex;
-  align-items: baseline;
-  gap: 18px;
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
+  align-items: center;
 }
 
-.keys dl > div:last-child { border-bottom: 1px solid var(--border); }
-
-.keys dt { display: flex; gap: 5px; min-width: 130px; }
-.keys dd { margin: 0; color: var(--muted); font-size: 16px; }
-
-kbd {
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 3px 9px;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 7px;
+.specimen {
+  margin: 0;
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: clamp(1.25rem, 2.4vw, 1.9rem);
+  box-shadow: 0 1px 2px var(--scrim), 0 30px 60px -44px var(--scrim);
+}
+.specimenCap {
+  font-family: var(--mono);
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.specimenText {
+  font-family: var(--mono);
+  font-size: clamp(15px, 1.9vw, 21px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-top: 0.7rem;
+  word-break: break-all;
+  min-height: 2.4em;
 }
 
-/* ---------- privacy / install ---------- */
-
-.privacy, .install { padding-bottom: 88px; max-width: 680px; }
-.privacy p { color: var(--muted); }
-
-.install ol { margin: 24px 0; padding-left: 22px; color: var(--muted); }
-.install li { margin-bottom: 12px; }
-
-/* ---------- footer ---------- */
-
-footer {
+.specimenRule {
+  display: flex; align-items: flex-start; gap: 0.7rem;
+  margin-top: 1.25rem; padding-top: 1.25rem;
   border-top: 1px solid var(--border);
-  padding: 48px 24px 64px;
+  font-size: 14.5px; color: var(--muted);
+  min-height: 4.2em;
+}
+.specimenRuleNo {
+  flex: none;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--accent); color: var(--onAccent);
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+}
+
+.specimenVerdict {
+  display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+  margin-top: 1.25rem;
+  font-size: 14.5px; color: var(--muted);
+}
+.verdictBadge {
+  font-family: var(--mono);
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+.specimen[data-verdict="url"] .verdictBadge { background: var(--accent); color: var(--onAccent); }
+.specimen[data-verdict="prompt"] .verdictBadge { background: transparent; color: var(--accent); }
+.verdictNote { flex: 1; min-width: 14ch; }
+
+.rules { display: grid; gap: clamp(2.5rem, 6vw, 4.5rem); }
+.rule {
+  padding-left: 1.5rem;
+  border-left: 2px solid var(--border);
+  transition: border-color 0.4s var(--ease), opacity 0.4s var(--ease);
+  /* Dimmed, not hidden: the inactive rules still have to be readable if you
+     just want to read the list straight through. */
+  opacity: 0.66;
+}
+.rule.active { border-left-color: var(--accent); opacity: 1; }
+.rule h3 { display: flex; align-items: baseline; gap: 0.7rem; font-size: clamp(1.1rem, 2vw, 1.45rem); }
+.ruleNo {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--accent);
+}
+.rule p { margin-top: 0.8rem; color: var(--muted); max-width: 52ch; }
+
+@media (max-width: 900px) {
+  .decisionGrid { grid-template-columns: 1fr; gap: 2rem; }
+  .specimenWrap { top: var(--nav); z-index: 20; }
+  .specimen { box-shadow: 0 12px 24px -18px var(--scrim); }
+  .specimenText { min-height: 0; }
+  .specimenRule { min-height: 0; }
+  .rule { opacity: 1; }
+  /* No room to centre anything on a phone: back to a plain pinned header. */
+  .specimenWrap { height: auto; display: block; padding-top: 0.75rem; background: var(--bg); }
+}
+
+/* ------------------------------------------------------------- the lab --- */
+.lab {
+  background: var(--raised);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: var(--band) var(--gutter);
+}
+.labHead { max-width: var(--shell); margin: 0 auto clamp(2.5rem, 5vw, 4rem); }
+
+.labPanel {
+  max-width: var(--shell);
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.labInputRow {
+  display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
+}
+.labInputRow input {
+  flex: 1 1 22ch; min-width: 0;
+  font: inherit; font-family: var(--mono); font-size: clamp(15px, 1.7vw, 18px);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0.75rem 1.15rem;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.labInputRow input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.labForce { display: flex; gap: 0.3rem; background: var(--raised);
+  border: 1px solid var(--border); border-radius: var(--r-pill); padding: 0.25rem; }
+.labForce button {
+  font: inherit; font-size: 13px; font-weight: 500;
+  color: var(--muted);
+  background: none; border: 0;
+  border-radius: var(--r-pill);
+  padding: 0.4rem 0.85rem;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+.labForce button:hover { color: var(--text); }
+.labForce button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--scrim); }
+
+.labOut {
+  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+  margin-top: 1.5rem; padding: 1.15rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  min-height: 4.5rem;
+}
+.labBadge {
+  font-family: var(--mono);
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+.labOut[data-verdict="url"] .labBadge { background: var(--accent); color: var(--onAccent); }
+.labOut[data-verdict="prompt"] .labBadge { background: transparent; color: var(--accent); }
+.labDest {
+  font-family: var(--mono); font-size: clamp(14px, 1.6vw, 16px); font-weight: 500;
+  word-break: break-all;
+}
+.labWhy { flex-basis: 100%; color: var(--muted); font-size: 14.5px; }
+
+.labChips { margin-top: 2rem; }
+.labChipsTitle {
+  font-family: var(--mono);
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 0.7rem;
+}
+.labChips ul { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem; }
+.labChips ul:last-child { margin-bottom: 0; }
+.labChips button { background: var(--raised); }
+
+/* ------------------------------------------------------- the whole page -- */
+/* Image-led, and the only section that is. The screenshot is the argument. */
+.surface { max-width: var(--shell); margin: 0 auto; padding: var(--band) var(--gutter); }
+.surfaceHead { max-width: 62ch; margin-bottom: clamp(2.5rem, 5vw, 3.5rem); }
+
+.surfaceShot { margin: 0; }
+.surfaceShot picture {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  box-shadow: 0 1px 2px var(--scrim), 0 50px 90px -55px var(--scrim);
+}
+
+.surfaceList {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+}
+.surfaceList dt {
+  font-size: 15.5px; font-weight: 600; letter-spacing: -0.015em;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.surfaceList dd { margin: 0.5rem 0 0; color: var(--muted); font-size: 14.5px; }
+
+@media (max-width: 900px) { .surfaceList { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .surfaceList { grid-template-columns: 1fr; } }
+
+/* ----------------------------------------------------------- the modes --- */
+.modes { max-width: var(--shell); margin: 0 auto; padding: var(--band) var(--gutter); }
+.modesHead { max-width: 62ch; margin-bottom: clamp(2.5rem, 5vw, 4rem); }
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1rem;
+}
+.cell {
+  grid-column: span 2;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: clamp(1.25rem, 2.4vw, 1.85rem);
+  transition: border-color 0.24s var(--ease), transform 0.24s var(--ease);
+}
+.cell:hover { border-color: var(--accent); transform: translateY(-2px); }
+.cell p { margin-top: 0.7rem; color: var(--muted); font-size: 15px; }
+
+.cellWide { grid-column: span 4; }
+.cellWide h3 { font-size: clamp(1.3rem, 2.6vw, 1.85rem); }
+.cellWide p { font-size: 16.5px; max-width: 48ch; }
+.cellMeta {
+  font-family: var(--mono); font-size: 11.5px !important;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--accent) !important;
+  margin-top: 1.25rem !important;
+}
+
+/* The one cell carrying the render, so the grid is not six text boxes.
+   Pinned to the full right-hand column: six modes have to make exactly six
+   cells, and spanning only two rows left a two-column hole in the last row. */
+.cellArt {
+  grid-column: 5 / span 2;
+  grid-row: 1 / span 3;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  min-height: 300px;
+  background: var(--raised);
+}
+/* The render occupies a fixed share of the cell and crops to fit, rather than
+   scaling with the cell's width. The cell is tall on desktop and short and wide
+   on a phone; letting a 4:3 image drive its own height put the arcs straight
+   through the copy at one size or the other every time. */
+.cellArt picture {
+  position: absolute;
+  inset: 0 -6% auto -6%;
+  height: 58%;
+  overflow: hidden;
+  opacity: 0.95;
+  pointer-events: none;
+}
+.cellArt picture img {
+  width: 100%; height: 100%; max-width: none;
+  object-fit: cover;
+  object-position: center 46%;
+}
+
+/* And the render still has to stop before the copy starts. */
+.cellArt::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom,
+    transparent 26%,
+    color-mix(in srgb, var(--raised) 70%, transparent) 46%,
+    var(--raised) 62%);
+  pointer-events: none;
+}
+.cellArt h3, .cellArt p { position: relative; z-index: 1; }
+
+.cellQuiet { background: var(--raised); }
+
+@media (max-width: 860px) {
+  .bento { grid-template-columns: repeat(2, 1fr); }
+  .cell { grid-column: span 1; }
+  .cellWide { grid-column: span 2; }
+  .cellArt { grid-column: span 2; grid-row: auto; min-height: 280px; }
+}
+@media (max-width: 520px) {
+  .bento { grid-template-columns: 1fr; }
+  .cellWide, .cellArt { grid-column: span 1; }
+}
+
+/* --------------------------------------------------------- the privacy --- */
+.privacy {
+  background: var(--raised);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: var(--band) var(--gutter);
+}
+.privacyHead { max-width: var(--shell); margin: 0 auto clamp(2.5rem, 5vw, 4rem); }
+.privacyHead h2 { max-width: 24ch; }
+
+.ledger {
+  max-width: var(--shell); margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1rem;
+  /* Two entries on the left against five on the right: stretching the short
+     column to match leaves it two thirds empty. */
+  align-items: start;
+}
+.ledgerCol {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: clamp(1.25rem, 2.6vw, 2rem);
+}
+.ledgerNow { border-color: var(--accent); }
+.ledgerCol h3 {
+  font-family: var(--mono);
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.ledgerNow h3 { color: var(--accent); }
+
+.ledgerCol dl { margin: 1.25rem 0 0; display: grid; gap: 1.1rem; }
+.ledgerCol dt {
+  font-family: var(--mono); font-size: 14.5px; font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.ledgerCol dd { margin: 0.25rem 0 0; color: var(--muted); font-size: 15px; }
+
+.ledgerNote {
+  margin-top: 1.5rem; padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 14.5px;
+}
+
+.privacyClose {
+  max-width: 56ch;
+  margin: clamp(2.5rem, 5vw, 4rem) auto 0;
   text-align: center;
+  font-size: clamp(17px, 2vw, 21px);
+  letter-spacing: -0.015em;
+  line-height: 1.45;
+}
+
+@media (max-width: 800px) { .ledger { grid-template-columns: 1fr; } }
+
+/* --------------------------------------------------------- the install --- */
+/* Steps only now: the screenshot that used to sit beside them moved up to
+   the page section, where it is the subject rather than a decoration. */
+.install {
+  max-width: var(--shell); margin: 0 auto;
+  padding: var(--band) var(--gutter);
+}
+.installCopy { max-width: 62ch; }
+.steps { margin-top: clamp(2rem, 4vw, 3rem); display: grid; gap: 1.5rem; counter-reset: s; }
+.steps li {
+  counter-increment: s;
+  display: grid; grid-template-columns: 28px 1fr; gap: 0 1rem;
+  align-items: baseline;
+}
+.steps li::before {
+  content: counter(s);
+  grid-row: span 2;
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--onAccent); background: var(--accent);
+  width: 24px; height: 24px; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  align-self: start;
+}
+.steps p { grid-column: 2; margin-top: 0.35rem; color: var(--muted); font-size: 15px; }
+.install .cta { margin-top: clamp(2rem, 4vw, 3rem); }
+
+
+
+/* ------------------------------------------------------------ the doc --- */
+/* /privacy. A document, not a landing page: one column, a real measure, and
+   nothing that moves. It shares the tokens and the furniture, and none of the
+   marketing layout. */
+.docBody {
+  max-width: 76ch;
+  margin: 0 auto;
+  padding: clamp(3rem, 8vw, 6rem) var(--gutter) clamp(4rem, 9vw, 7rem);
+}
+
+.docHead { margin-bottom: clamp(2.5rem, 5vw, 3.5rem); }
+.docHead h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: -0.04em;
+}
+.docDate {
+  margin-top: 1rem;
+  font-family: var(--mono);
+  font-size: 13px;
   color: var(--muted);
 }
 
-.footMark { width: 26px; height: 26px; color: var(--faint); margin-bottom: 12px; }
-footer p { margin: 0 0 8px; font-size: 15px; }
-footer .small { font-size: 14px; }
+.docLead {
+  padding: clamp(1.25rem, 3vw, 1.85rem);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  font-size: clamp(16.5px, 1.7vw, 18.5px);
+}
+.docLead p + p { margin-top: 1rem; }
 
-/* ---------- a11y ---------- */
+.docBody section { margin-top: clamp(3rem, 6vw, 4.5rem); }
+.docBody h2 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  max-width: none;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.docBody section > p { margin-top: 1.2rem; color: var(--muted); }
+.docBody section > p strong { color: var(--text); font-weight: 500; }
+.docBody a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.callout {
+  margin-top: 1.5rem !important;
+  padding: 1rem 1.15rem;
+  border-left: 2px solid var(--accent);
+  background: var(--raised);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.docList { margin: 1.5rem 0 0; display: grid; gap: 1.5rem; }
+.docList dt { font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
+.docList dd { margin: 0.5rem 0 0; color: var(--muted); font-size: 15.5px; }
+
+/* Tables are the one thing here that can outgrow the column, so they get their
+   own scroll box. The page body must never scroll sideways. */
+.tableWrap {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+.docBody table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 34rem; }
+.docBody th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--muted);
+  padding: 0.9rem 1rem;
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+}
+.docBody td { padding: 0.9rem 1rem; color: var(--muted); vertical-align: top; }
+.docBody tbody tr + tr td { border-top: 1px solid var(--border); }
+.docBody td:first-child { color: var(--text); }
+
+/* ---------------------------------------------------------------- foot --- */
+footer {
+  border-top: 1px solid var(--border);
+  padding: clamp(3rem, 6vw, 4.5rem) var(--gutter);
+}
+.footInner {
+  max-width: var(--shell); margin: 0 auto;
+  display: grid; gap: 1rem;
+  color: var(--muted); font-size: 14.5px;
+}
+.footInner p { max-width: 52ch; }
+.footLinks { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+.footLinks a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
+.footLinks a:hover { border-bottom-color: var(--accent); color: var(--accent); }
+
+/* --------------------------------------------------------------- motion -- */
+/* MOTION_INTENSITY 7. Every animation below is an entrance: it establishes
+   reading order once and then never runs again. There are no infinite loops,
+   no parallax, and no scroll listener anywhere in app.js. */
+@media (prefers-reduced-motion: no-preference) {
+  .heroCopy > *, .heroDemo {
+    animation: rise 0.85s var(--ease) both;
+  }
+  .heroCopy .eyebrow { animation-delay: 0.02s; }
+  .heroCopy h1 { animation-delay: 0.08s; }
+  .heroCopy .lede { animation-delay: 0.16s; }
+  .heroCopy .cta { animation-delay: 0.24s; }
+  .heroDemo { animation-delay: 0.3s; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* The arc gets its own keyframe: `rise` would land on opacity 1 and blow out
+     the ambient level the rule above sets. */
+  .heroArc { animation: drift 1.6s var(--ease) 0.1s both; }
+  @keyframes drift {
+    from { opacity: 0; transform: translateY(30px) scale(1.04); }
+    to { opacity: 0.55; transform: none; }
+  }
+  @media (prefers-color-scheme: dark) {
+    @keyframes drift {
+      from { opacity: 0; transform: translateY(30px) scale(1.04); }
+      to { opacity: 0.5; transform: none; }
+    }
+  }
+
+  /* The specimen swap is a state transition, so it gets a beat of its own. */
+  .specimenText, .specimenRuleText, .verdictNote { transition: opacity 0.25s var(--ease); }
+  .specimen.swapping .specimenText,
+  .specimen.swapping .specimenRuleText,
+  .specimen.swapping .verdictNote { opacity: 0; }
+
+  /* Section reveals, on the browser's own scroll timeline. No observer and no
+     JS: an element the page never scrolls to simply renders in its finished
+     state, which is the failure mode you want. The @supports guard means a
+     browser without scroll-driven animations shows everything immediately
+     rather than showing nothing. */
+  @supports (animation-timeline: view()) {
+    .decisionHead, .labHead, .labPanel, .modesHead, .cell,
+    .privacyHead, .ledgerCol, .privacyClose, .installCopy,     @keyframes reveal {
+      from { opacity: 0; transform: translateY(26px); }
+      to { opacity: 1; transform: none; }
+    }
+  }
+}

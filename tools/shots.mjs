@@ -76,6 +76,60 @@ for (const scheme of ["light", "dark"]) {
     await page.close();
   }
 
+  // The marketing site ships one of these as web/assets/newtab-<scheme>.png, so
+  // generate it here rather than by hand: the version that shipped before this
+  // was from Phase 1 and still showed placeholder rows that had been replaced
+  // by real ones two phases earlier.
+  //
+  // Filled and configured rather than at rest. A fresh profile has granted
+  // nothing, so the resting page is a clock and an empty box: the favourites
+  // bar and the weather card are both opt-in and simply absent. Seeding
+  // chrome.storage shows the page someone actually ends up with.
+  //
+  // The weather reading is written straight into the cache, so no request goes
+  // to Open-Meteo and the shot is the same every run. `at` is now, because a
+  // stale reading would send dashboard.js looking for a fresh one.
+  const site = await ctx.newPage();
+  await site.setViewportSize({ width: 1280, height: 800 });
+  await site.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+  await site.waitForTimeout(200);
+
+  await site.evaluate(() => {
+    return chrome.storage.local.set({
+      favorites: [
+        { id: "https://github.com", url: "https://github.com", name: "GitHub" },
+        { id: "https://news.ycombinator.com", url: "https://news.ycombinator.com", name: "Hacker News" },
+        { id: "https://developer.mozilla.org", url: "https://developer.mozilla.org", name: "MDN" },
+        { id: "https://linear.app", url: "https://linear.app", name: "Linear" },
+        { id: "https://figma.com", url: "https://figma.com", name: "Figma" },
+      ],
+      weatherPlace: { name: "Lisbon", latitude: 38.72, longitude: -9.14 },
+      weatherUnit: "celsius",
+      weatherCache: {
+        place: "Lisbon",
+        unit: "celsius",
+        temperature: 19,
+        text: "Partly cloudy",
+        icon: "partly",
+        high: 23,
+        low: 14,
+        at: Date.now(),
+      },
+      // The default-engine hint is a one-time nudge, not part of the page. It
+      // would read as chrome in a marketing shot.
+      engineNudgeDismissed: true,
+    });
+  });
+
+  await site.reload({ waitUntil: "domcontentloaded" });
+  await site.waitForTimeout(350);
+  await site.fill("#query", "what is a nock");
+  await site.waitForTimeout(200);
+  const sitePath = join(ROOT, "web", "assets", `newtab-${scheme}.png`);
+  await site.screenshot({ path: sitePath, clip: { x: 0, y: 0, width: 1280, height: 700 } });
+  console.log(sitePath);
+  await site.close();
+
   const options = await ctx.newPage();
   await options.setViewportSize({ width: 900, height: 800 });
   await options.goto(`chrome-extension://${extensionId(EXT)}/options.html`, { waitUntil: "domcontentloaded" });
