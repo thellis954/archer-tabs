@@ -8,6 +8,13 @@ A Chrome Manifest V3 extension that replaces the browser's New Tab page with an 
 search page. Four files, no dependencies, no build step, no test suite — the source *is* the shipped
 artifact, and the browser loads these files verbatim.
 
+**Read `docs/ROADMAP.md` before making substantive changes.** It carries the audit of the current
+build (including known bugs in the URL/prompt classifier), the constraints that bound the design —
+Chrome Web Store search policy, OpenAI trademark, and the fact that no sanctioned API exposes ChatGPT
+conversation history — and the phased plan. The scope decision that matters most: **this extension
+owns the new tab page only.** Making ChatGPT the address-bar default search engine is handled by
+OpenAI's own "ChatGPT search" extension, not by this one.
+
 ## Development loop
 
 There is nothing to build or install. To run it:
