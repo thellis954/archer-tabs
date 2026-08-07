@@ -7,8 +7,10 @@
 //   mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright
 
 import { createHash } from "node:crypto";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const EXT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "extension");
 
@@ -218,7 +220,12 @@ check(
   "the big page mark is hidden from assistive tech",
   (await page.locator(".logo[aria-hidden=true]").count()) === 1,
 );
-check("the suggestion list is labelled", (await page.locator(".suggestions[aria-label]").count()) === 1);
+const lists = await page.locator(".suggestions").count();
+check(
+  "every suggestion list is labelled",
+  lists > 0 && (await page.locator(".suggestions[aria-label]").count()) === lists,
+  `${lists} lists`,
+);
 
 const unlabelled = await page.evaluate(() =>
   [...document.querySelectorAll("button")].filter(
@@ -369,8 +376,291 @@ check(
   JSON.stringify(manifest.permissions),
 );
 check("no host permissions are requested", !manifest.host_permissions?.length);
+check(
+  "history is optional, so it is not in the install prompt",
+  manifest.optional_permissions?.includes("history") && !manifest.permissions.includes("history"),
+  JSON.stringify({ permissions: manifest.permissions, optional: manifest.optional_permissions }),
+);
+
+// --- rows, without the history permission ------------------------------------
+
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+
+check("the onboarding row is offered when history is not granted", await page.locator("#onboarding").isVisible());
+check(
+  "prompt rows appear with no permission at all",
+  (await page.locator("#rows .row.isPrompt").count()) > 0,
+  `${await page.locator("#rows .row").count()} rows`,
+);
+check(
+  "no conversation rows without history access",
+  (await page.locator("#rows .row.isConversation").count()) === 0,
+);
+
+// Every row's text came from a prompt or a page title. If any of it were ever
+// parsed as markup this would find it.
+await page.evaluate(() =>
+  chrome.storage.local.set({
+    launches: [{ text: "<img src=x onerror=alert(1)> & <b>bold</b>", at: Date.now() }],
+  }),
+);
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+check(
+  "row text is inserted as text, never as markup",
+  (await page.locator("#rows .row .title").first().innerText()).includes("<img src=x") &&
+    (await page.locator("#rows .row").first().evaluate((n) => n.querySelectorAll("img, b").length)) === 0,
+);
+
+// --- keyboard through the rows -----------------------------------------------
+
+await page.evaluate(() =>
+  chrome.storage.local.set({
+    launches: [
+      { text: "sourdough starter ratios", at: Date.now() - 3000 },
+      { text: "how to fletch an arrow", at: Date.now() - 2000 },
+      { text: "tide times for saturday", at: Date.now() - 1000 },
+    ],
+    dismissed: [],
+    pinned: [],
+  }),
+);
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+
+const rowTitles = () => page.locator("#rows .row .title").allInnerTexts();
+check("all three prompts render", (await rowTitles()).length === 3, JSON.stringify(await rowTitles()));
+
+await page.locator("#query").focus();
+await page.keyboard.press("ArrowDown");
+check(
+  "ArrowDown selects the first row",
+  (await page.locator("#rows .row.isActive").count()) === 1 &&
+    (await page.locator("#rows .row").first().getAttribute("aria-selected")) === "true",
+);
+check(
+  "the selection is announced on the input",
+  (await page.locator("#query").getAttribute("aria-activedescendant")) === "row-0",
+);
+
+await page.keyboard.press("ArrowUp");
+check("ArrowUp returns to the input", (await page.locator("#rows .row.isActive").count()) === 0);
+
+await page.keyboard.press("ArrowUp");
+check(
+  "wrapping past the input lands on the last row",
+  (await page.locator("#rows .row").last().getAttribute("aria-selected")) === "true",
+);
+
+await page.keyboard.press("Escape");
+check("Escape drops the selection first", (await page.locator("#rows .row.isActive").count()) === 0);
+
+// --- filtering ---------------------------------------------------------------
+
+await page.fill("#query", "fletch");
+await page.waitForTimeout(150);
+check(
+  "typing filters the rows",
+  (await rowTitles()).join("|") === "how to fletch an arrow",
+  JSON.stringify(await rowTitles()),
+);
+
+await page.fill("#query", "zzzq");
+await page.waitForTimeout(150);
+check("a query with no matches says so", await page.locator("#noMatches").isVisible());
+check("...and does not claim there is nothing at all", await page.locator("#emptyState").isHidden());
+
+await page.fill("#query", "");
+await page.waitForTimeout(150);
+check("clearing the box brings every row back", (await rowTitles()).length === 3);
+
+// --- relaunching a prompt row ------------------------------------------------
+
+nav.length = 0;
+await page.locator("#query").press("ArrowDown");
+await page.locator("#query").press("Enter");
+await page.waitForTimeout(300);
+check(
+  "Enter on a selected row re-asks that prompt",
+  isSearchFor(nav, "tide times for saturday"),
+  JSON.stringify(nav),
+);
+
+// --- pin and dismiss ---------------------------------------------------------
+
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+
+await page.locator("#rows .row").last().locator(".pin").click();
+await page.waitForTimeout(250);
+check(
+  "pinning moves a row to the top",
+  (await rowTitles())[0] === "sourdough starter ratios",
+  JSON.stringify(await rowTitles()),
+);
+check("a pinned row is marked", (await page.locator("#rows .row.isPinned").count()) === 1);
+
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+check("the pin survives a reload", (await rowTitles())[0] === "sourdough starter ratios");
+
+await page.locator("#rows .row").first().locator(".dismissRow").click();
+await page.waitForTimeout(250);
+check(
+  "dismissing removes the row",
+  !(await rowTitles()).includes("sourdough starter ratios"),
+  JSON.stringify(await rowTitles()),
+);
+
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+check("the dismissal survives a reload", (await rowTitles()).length === 2);
+
+// --- the empty state ---------------------------------------------------------
+
+await page.evaluate(() => chrome.storage.local.set({ launches: [], pinned: [], dismissed: [] }));
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(400);
+// With no permission and nothing logged, the onboarding row *is* the empty
+// state — saying "nothing yet" underneath an offer to show something would be
+// two answers to one question.
+check("with nothing to show, the onboarding row stands alone", await page.locator("#onboarding").isVisible());
+check("...and the empty-state line stays out of its way", await page.locator("#emptyState").isHidden());
 
 await ctx.close();
+
+// --- with the history permission granted --------------------------------------
+//
+// chrome.permissions.request() opens a native dialog that headless Chromium
+// never resolves, so the granted path is exercised through a fixture: the same
+// extension directory, copied, with `history` moved from optional_permissions
+// into permissions so it is granted at install. Same source, same chrome.history
+// — only the consent step is skipped, and that step is covered above by
+// asserting the onboarding row calls for it.
+
+const fixture = mkdtempSync(join(tmpdir(), "archer-history-"));
+cpSync(EXT, fixture, { recursive: true });
+{
+  const path = join(fixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  m.permissions = [...m.permissions, ...m.optional_permissions];
+  delete m.optional_permissions;
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+
+const histCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${fixture}`, `--load-extension=${fixture}`, "--no-sandbox"],
+});
+const FIXTURE_NEWTAB = `chrome-extension://${extensionId(fixture)}/newtab.html`;
+
+const CONVOS = [
+  { id: "0f9c2a41-1b3d-4c8e-9a77-5e2b6d0c4a19", title: "Evaluate Claude vs rivals", prompt: "compare the coding tools" },
+  { id: "7a1e5c93-2d4f-4b6a-8c05-1f3e9b7d2a68", title: "News about Air Quality Alerts", prompt: "why are there air quality alerts" },
+];
+
+const seed = await histCtx.newPage();
+await seed.goto(FIXTURE_NEWTAB, { waitUntil: "domcontentloaded" });
+await seed.waitForTimeout(300);
+check("the fixture has history access", await seed.evaluate(() => typeof chrome.history?.search === "function"));
+
+// The launches have to predate the visits for the binding to be able to explain
+// them, which is the whole point of §3.3 Source B.
+await seed.evaluate(
+  (convos) =>
+    chrome.storage.local.set({
+      launches: convos.map((c, i) => ({ text: c.prompt, at: Date.now() - 20_000 + i })),
+      pinned: [],
+      dismissed: [],
+    }),
+  CONVOS,
+);
+
+// Real navigations, so Chrome records real titles — the title is the only thing
+// that makes a history entry usable as a conversation row.
+const browsing = await histCtx.newPage();
+await browsing.route(/^https:\/\/chatgpt\.com\//, (r) => {
+  const found = CONVOS.find((c) => r.request().url().includes(c.id));
+  return r.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: `<!doctype html><meta charset="utf-8"><title>${found?.title ?? "ChatGPT"}</title><p>x`,
+  });
+});
+for (const convo of CONVOS) {
+  await browsing.goto(`https://chatgpt.com/c/${convo.id}`, { waitUntil: "load" });
+  await browsing.waitForTimeout(150);
+}
+// A conversation Chrome only ever saw before it was named must not become a row.
+await browsing.goto("https://chatgpt.com/c/11111111-2222-4333-8444-555555555555", { waitUntil: "load" });
+await browsing.waitForTimeout(150);
+await browsing.close();
+
+const convoPage = await histCtx.newPage();
+await convoPage.goto(FIXTURE_NEWTAB, { waitUntil: "domcontentloaded" });
+await convoPage.waitForTimeout(700);
+
+check("the onboarding row is gone once access is granted", await convoPage.locator("#onboarding").isHidden());
+
+const convoTitles = await convoPage.locator("#rows .row.isConversation .title").allInnerTexts();
+check(
+  "recent conversations render, titled from history",
+  CONVOS.every((c) => convoTitles.includes(c.title)),
+  JSON.stringify(convoTitles),
+);
+check(
+  "an untitled conversation is not offered as a row",
+  !convoTitles.some((t) => t.toLowerCase() === "chatgpt"),
+  JSON.stringify(convoTitles),
+);
+
+// Pairing, not just presence: the launches here are fired in a burst before
+// any conversation resolves, which is exactly the case where a "nearest
+// timestamp" rule pairs everything backwards.
+const paired = await convoPage.locator("#rows .row.isConversation").evaluateAll((rows) =>
+  Object.fromEntries(
+    rows.map((r) => [r.querySelector(".title").textContent, r.querySelector(".description").textContent]),
+  ),
+);
+check(
+  "each conversation gets the prompt that actually started it",
+  CONVOS.every((c) => paired[c.title] === `— ${c.prompt}`),
+  JSON.stringify(paired),
+);
+check(
+  "a bound launch does not also appear as its own ask-again row",
+  (await convoPage.locator("#rows .row.isPrompt").count()) === 0,
+  `${await convoPage.locator("#rows .row.isPrompt").count()} prompt rows`,
+);
+
+// Opening a row must go to the conversation, and to a URL rebuilt from the id.
+const convoNav = [];
+await convoPage.route(/^https?:/, (r) => {
+  if (r.request().isNavigationRequest()) convoNav.push(r.request().url());
+  return r.fulfill({ status: 204, body: "" });
+});
+await convoPage.locator("#rows .row.isConversation").first().click();
+await convoPage.waitForTimeout(300);
+check(
+  "clicking a conversation opens it",
+  /^https:\/\/chatgpt\.com\/c\/[0-9a-f-]{36}$/.test(convoNav[0] ?? ""),
+  JSON.stringify(convoNav),
+);
+
+// The real empty state: access granted, but nothing found.
+await convoPage.evaluate(() =>
+  chrome.storage.local.set({ launches: [], pinned: [], dismissed: [] }).then(() =>
+    chrome.history.deleteAll(),
+  ),
+);
+await convoPage.reload({ waitUntil: "domcontentloaded" });
+await convoPage.waitForTimeout(500);
+check("granted but empty gets a real empty state", await convoPage.locator("#emptyState").isVisible());
+
+await histCtx.close();
+rmSync(fixture, { recursive: true, force: true });
 
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.

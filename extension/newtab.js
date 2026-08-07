@@ -1,12 +1,28 @@
 import { URL_KIND, PROMPT } from "./src/classify.js";
 import { route, NONE, NAVIGATE, SEARCH, ASK, AUTO } from "./src/router.js";
-import { loadSettings, saveMode, dismissEngineNudge, recordLaunch } from "./src/settings.js";
+import {
+  loadSettings,
+  saveMode,
+  dismissEngineNudge,
+  recordLaunch,
+  readLaunches,
+  readRowState,
+  togglePinned,
+  dismissRow as persistDismissal,
+} from "./src/settings.js";
 import { createModeMenu } from "./src/modemenu.js";
+import { buildRows, filterRows, CONVERSATION } from "./src/conversations.js";
+import { hasHistoryAccess, requestHistoryAccess, readConversationVisits } from "./src/history.js";
+import { renderRows, setActiveRow } from "./src/rows.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
 const send = document.getElementById("send");
 const nudge = document.getElementById("engineNudge");
+const list = document.getElementById("rows");
+const onboarding = document.getElementById("onboarding");
+const emptyState = document.getElementById("emptyState");
+const noMatches = document.getElementById("noMatches");
 
 // --- mode ---------------------------------------------------------------------
 
@@ -32,22 +48,124 @@ const ready = loadSettings().then((settings) => {
   nudge.hidden = settings.nudgeDismissed;
 });
 
+// --- rows ---------------------------------------------------------------------
+
+/** Everything we could show, before the input filters it. */
+let allRows = [];
+/** Index into the currently *visible* rows, or -1 for "the input itself". */
+let active = -1;
+let visible = [];
+
+// Not awaited: the listeners below must be attached before history resolves.
+refreshRows();
+
+async function refreshRows() {
+  const granted = await hasHistoryAccess();
+  onboarding.hidden = granted;
+
+  const [launches, { pinned, dismissed }] = await Promise.all([readLaunches(), readRowState()]);
+  const visits = granted ? await readConversationVisits() : [];
+
+  allRows = buildRows({ visits, launches, pinned, dismissed });
+  paint();
+}
+
+function paint() {
+  visible = filterRows(allRows, input.value);
+  active = -1;
+
+  renderRows(list, visible, {
+    onOpen: open,
+    async onPin(row) {
+      await togglePinned(row.id);
+      await refreshRows();
+    },
+    async onDismiss(row) {
+      await persistDismissal(row.id);
+      await refreshRows();
+    },
+  });
+
+  setActiveRow(list, input, -1);
+  input.setAttribute("aria-expanded", String(visible.length > 0));
+
+  const query = input.value.trim();
+  // "Nothing yet" and "nothing matches" are different states and deserve
+  // different words; the onboarding row is its own third answer.
+  emptyState.hidden = visible.length > 0 || query !== "" || !onboarding.hidden;
+  noMatches.hidden = visible.length > 0 || query === "" || allRows.length === 0;
+}
+
+function open(row) {
+  if (row.kind === CONVERSATION) {
+    navigate(row.url);
+    return;
+  }
+  // A prompt row re-asks, through whatever mode is current — the destination is
+  // a live setting, not something frozen at the time it was first asked.
+  input.value = row.text;
+  syncSend();
+  go(row.text, null);
+}
+
+document.getElementById("enableHistory").addEventListener("click", async () => {
+  // Must stay inside the click: Chrome refuses a permission request that is not
+  // driven by a user gesture, and refuses it silently.
+  const granted = await requestHistoryAccess();
+  if (granted) await refreshRows();
+  input.focus();
+});
+
 // --- submitting ---------------------------------------------------------------
 
 // Enter is handled here rather than by form submit alone, because Cmd+Enter and
 // Shift+Enter do not reliably raise a submit event across platforms.
 input.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    input.value = "";
-    syncSend();
-    return;
-  }
-  if (event.key !== "Enter") return;
+  switch (event.key) {
+    case "ArrowDown":
+      event.preventDefault();
+      moveActive(1);
+      return;
 
-  event.preventDefault();
-  const force = event.metaKey || event.ctrlKey ? PROMPT : event.shiftKey ? URL_KIND : null;
-  go(input.value, force);
+    case "ArrowUp":
+      event.preventDefault();
+      moveActive(-1);
+      return;
+
+    case "Escape":
+      // Back out of the list first; a second Escape clears the box. Losing a
+      // half-typed query to a keystroke meant for the selection is worse than
+      // needing one more press.
+      if (active >= 0) {
+        active = -1;
+        setActiveRow(list, input, -1);
+        return;
+      }
+      input.value = "";
+      paint();
+      syncSend();
+      return;
+
+    case "Enter": {
+      event.preventDefault();
+      if (active >= 0 && visible[active]) {
+        open(visible[active]);
+        return;
+      }
+      const force = event.metaKey || event.ctrlKey ? PROMPT : event.shiftKey ? URL_KIND : null;
+      go(input.value, force);
+    }
+  }
 });
+
+function moveActive(delta) {
+  if (!visible.length) return;
+  // -1 is the input, so the range is [-1, visible.length - 1] and wraps through
+  // the input rather than jumping end to end.
+  const span = visible.length + 1;
+  active = ((active + 1 + delta + span) % span) - 1;
+  setActiveRow(list, input, active);
+}
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -150,7 +268,10 @@ function isTextField(node) {
 
 // --- send button ---------------------------------------------------------------
 
-input.addEventListener("input", syncSend);
+input.addEventListener("input", () => {
+  syncSend();
+  paint();
+});
 syncSend();
 
 /** The send control is the page's primary action, so it stays inert until

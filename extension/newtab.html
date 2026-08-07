@@ -77,6 +77,10 @@
           autocomplete="off"
           spellcheck="false"
           autofocus
+          role="combobox"
+          aria-controls="rows"
+          aria-expanded="false"
+          aria-autocomplete="list"
         >
 
         <!-- Disabled until there is something to send. Replaced the decorative
@@ -93,32 +97,58 @@
     </form>
 
     <!--
-      Placeholder rows. Phase 3 of docs/ROADMAP.md replaces these with the user's
-      recent ChatGPT conversations, sourced from chrome.history + a local launch
-      log. Render that text with textContent, never innerHTML — page titles are
-      attacker-influenceable.
+      Filled by src/rows.js from chrome.history + the local launch log. Every
+      string in here is a page title or a prompt, so it is inserted with
+      textContent and the markup comes from the <template> below — never from a
+      string built in JS. tools/lint.js fails the build on innerHTML.
     -->
-    <ul class="suggestions" aria-label="Suggestions">
+    <ul class="suggestions" id="rows" role="listbox" aria-label="Recent conversations and prompts"></ul>
 
-      <li><button class="suggestion" type="button">
-        <span class="dot" aria-hidden="true"></span>
-        <span class="title">Your recent conversations land here</span>
-        <span class="description">— once history is wired up in Phase 3</span>
+    <!-- Shown when the history permission has not been granted. Mirrors the
+         "Import from another browser" onboarding row on the reference page. -->
+    <ul class="suggestions" id="onboarding" aria-label="Set up" hidden>
+      <li><button class="suggestion onboard" type="button" id="enableHistory">
+        <span class="rowIcon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path d="M10 5.5v4.5l3 2"/><circle cx="10" cy="10" r="6.5"/></svg>
+        </span>
+        <span class="title">Show your recent conversations</span>
+        <span class="description">— reads your history for chatgpt.com only, on this device</span>
       </button></li>
-
-      <li><button class="suggestion" type="button">
-        <span class="dot" aria-hidden="true"></span>
-        <span class="title">Ask anything</span>
-        <span class="description">— type above and press Enter to send it on</span>
-      </button></li>
-
-      <li><button class="suggestion" type="button">
-        <span class="dot" aria-hidden="true"></span>
-        <span class="title">Or just go somewhere</span>
-        <span class="description">— type a domain and Archer navigates instead</span>
-      </button></li>
-
     </ul>
+
+    <!-- Granted, but there is nothing to show yet. -->
+    <p class="empty" id="emptyState" hidden>
+      Nothing yet. Anything you ask from here shows up as a row you can pick back up.
+    </p>
+
+    <p class="empty" id="noMatches" hidden>No rows match what you've typed.</p>
+
+    <template id="rowTemplate">
+      <li class="suggestion row" role="option" aria-selected="false">
+        <span class="rowIcon" aria-hidden="true">
+          <svg class="iconChat" viewBox="0 0 20 20">
+            <path d="M4 5.5h12v8H9.5L6 16.5V13.5H4z"/>
+          </svg>
+          <svg class="iconPrompt" viewBox="0 0 20 20">
+            <path d="M16 5v4.5a2 2 0 0 1-2 2H5M8 8.5 4.5 11.5 8 14.5"/>
+          </svg>
+        </span>
+        <span class="title"></span>
+        <span class="description"></span>
+        <span class="rowActions">
+          <button type="button" class="rowBtn pin">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M10 3.5 11.8 8h4.7l-3.8 2.9 1.5 4.6L10 12.6l-4.2 2.9 1.5-4.6L3.5 8h4.7z"/>
+            </svg>
+          </button>
+          <button type="button" class="rowBtn dismissRow">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M6 6l8 8M14 6l-8 8"/>
+            </svg>
+          </button>
+        </span>
+      </li>
+    </template>
 
     <!--
       Hidden until settings load, so a dismissed hint never flashes. Nothing

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archer",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A calm new tab page. Ask a question or type a URL — Archer works out which you meant.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
@@ -15,5 +15,8 @@
     "32": "assets/icon-32.png",
     "48": "assets/icon-48.png",
     "128": "assets/icon-128.png"
-  }
+  },
+  "optional_permissions": [
+    "history"
+  ]
 }

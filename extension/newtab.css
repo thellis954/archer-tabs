@@ -260,6 +260,8 @@ body {
   list-style: none;
 }
 
+/* Both a <button> (the onboarding row) and an <li role=option> (a real row) —
+   neither inherits the page font on its own. */
 .suggestion {
   width: 100%;
   height: 44px;
@@ -285,11 +287,80 @@ body {
 .suggestion:hover  { background: var(--surface); }
 .suggestion:active { background: var(--pressed); }
 
-.dot {
+/* Keyboard selection has to look like hover without being it — ↑/↓ moves this
+   while the pointer sits somewhere else entirely. */
+.suggestion.isActive { background: var(--surface); }
+.suggestion.isActive .title { color: var(--accent); }
+
+.rowIcon {
   flex: none;
+  display: grid;
+  place-items: center;
   width: 16px; height: 16px;
-  border-radius: 5px;
-  background: var(--border);
+  color: var(--muted);
+}
+
+.rowIcon svg {
+  width: 16px; height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* One icon per row kind, both in the template, one shown. */
+.row.isConversation .iconPrompt,
+.row.isPrompt .iconChat { display: none; }
+
+.row.isPinned .rowIcon { color: var(--accent); }
+
+/* ---------- row actions ---------- */
+
+.rowActions {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 8px;
+  opacity: 0;
+}
+
+/* Revealed on hover, and on keyboard selection, and whenever one of them holds
+   focus — otherwise tabbing to a hidden button moves focus nowhere visible. */
+.suggestion:hover .rowActions,
+.suggestion.isActive .rowActions,
+.rowActions:focus-within { opacity: 1; }
+
+/* A pinned row keeps its pin visible, or there is no sign it is pinned once
+   the pointer leaves. */
+.row.isPinned .rowActions { opacity: 1; }
+
+.rowBtn {
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rowBtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rowBtn:hover  { background: var(--bg); color: var(--text); }
+.rowBtn:active { background: var(--pressed); }
+
+.row.isPinned .pin { color: var(--accent); }
+
+/* ---------- empty states ---------- */
+
+.empty {
+  width: min(795px, 100%);
+  margin: 8px auto 0;
+  padding: 0 21px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 /* Brass is reserved for the mark, focus, hover, and the send control. A whole

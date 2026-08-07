@@ -15,7 +15,8 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 
 ```
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
-  src/       classify.js, router.js, settings.js, modemenu.js + the generated TLD list
+  src/       classify.js, router.js, conversations.js, history.js, rows.js,
+             settings.js, modemenu.js + the generated TLD list
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
 docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
 tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs (need playwright)
@@ -44,7 +45,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 76 unit cases (classifier + router), on node's built-in runner. No install needed. |
+| `npm test` | 104 unit cases (classifier, router, conversations). No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
@@ -75,7 +76,11 @@ dead weight.
 - `src/classify.js` — is this string a URL or a prompt? Total, no I/O, 47 unit cases.
 - `src/router.js` — that verdict plus the routing mode plus any modifier key → one of
   `none` / `navigate` / `search` / `ask`. Also pure, 29 unit cases.
+- `src/conversations.js` — `chrome.history` visits + the launch log → the suggestion rows.
+  Collapsing, prompt binding, pinning and fuzzy filtering all happen here. Pure, 39 unit cases.
 - `src/settings.js` — the only thing that touches `chrome.storage`.
+- `src/history.js` — the only thing that touches `chrome.history` and `chrome.permissions`.
+- `src/rows.js` — paints the rows.
 - `src/modemenu.js` — the `Auto ⌄` listbox.
 
 **Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
@@ -90,12 +95,14 @@ Some of the UI is **still decorative** — know this before "fixing" what looks 
 
 - The `.plus` and sidebar buttons are `type="button"` with no listeners. Roadmap Phase 5 wires
   `.plus`. The `.mode` button is real as of Phase 2.
-- The three `.suggestion` rows are placeholder copy. Roadmap Phase 3 replaces them with real recent
-  conversations; when it does, render that text with `textContent`, never `innerHTML` — page titles
-  are attacker-influenceable.
+Wiring it up is real work, not a bug fix. The send button (`#send`), the mode picker and the
+suggestion rows are all real.
 
-Wiring them up is real work, not a bug fix. The send button (`#send`) is *not* decorative: it
-submits, and it stays `disabled` until the input has content.
+**The suggestion rows are built from attacker-influenceable text.** A conversation title is whatever
+a page's `<title>` said, and anyone who can get you to open a link controls one. So `src/rows.js`
+clones a `<template>` from `newtab.html` and assigns `textContent` — it contains no code path that
+can turn text into an element, which is a stronger guarantee than remembering to escape. Keep it that
+way; `npm run lint` fails the build on `innerHTML` anywhere under `extension/`.
 
 `newtab.css` is a token system: every color is a custom property on `:root`, redefined once under
 `prefers-color-scheme: dark`. Add colors as tokens, never as literals in a rule — a hard-coded hex

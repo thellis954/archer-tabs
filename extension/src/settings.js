@@ -14,6 +14,11 @@ import { AUTO, MODES } from "./router.js";
 const KEY_MODE = "mode";
 const KEY_NUDGE = "engineNudgeDismissed";
 const KEY_LAUNCHES = "launches";
+const KEY_PINNED = "pinned";
+const KEY_DISMISSED = "dismissed";
+
+/** Dismissals are a tidying gesture, not a tombstone list to keep forever. */
+const DISMISSED_LIMIT = 300;
 
 /** Enough to reconstruct a month of rows without letting the log grow forever. */
 export const LAUNCH_LIMIT = 200;
@@ -79,3 +84,36 @@ export async function readLaunches() {
   const { [KEY_LAUNCHES]: log } = await store().get({ [KEY_LAUNCHES]: [] });
   return (Array.isArray(log) ? log : []).slice().reverse();
 }
+
+// --- row state ----------------------------------------------------------------
+
+/** @returns {Promise<{pinned: string[], dismissed: string[]}>} */
+export async function readRowState() {
+  const raw = await store().get({ [KEY_PINNED]: [], [KEY_DISMISSED]: [] });
+  return {
+    pinned: list(raw[KEY_PINNED]),
+    dismissed: list(raw[KEY_DISMISSED]),
+  };
+}
+
+/** @returns {Promise<boolean>} whether the row is pinned afterwards. */
+export async function togglePinned(id) {
+  const { pinned } = await readRowState();
+  const next = pinned.includes(id) ? pinned.filter((x) => x !== id) : [...pinned, id];
+  await store().set({ [KEY_PINNED]: next });
+  return next.includes(id);
+}
+
+export async function dismissRow(id) {
+  const { pinned, dismissed } = await readRowState();
+  if (dismissed.includes(id)) return;
+
+  await store().set({
+    [KEY_DISMISSED]: [...dismissed, id].slice(-DISMISSED_LIMIT),
+    // A dismissed row that is still pinned would come back the moment the
+    // dismissal aged out of the list above.
+    [KEY_PINNED]: pinned.filter((x) => x !== id),
+  });
+}
+
+const list = (value) => (Array.isArray(value) ? value.filter((x) => typeof x === "string") : []);
