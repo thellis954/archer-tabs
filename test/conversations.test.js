@@ -218,9 +218,71 @@ test("dismissing a conversation frees its launch to stand on its own", () => {
 });
 
 test("the row cap is honoured", () => {
+  // Eight since Phase 5: top sites and closed tabs share the list, and six left
+  // no room for them once you had a day's worth of prompts.
   const launches = Array.from({ length: 20 }, (_, i) => ({ text: `q${i}`, at: T + i }));
-  assert.equal(buildRows({ launches }).length, 6);
+  assert.equal(buildRows({ launches }).length, 8);
   assert.equal(buildRows({ launches, limit: 3 }).length, 3);
+});
+
+// --- top sites and closed tabs (Phase 5) -------------------------------------
+
+const site = (url, title) => ({ url, title });
+
+test("top sites and closed tabs become rows", () => {
+  const rows = buildRows({
+    sites: [site("https://news.example.com", "News")],
+    closed: [{ url: "https://docs.example.com", title: "Docs", at: T }],
+  });
+  assert.deepEqual(rows.map((r) => r.kind), ["closed", "site"]);
+  assert.equal(rows[0].title, "Docs");
+});
+
+test("what you asked outranks where you have been", () => {
+  const rows = buildRows({
+    launches: [{ text: "an old prompt", at: T - 900_000 }],
+    sites: [site("https://news.example.com", "News")],
+    closed: [{ url: "https://docs.example.com", title: "Docs", at: T }],
+  });
+  assert.equal(rows[0].kind, PROMPT_ROW, "even though the closed tab is newer");
+});
+
+test("a site that is already a conversation row is not repeated", () => {
+  const rows = buildRows({
+    visits: [visit(UUID, "Evaluate Claude vs rivals", T)],
+    sites: [site(`https://chatgpt.com/c/${UUID}`, "Evaluate Claude vs rivals")],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, CONVERSATION);
+});
+
+test("closed tabs and top sites do not duplicate each other", () => {
+  const rows = buildRows({
+    sites: [site("https://example.com", "Example")],
+    closed: [{ url: "https://example.com", title: "Example", at: T }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, "closed", "the one with a time survives");
+});
+
+test("browsing rows can be pinned and dismissed like any other", () => {
+  const pinned = buildRows({
+    launches: [{ text: "recent prompt", at: T }],
+    sites: [site("https://example.com", "Example")],
+    pinned: ["site:https://example.com"],
+  });
+  assert.equal(pinned[0].title, "Example");
+
+  assert.equal(
+    buildRows({ sites: [site("https://example.com", "Example")], dismissed: ["site:https://example.com"] }).length,
+    0,
+  );
+});
+
+test("browsing rows are searchable by title and by host", () => {
+  const rows = buildRows({ sites: [site("https://news.example.com", "The Daily")] });
+  assert.equal(filterRows(rows, "daily").length, 1);
+  assert.equal(filterRows(rows, "news.example").length, 1);
 });
 
 test("nothing in, nothing out", () => {

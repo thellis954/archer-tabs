@@ -9,6 +9,13 @@
 
 export const CONVERSATION = "conversation";
 export const PROMPT_ROW = "prompt";
+/** A frequently-visited site (chrome.topSites). */
+export const SITE = "site";
+/** A tab you closed (chrome.sessions). */
+export const CLOSED = "closed";
+
+/** Row kinds that are a link to follow rather than a prompt to re-ask. */
+export const LINK_KINDS = new Set([CONVERSATION, SITE, CLOSED]);
 
 /**
  * How long after a launch a conversation may appear and still be attributed to
@@ -38,7 +45,15 @@ export const conversationURL = (id) => `https://chatgpt.com/c/${id}`;
  * @param {number}   [input.limit]
  * @returns {Array<object>} rows, pinned first then most recent, capped at `limit`
  */
-export function buildRows({ visits = [], launches = [], pinned = [], dismissed = [], limit = 6 } = {}) {
+export function buildRows({
+  visits = [],
+  launches = [],
+  sites = [],
+  closed = [],
+  pinned = [],
+  dismissed = [],
+  limit = 8,
+} = {}) {
   const dropped = new Set(dismissed);
   const conversations = collapseVisits(visits).filter((c) => !dropped.has(c.id));
 
@@ -47,16 +62,48 @@ export function buildRows({ visits = [], launches = [], pinned = [], dismissed =
   const log = [...launches].filter((l) => l && l.text).sort((a, b) => a.at - b.at);
   const spent = bindLaunches(conversations, log);
 
-  const rows = [
-    ...conversations,
-    ...unboundPrompts(log, spent, dropped),
-  ];
+  const recall = [...conversations, ...unboundPrompts(log, spent, dropped)];
+  const browsing = browsingRows(sites, closed, dropped, recall);
 
   const isPinned = new Set(pinned);
-  for (const row of rows) row.pinned = isPinned.has(row.id);
+  for (const row of [...recall, ...browsing]) row.pinned = isPinned.has(row.id);
 
-  rows.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.at - a.at);
-  return rows.slice(0, limit);
+  const byRecency = (a, b) => b.at - a.at;
+  recall.sort(byRecency);
+  browsing.sort(byRecency);
+
+  // Pinning is an explicit instruction, so it outranks everything — including
+  // the grouping below. Among the rest, what you asked beats where you have
+  // been: this is a recall surface first, and top sites are here to fill the
+  // space rather than to compete for it.
+  const rest = [...recall, ...browsing].filter((r) => !r.pinned);
+  const top = [...recall, ...browsing].filter((r) => r.pinned).sort(byRecency);
+
+  return [...top, ...rest].slice(0, limit);
+}
+
+function browsingRows(sites, closed, dropped, recall) {
+  const rows = [];
+  // A conversation you can already reach as a row does not need a second entry
+  // as "a site you visit a lot".
+  const seen = new Set(recall.map((r) => r.url).filter(Boolean));
+
+  for (const tab of closed ?? []) {
+    if (!tab?.url || seen.has(tab.url)) continue;
+    seen.add(tab.url);
+    const row = { kind: CLOSED, id: `closed:${tab.url}`, url: tab.url, title: tab.title ?? "", at: Number(tab.at) || 0 };
+    if (!dropped.has(row.id)) rows.push(row);
+  }
+
+  for (const site of sites ?? []) {
+    if (!site?.url || seen.has(site.url)) continue;
+    seen.add(site.url);
+    // topSites reports no times at all, so these carry no recency to sort by.
+    const row = { kind: SITE, id: `site:${site.url}`, url: site.url, title: site.title ?? "", at: 0 };
+    if (!dropped.has(row.id)) rows.push(row);
+  }
+
+  return rows;
 }
 
 function collapseVisits(visits) {
@@ -145,7 +192,7 @@ function unboundPrompts(log, spent, dropped) {
 
 /** The text a row is matched and displayed by. */
 export const rowText = (row) =>
-  row.kind === CONVERSATION ? `${row.title} ${row.prompt ?? ""}` : row.text;
+  row.kind === PROMPT_ROW ? row.text : `${row.title ?? ""} ${row.prompt ?? row.url ?? ""}`;
 
 /**
  * Subsequence match, ranked. Typing `evcl` finds "Evaluate Claude" — the same

@@ -21,6 +21,48 @@
     </h1>
 
     <section class="card">
+      <h2>Saved prompts</h2>
+      <p class="prose">
+        Type <kbd>/</kbd> in an empty search box to find one. Put <code>{{blanks}}</code> anywhere in
+        the text and Archer selects the first one for you to type over — <kbd>Tab</kbd> moves to the
+        next.
+      </p>
+
+      <ul class="templates" id="templates"></ul>
+
+      <div class="fieldPair">
+        <div class="field">
+          <label for="templateName">Name</label>
+          <input id="templateName" type="text" placeholder="translate" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="templateText">Prompt</label>
+          <input id="templateText" type="text" placeholder="Translate {{text}} into {{language}}">
+        </div>
+      </div>
+
+      <div class="rowButtons">
+        <button type="button" class="primary" id="addTemplate">Save prompt</button>
+      </div>
+      <p class="status" id="templateStatus" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>What you ask</h2>
+      <p class="prose">
+        Computed here, from the prompts already stored on this device. Nothing is sent anywhere to
+        work this out.
+      </p>
+      <div id="analytics"></div>
+
+      <div class="rowButtons">
+        <button type="button" id="exportMarkdown">Export prompts as Markdown</button>
+        <button type="button" id="clearHistory">Clear prompt history</button>
+      </div>
+      <p class="status" id="dataStatus" role="status"></p>
+    </section>
+
+    <section class="card">
       <h2>Answer on the new tab page</h2>
 
       <p class="prose">
