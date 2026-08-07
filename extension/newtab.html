@@ -24,10 +24,30 @@
       <span class="brandName">Archer</span>
     </span>
 
-    <button type="button" class="mode" aria-label="Routing mode: Auto">
-      Auto
-      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 8.5l4 4 4-4"/></svg>
-    </button>
+    <div class="modeWrap">
+      <button type="button" class="mode" id="modeButton"
+              aria-haspopup="listbox" aria-expanded="false" aria-label="Routing mode: Auto">
+        <span id="modeLabel">Auto</span>
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 8.5l4 4 4-4"/></svg>
+      </button>
+
+      <!-- Where a prompt goes. A URL always just opens, in every mode except
+           Search, which is the sticky form of ⌘+Enter. -->
+      <ul class="modeMenu" id="modeMenu" role="listbox" aria-label="Routing mode" hidden>
+        <li role="option" data-mode="auto" data-label="Auto" tabindex="0" aria-selected="true">
+          <span class="modeName">Auto</span>
+          <span class="modeHint">URLs open. Anything else goes to your default search engine.</span>
+        </li>
+        <li role="option" data-mode="chatgpt" data-label="ChatGPT" tabindex="-1" aria-selected="false">
+          <span class="modeName">ChatGPT</span>
+          <span class="modeHint">URLs open. Anything else goes to ChatGPT, whatever your default engine is.</span>
+        </li>
+        <li role="option" data-mode="search" data-label="Search" tabindex="-1" aria-selected="false">
+          <span class="modeName">Search</span>
+          <span class="modeHint">Never navigate. Everything is a query, even if it looks like a URL.</span>
+        </li>
+      </ul>
+    </div>
   </header>
 
   <main class="page">
@@ -99,6 +119,22 @@
       </button></li>
 
     </ul>
+
+    <!--
+      Hidden until settings load, so a dismissed hint never flashes. Nothing
+      here claims to know the user's default engine — no API reports it — so it
+      states what Archer does and leaves the conclusion to them.
+    -->
+    <p class="nudge" id="engineNudge" hidden>
+      <span class="nudgeText">Prompts go to your default search engine. To make that ChatGPT, use <a
+        href="https://chromewebstore.google.com/detail/chatgpt-search/ejcfepkfckglbgocfkanmcdngdijcgld"
+        rel="noreferrer">OpenAI's ChatGPT search extension</a>.</span>
+      <button type="button" class="dismiss" id="dismissNudge" aria-label="Dismiss this hint">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M6 6l8 8M14 6l-8 8"/>
+        </svg>
+      </button>
+    </p>
 
   </main>
 

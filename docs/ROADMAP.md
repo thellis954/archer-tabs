@@ -359,14 +359,51 @@ flag fixes it, because the screenshot canvas is sized by the window rather than 
   filled-input/hovered-row state — the states the resting page does not show. Added because the
   suggestion rows were misaligned under the search box and nothing but a render would have said so.
 
-### Phase 2 — Real routing (~0.5 day) 🔴 this is the product, and it got much smaller
-Makes "Ask ChatGPT or type a URL" true, replacing the Google fallback. §0.5 does most of the work.
-- `Auto` mode: URL → `chrome.tabs.update`; prompt → `chrome.search.query()` → the user's default
-  engine → ChatGPT. **That's the entire routing story.** No hardcoded ChatGPT URL, no content script.
-- Dropdown modes `Auto` / `ChatGPT` / `Search`, persisted in `chrome.storage`
-- First-run check: if the default engine isn't ChatGPT, show a dismissible one-line nudge linking to
-  OpenAI's extension. Detecting this is imprecise — treat it as a hint, never a blocker
-- Bind the resulting `/c/<uuid>` back to the launched prompt (§3.3 Source B)
+### Phase 2 — Real routing ✅ **done**
+- ✅ URL → `chrome.tabs.update`; prompt → `chrome.search.query()` → the user's default engine
+- ✅ Dropdown modes `Auto` / `ChatGPT` / `Search`, persisted in `chrome.storage.local`
+- ✅ Dismissible one-line hint linking to OpenAI's extension
+- ✅ The launch log (§3.3 Source B), recorded on every prompt
+
+**`Auto` and `Search` were the same mode as written.** Under §0.5 both mean "classify, then send
+prompts to the default engine", so the picker had two identical entries. Sharpened to three modes
+that each do something:
+
+| Mode | A URL | Anything else |
+|---|---|---|
+| **Auto** (default) | opens | your default search engine |
+| **ChatGPT** | opens | `chatgpt.com/?q=…`, whatever your default engine is |
+| **Search** | *searched* | your default search engine |
+
+`Search` is the sticky form of ⌘+Enter — "I am searching, not navigating" — which makes it the only
+mode that suppresses URL detection. A modifier still beats the mode in every case, because it is the
+more recent statement of intent. The whole table is `src/router.js`, a pure function with 29 unit
+cases, including one that asserts no mode/modifier combination can ever produce a non-`http(s)` URL.
+
+**`ChatGPT` mode ships without the content script, and that is not a regression.** It navigates to
+`chatgpt.com/?q=<prompt>`, which prefills the composer without submitting. The deferred-content-script
+note below already called this the right fallback ("always fall back to leaving text in the composer
+rather than a dead button"); doing it now means the mode is real today, at the cost of one keystroke,
+and `host_permissions` on `chatgpt.com` stays unrequested.
+
+**Deviations from the plan, deliberately:**
+- **`tabs` was *not* added to the manifest.** `chrome.tabs.update({url})` needs no permission to
+  retarget the current tab — `tabs` gates *reading* a tab's `url`/`title`/`favIconUrl`, which we
+  never do. Since that permission's install prompt reads "Read your browsing history", skipping it is
+  a real trust win for zero functional cost. The ledger below is corrected. `npm run e2e` asserts the
+  manifest asks for exactly `search` + `storage`, so this cannot drift.
+- **Binding `/c/<uuid>` back to a prompt moves to Phase 3.** It needs `history`, whose own row in the
+  ledger says Phase 3, so doing it here would mean requesting a permission a phase early. Phase 2
+  ships the half that costs nothing — the log — so it already has depth when Phase 3 reads it.
+- **No esbuild.** It was scheduled here for "the content script and the TLD list", and the content
+  script is deferred. Native ES modules work in MV3 pages, and a bundler would end "the source is the
+  shipped artifact". Revisit if a content script ever lands.
+- **`chrome.storage.local`, not `.sync`.** The launch log is the wrong shape for sync (8 KB/item,
+  100 KB total) and one store with one set of semantics beats two. Carrying settings between machines
+  is the "settings import/export" idea in §4.5.
+- **Naming ChatGPT in the mode picker and the hint is nominative use** — a factual list of
+  destinations, the same way Chrome's settings name Google. No OpenAI logo, wordmark or styling is
+  used, and the placeholder stays "Ask or type a URL" per `docs/BRAND.md`.
 
 **Deferred, possibly forever — the direct-handoff content script.** For users who explicitly pick
 `ChatGPT` mode while running a *different* default engine, we'd need `https://chatgpt.com/?q=<q>`
@@ -408,10 +445,19 @@ Ordered by my estimate of value per unit of work:
 - Tag `1.0.0` → publish
 
 ### Engineering foundation
-Stay dependency-light and zero-framework — this UI does not need React. Introduce **esbuild** at
-Phase 2 (the content script and TLD list make bundling worthwhile), **Vitest** at Phase 0.
-Split `newtab.js` into `src/classify.js`, `src/router.js`, `src/history.js`, `src/render.js` at Phase 1
-— it stops being one file the moment Phase 3 lands.
+Stay dependency-light and zero-framework — this UI does not need React. ~~Introduce **esbuild** at
+Phase 2~~ (dropped: the content script that justified it is deferred, and native ES modules work in
+MV3 pages). ~~**Vitest** at Phase 0~~ (node's built-in runner instead — zero dependencies).
+
+`newtab.js` is split as planned; as of Phase 2 the shipped modules are:
+
+| File | Owns |
+|---|---|
+| `src/classify.js` | URL vs prompt. Pure, total, 47 cases |
+| `src/router.js` | mode + modifier + verdict → one instruction. Pure, 29 cases |
+| `src/settings.js` | `chrome.storage.local`: mode, hint dismissal, launch log |
+| `src/modemenu.js` | the `Auto ⌄` listbox |
+| `newtab.js` | DOM wiring, and nothing else |
 
 ### Permissions ledger
 Each one costs install-time trust; add only when its phase needs it.
@@ -420,7 +466,7 @@ Each one costs install-time trust; add only when its phase needs it.
 |---|---|---|
 | `search` | 0 | Respect the user's default engine |
 | `storage` | 2 | Mode, launch log, preferences |
-| `tabs` | 2 | Cleaner navigation than `location.href` |
+| ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
 | `history` | 3 | Recent ChatGPT conversations |
 | `topSites`, `sessions` | 5 | Tiles, recently-closed |
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
