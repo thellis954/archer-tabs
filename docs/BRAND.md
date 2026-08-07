@@ -54,6 +54,10 @@ and arrow read as a Bluetooth glyph. Ambiguity at small sizes killed all of them
 | 32 | 2.9 | 7 | 22 |
 | 16 | 3.3 | 4 | 12 |
 
+**On the page.** Since the dashboard landed, the oversized page mark is 44px rather than 72 — the
+clock is now the thing you look at first, and two large elements stacked above the search box fought
+each other. The mark still carries the identity; the wordmark in the top bar still names it.
+
 **Two-tone vs. one-tone.** In the top bar and on app icons the legs take the foreground color and the
 bow takes brass — the accent is what makes it read as a bow rather than a font glyph. The oversized
 page mark drops to a single faint tone: at 72px the two-tone version competes with the search box,

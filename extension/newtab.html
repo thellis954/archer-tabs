@@ -10,10 +10,19 @@
 <body>
 
   <header class="bar">
-    <button type="button" class="iconBtn" aria-label="Toggle sidebar">
-      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-        <path d="M3 5h14M3 10h9M3 15h14"/>
-      </svg>
+    <!-- Hidden until a place is set: an empty weather card is worse than none. -->
+    <button type="button" class="weather" id="weather" aria-label="Weather — open settings" hidden>
+      <span class="weatherIcon" id="weatherIcon" aria-hidden="true"></span>
+      <span class="weatherBody">
+        <span class="weatherTop">
+          <strong class="weatherTemp" id="weatherTemp"></strong>
+          <span class="weatherText" id="weatherText"></span>
+        </span>
+        <span class="weatherBottom">
+          <span class="weatherPlace" id="weatherPlace"></span>
+          <span class="weatherRange" id="weatherRange"></span>
+        </span>
+      </span>
     </button>
 
     <span class="brand">
@@ -23,6 +32,13 @@
       </svg>
       <span class="brandName">Archer</span>
     </span>
+
+    <button type="button" class="iconBtn gear" id="openSettings" aria-label="Settings">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M3 6.5h14M3 13.5h14"/>
+        <circle cx="7.5" cy="6.5" r="2"/><circle cx="13" cy="13.5" r="2"/>
+      </svg>
+    </button>
 
     <div class="modeWrap">
       <button type="button" class="mode" id="modeButton"
@@ -64,12 +80,50 @@
 
   <main class="page">
 
+    <!-- The clock is the one thing on this page that is true without any
+         permission, any key, or any network. -->
+    <div class="clock">
+      <p class="clockTime" id="clockTime"></p>
+      <p class="clockGreeting" id="clockGreeting"></p>
+      <p class="clockDate" id="clockDate"></p>
+    </div>
+
     <!-- Decorative: the wordmark in the bar already names the product, so
          announcing "Archer" a second time is noise on a page this small. -->
     <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
       <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
       <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
     </svg>
+
+    <!-- The three destinations worth one click. The full set, including Auto,
+         Perplexity and Answer here, stays in the menu in the top bar; both
+         controls read and write the same mode. -->
+    <div class="targets" role="group" aria-label="Where prompts go">
+      <button type="button" class="target" data-mode="auto" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="9" cy="9" r="5.5"/><path d="M13 13l3.5 3.5"/>
+        </svg>
+        Search
+      </button>
+      <button type="button" class="target" data-mode="chatgpt" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M4 5.5h12v8H9.5L6 16.5V13.5H4z"/>
+        </svg>
+        ChatGPT
+      </button>
+      <button type="button" class="target" data-mode="claude" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M10 3.2 12 8l4.8 2-4.8 2-2 4.8L8 12l-4.8-2L8 8z"/>
+        </svg>
+        Claude
+      </button>
+      <button type="button" class="target" data-mode="perplexity" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M10 3.5v13M10 6.5 5 3.5v9M10 6.5l5-3v9"/>
+        </svg>
+        Perplexity
+      </button>
+    </div>
 
     <form id="searchForm" role="search">
       <label class="visuallyHidden" for="query">Ask a question or enter a URL</label>
@@ -174,6 +228,26 @@
 
     <p class="empty" id="noMatches" hidden>No rows match what you've typed.</p>
 
+    <template id="weather-clear"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7 17 17M7 7 5.3 5.3"/></svg></template>
+    <template id="weather-partly"><svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M9 1.8v1.8M3.5 8.5H1.7M14.5 3 13.2 4.3M4.8 4.3 3.5 3"/><path d="M8.5 20.5h9a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.5 1 3 3 0 0 0 .2 6z"/></svg></template>
+    <template id="weather-cloud"><svg viewBox="0 0 24 24"><path d="M7.5 19.5h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.2 3.4 3.4 0 0 0 .7 6.8z"/></svg></template>
+    <template id="weather-fog"><svg viewBox="0 0 24 24"><path d="M7.5 14.5h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.2 3.4 3.4 0 0 0 .7 6.8z"/><path d="M4.5 18h15M6.5 21h11"/></svg></template>
+    <template id="weather-rain"><svg viewBox="0 0 24 24"><path d="M7.5 14.5h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.2 3.4 3.4 0 0 0 .7 6.8z"/><path d="M8.5 17.5 7.5 21M12 17.5 11 21M15.5 17.5 14.5 21"/></svg></template>
+    <template id="weather-snow"><svg viewBox="0 0 24 24"><path d="M7.5 14.5h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.2 3.4 3.4 0 0 0 .7 6.8z"/><path d="M8 18.5v2.4M6.9 19.1l2.2 1.2M9.1 19.1l-2.2 1.2M15 18.5v2.4M13.9 19.1l2.2 1.2M16.1 19.1l-2.2 1.2"/></svg></template>
+    <template id="weather-storm"><svg viewBox="0 0 24 24"><path d="M7.5 14.5h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.2 3.4 3.4 0 0 0 .7 6.8z"/><path d="M12.5 16.5 10 20h3l-1.5 3"/></svg></template>
+
+    <template id="tileTemplate">
+      <li class="tile">
+        <a class="tileLink">
+          <span class="tileFace" aria-hidden="true"></span>
+          <span class="tileName"></span>
+        </a>
+        <button type="button" class="tileRemove">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 6l8 8M14 6l-8 8"/></svg>
+        </button>
+      </li>
+    </template>
+
     <template id="rowTemplate">
       <li class="suggestion row" role="option" aria-selected="false">
         <span class="rowIcon" aria-hidden="true">
@@ -225,6 +299,41 @@
         </svg>
       </button>
     </p>
+
+    <!-- Favourites. Tile faces are monograms drawn from the site's own name —
+         no favicon fetch, no permission, works offline. -->
+    <section class="favourites" id="favourites">
+      <div class="favouritesHead">
+        <h2 class="favouritesTitle">Favourites</h2>
+        <button type="button" class="addFavourite" id="addFavourite">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12"/></svg>
+          Add
+        </button>
+      </div>
+
+      <ul class="tiles" id="tiles"></ul>
+
+      <p class="empty favouritesEmpty" id="favouritesEmpty" hidden>
+        Nothing pinned here yet. Add the handful of places you open without thinking.
+      </p>
+
+      <!-- Inline rather than a dialog: two fields do not need a modal, and a
+           modal on a new tab page would fight the address bar for focus. -->
+      <form class="addTile" id="addTileForm" hidden>
+        <label class="visuallyHidden" for="tileUrl">Web address</label>
+        <input id="tileUrl" type="text" placeholder="example.com" autocomplete="off" spellcheck="false">
+        <label class="visuallyHidden" for="tileName">Name (optional)</label>
+        <input id="tileName" type="text" placeholder="Name (optional)" autocomplete="off">
+        <button type="submit" class="tileSave">Add</button>
+        <button type="button" class="tileCancel" id="cancelTile">Cancel</button>
+      </form>
+
+      <p class="status tileStatus" id="tileStatus" role="status"></p>
+    </section>
+
+    <!-- Weather glyphs. In the page rather than built in JS, for the same
+         reason the row markup is: nothing in src/ can turn text into an
+         element. src/dashboard.js clones one of these by id. -->
 
   </main>
 

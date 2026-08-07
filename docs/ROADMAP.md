@@ -527,7 +527,54 @@ optional, so the install prompt is still `search` + `storage`.
 - **A "clear prompt history" button** came with the analytics. Showing someone a computed profile of
   what they ask about, with no way to erase the input, would have been the wrong thing to build.
 
-### Phase 6 — Ship (~2 days) 🟢
+### Phase 6 — The dashboard ✅ **done**
+
+**Not in the original plan** — asked for during Phase 5, against a reference screenshot of a
+different new tab page. Inserted here rather than appended, so the store screenshots in Phase 7 show
+what actually ships.
+
+- ✅ Clock, greeting and date with the time zone
+- ✅ Weather card, from Open-Meteo
+- ✅ Favourites bar with monogram tiles
+- ✅ Destination pills above the search box — Search / ChatGPT / Claude / Perplexity
+- ✅ A "default destination" setting
+
+**The pills and the top-bar menu are one setting, in two places.** The pills carry the four
+destinations worth a single click; the menu still carries all six, including `Search only` and
+`Answer here`. Either control moves the other, and a mode with no pill leaves all four unpressed
+rather than lying about one. The same value is a select on the settings page, labelled as the
+default a new tab starts from.
+
+**The "Search" pill is not a "Google" pill, deliberately.** It routes through `chrome.search`, i.e.
+*the user's own default engine*. Hardcoding Google is the exact thing §2.2 says gets an NTP override
+pulled from the Web Store — and it would also break §0.5, where the whole point is that someone
+running OpenAI's search extension gets ChatGPT from this pill for free. The settings page says so
+in as many words.
+
+**Weather uses a place name, not the browser's geolocation.** `geolocation` never enters the
+permission list, the user picks how precise they are willing to be, and Open-Meteo needs no account
+and no API key — so there is no credential to store or leak. Two optional host permissions,
+requested at the click that saves a place. Readings are cached for 30 minutes, and a stale reading
+is shown in preference to an error: this page's job is to get out of the way.
+
+**Tiles are monograms, not favicons.** A real favicon needs the `favicon` permission or a network
+fetch per tile; two letters drawn from the site's own name work offline, in both themes, at any
+size, and cost nothing. The hue is derived from the host so a site keeps its colour between
+sessions. `GitHub` → `GH` rather than `GI`, because an internal capital is almost always the second
+half of a compound name.
+
+A favourite goes through the same rule the search box enforces: **only `http(s)` is ever stored**,
+and userinfo in the authority is refused. A tile is a link the user clicks from a privileged
+extension origin, so `javascript:` there would be exactly as dangerous as it is in the box.
+
+**Deviations:**
+- **The site-name fallback carries a nine-entry suffix list** (`co`, `com`, `ac`, …) so `bbc.co.uk`
+  is "Bbc" and not "Co". The correct answer is the Public Suffix List, which is ~15k entries — far
+  too much weight for a name the user can overwrite by typing one.
+- **The top bar lost its sidebar button.** It had no listener and no phase that owned one; the space
+  went to the weather card. The Archer wordmark stays.
+
+### Phase 7 — Ship (~2 days) 🟢
 - ~~Neutral brand skin~~ ✅ done — Archer, `docs/BRAND.md`. Remaining: store screenshots, listing
   copy, privacy policy ("all data stays on your device")
 - Per-permission opt-in with plain-language rationale — request `history` only when the user enables
@@ -564,6 +611,7 @@ Each one costs install-time trust; add only when its phase needs it.
 | ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
 | `history` *(optional)* | 3 | Recent ChatGPT conversations. Requested at the click that turns them on, never at install — so it is absent from the install prompt entirely |
 | `optional_host_permissions: api.openai.com` | 4 | Inline answers. Optional, requested when a key is saved — never at install |
+| `optional_host_permissions: *.open-meteo.com` | 6 | Weather. Optional, requested when a place is saved. No account and no API key, so there is no credential to store |
 | `topSites` *(optional)* | 5 | Top sites among the rows |
 | `sessions` + `tabs` *(optional)* | 5 | Recently-closed tabs. `sessions` alone returns no url or title — the pair is requested together, in its own opt-in, because it costs the "Read your browsing history" prompt |
 | `clipboardRead` *(optional)* | 5 | The `+` menu's paste |

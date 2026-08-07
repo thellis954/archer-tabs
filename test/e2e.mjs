@@ -1204,6 +1204,302 @@ check(
 await powerCtx.close();
 rmSync(powerFixture, { recursive: true, force: true });
 
+// --- Phase 6: the dashboard -------------------------------------------------------
+
+const dashFixture = mkdtempSync(join(tmpdir(), "archer-dash-"));
+cpSync(EXT, dashFixture, { recursive: true });
+{
+  // Open-Meteo is an optional host permission; the grant dialog never resolves
+  // headless, so the fixture holds it outright.
+  const path = join(dashFixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  m.host_permissions = m.optional_host_permissions.filter((o) => o.includes("open-meteo"));
+  m.optional_host_permissions = m.optional_host_permissions.filter((o) => !o.includes("open-meteo"));
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+
+const dashCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${dashFixture}`, `--load-extension=${dashFixture}`, "--no-sandbox"],
+});
+const DASH_NEWTAB = `chrome-extension://${extensionId(dashFixture)}/newtab.html`;
+
+const dash = await dashCtx.newPage();
+await dash.route("https://geocoding-api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      results: [{ name: "Brighton", admin1: "England", country_code: "GB", latitude: 50.82, longitude: -0.14 }],
+    }),
+  }),
+);
+await dash.route("https://api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      current: { temperature_2m: 21.6, weather_code: 2 },
+      daily: { temperature_2m_max: [28.9], temperature_2m_min: [19.5] },
+    }),
+  }),
+);
+
+await dash.goto(DASH_NEWTAB, { waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(400);
+
+// --- clock ---------------------------------------------------------------------
+
+check(
+  "the clock shows a time",
+  /\d{1,2}[:.]\d{2}/.test(await dash.locator("#clockTime").innerText()),
+  await dash.locator("#clockTime").innerText(),
+);
+check(
+  "...a greeting",
+  /^Good (morning|afternoon|evening|night)$/.test(await dash.locator("#clockGreeting").innerText()),
+  await dash.locator("#clockGreeting").innerText(),
+);
+check(
+  "...and a date with the zone",
+  (await dash.locator("#clockDate").innerText()).includes("·"),
+  await dash.locator("#clockDate").innerText(),
+);
+
+// --- weather ---------------------------------------------------------------------
+
+check("the weather card is hidden until a place is set", await dash.locator("#weather").isHidden());
+
+const dashOptions = await dashCtx.newPage();
+await dashOptions.route("https://geocoding-api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      results: [{ name: "Brighton", admin1: "England", country_code: "GB", latitude: 50.82, longitude: -0.14 }],
+    }),
+  }),
+);
+await dashOptions.route("https://api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      current: { temperature_2m: 21.6, weather_code: 2 },
+      daily: { temperature_2m_max: [28.9], temperature_2m_min: [19.5] },
+    }),
+  }),
+);
+await dashOptions.goto(`chrome-extension://${extensionId(dashFixture)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await dashOptions.waitForTimeout(300);
+
+await dashOptions.locator("#savePlace").click();
+await dashOptions.waitForTimeout(200);
+check(
+  "saving an empty place is refused",
+  (await dashOptions.locator("#placeStatus").innerText()).includes("town or city"),
+);
+
+await dashOptions.fill("#place", "Brighton");
+await dashOptions.locator("#savePlace").click();
+await dashOptions.waitForTimeout(600);
+check(
+  "a place is resolved and confirmed",
+  (await dashOptions.locator("#placeStatus").innerText()).includes("Brighton, England, GB"),
+  await dashOptions.locator("#placeStatus").innerText(),
+);
+
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(600);
+
+check("the weather card appears once a place is set", await dash.locator("#weather").isVisible());
+check(
+  "...with the temperature rounded",
+  (await dash.locator("#weatherTemp").innerText()) === "22°C",
+  await dash.locator("#weatherTemp").innerText(),
+);
+check(
+  "...the condition named",
+  (await dash.locator("#weatherText").innerText()) === "Partly cloudy",
+  await dash.locator("#weatherText").innerText(),
+);
+check(
+  "...and the day's range",
+  (await dash.locator("#weatherRange").innerText()) === "H:29° L:20°",
+  await dash.locator("#weatherRange").innerText(),
+);
+check("the card carries an icon", (await dash.locator("#weatherIcon svg").count()) === 1);
+
+await dashOptions.locator("#clearPlace").click();
+await dashOptions.waitForTimeout(300);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check("turning weather off removes the card", await dash.locator("#weather").isHidden());
+
+// --- target pills ------------------------------------------------------------------
+
+await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: true, favourites: [] }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(400);
+
+const pressed = () =>
+  dash.locator('.target[aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.dataset.mode));
+
+check("exactly one pill is pressed at a time", (await pressed()).length === 1, JSON.stringify(await pressed()));
+check("...and it matches the stored mode", (await pressed())[0] === "auto");
+
+await dash.locator('.target[data-mode="claude"]').click();
+await dash.waitForTimeout(200);
+check("clicking a pill selects it", (await pressed())[0] === "claude", JSON.stringify(await pressed()));
+check(
+  "...and the top-bar menu follows, since both are one setting",
+  (await dash.locator("#modeLabel").innerText()).trim() === "Claude",
+);
+
+await dash.bringToFront();
+
+const dashNav = [];
+await dash.route(/^https?:(?!\/\/(api|geocoding-api)\.open-meteo)/, (r) => {
+  if (r.request().isNavigationRequest()) dashNav.push(r.request().url());
+  return r.fulfill({ status: 204, body: "" });
+});
+
+await dash.fill("#query", "what is a nock");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(300);
+check(
+  "the pill actually routes the query",
+  dashNav[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
+  JSON.stringify(dashNav),
+);
+
+// Choosing in the menu has to move the pill back the other way.
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
+await dash.waitForTimeout(200);
+check("choosing in the menu moves the pill", (await pressed())[0] === "auto", JSON.stringify(await pressed()));
+
+check(
+  "all four destinations have a pill",
+  (await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))).join() ===
+    "auto,chatgpt,claude,perplexity",
+  JSON.stringify(await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))),
+);
+
+// A mode with no pill leaves them all unpressed rather than lying about one.
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="search"]').click();
+await dash.waitForTimeout(200);
+check("a mode with no pill presses none of them", (await pressed()).length === 0, JSON.stringify(await pressed()));
+
+// The default is one setting reachable from two places.
+await dashOptions.reload({ waitUntil: "domcontentloaded" });
+await dashOptions.waitForTimeout(300);
+check(
+  "settings shows the destination the page is using",
+  (await dashOptions.locator("#defaultMode").inputValue()) === "search",
+  await dashOptions.locator("#defaultMode").inputValue(),
+);
+
+await dashOptions.selectOption("#defaultMode", "perplexity");
+await dashOptions.waitForTimeout(250);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+check(
+  "changing the default there changes what a new tab uses",
+  (await pressed())[0] === "perplexity",
+  JSON.stringify(await pressed()),
+);
+
+// --- favourites ----------------------------------------------------------------------
+
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
+await dash.waitForTimeout(200);
+
+check("the favourites bar says when it is empty", await dash.locator("#favouritesEmpty").isVisible());
+check("the add form starts closed", await dash.locator("#addTileForm").isHidden());
+
+await dash.locator("#addFavourite").click();
+await dash.waitForTimeout(150);
+check("Add opens the form", await dash.locator("#addTileForm").isVisible());
+
+await dash.fill("#tileUrl", "javascript:alert(1)");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(250);
+check(
+  "a javascript: favourite is refused",
+  (await dash.locator("#tileStatus").innerText()).includes("web address") &&
+    (await dash.locator(".tile").count()) === 0,
+  await dash.locator("#tileStatus").innerText(),
+);
+
+await dash.fill("#tileUrl", "github.com");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(300);
+check("a bare host becomes a tile", (await dash.locator(".tile").count()) === 1);
+check(
+  "...named from the site",
+  (await dash.locator(".tileName").innerText()) === "Github",
+  await dash.locator(".tileName").innerText(),
+);
+check(
+  "...with a monogram face",
+  (await dash.locator(".tileFace").innerText()) === "GI",
+  await dash.locator(".tileFace").innerText(),
+);
+check("...and the empty line goes away", await dash.locator("#favouritesEmpty").isHidden());
+
+await dash.locator("#addFavourite").click();
+await dash.fill("#tileUrl", "youtube.com");
+await dash.fill("#tileName", "YouTube");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(300);
+check("a given name is kept", (await dash.locator(".tileName").allInnerTexts()).includes("YouTube"));
+check(
+  "...and drives the monogram",
+  (await dash.locator(".tile").last().locator(".tileFace").innerText()) === "YT",
+);
+
+dashNav.length = 0;
+await dash.bringToFront();
+await dash.locator(".tile").first().locator(".tileLink").click();
+await dash.waitForTimeout(300);
+check(
+  "clicking a tile opens it",
+  dashNav[0] === "https://github.com/",
+  JSON.stringify(dashNav),
+);
+
+await dash.locator(".tile").first().locator(".tileRemove").click();
+await dash.waitForTimeout(300);
+check("removing a tile removes exactly one", (await dash.locator(".tile").count()) === 1);
+
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check("favourites survive a reload", (await dash.locator(".tile").count()) === 1);
+
+// Titles come from the user, but a tile is still a rendered string.
+await dash.evaluate(() =>
+  chrome.storage.local.set({
+    favourites: [{ id: "https://example.com/", url: "https://example.com/", name: "<img src=x onerror=alert(1)>" }],
+  }),
+);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check(
+  "a tile name is text, never markup",
+  (await dash.locator(".tileName").innerText()).includes("<img src=x") &&
+    (await dash.locator(".tile").evaluate((n) => n.querySelectorAll("img").length)) === 0,
+);
+
+await dashCtx.close();
+rmSync(dashFixture, { recursive: true, force: true });
+
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.
 // Dark is where a missing token hides: the page still renders, just wrongly.
