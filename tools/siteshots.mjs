@@ -77,7 +77,7 @@ const SHOTS = [
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.fill("#demoInput", "netflix.com");
+      await page.fill("#demoInput", "youtube.com");
     },
   },
   {
@@ -86,7 +86,7 @@ const SHOTS = [
     height: 900,
     async prepare(page) {
       await page.selectOption("#demoMode", "claude");
-      await page.fill("#demoInput", "what should I make for dinner");
+      await page.fill("#demoInput", "ideas for a 10 minute presentation");
     },
   },
   {
@@ -100,30 +100,30 @@ const SHOTS = [
     },
   },
   {
-    name: "page",
+    name: "ai",
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.locator("#page").scrollIntoViewIfNeeded();
+      await page.locator("#ai").scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
     },
   },
   {
-    name: "modes",
+    name: "tricks-top",
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.locator("#modes").scrollIntoViewIfNeeded();
+      await page.locator("#tricks").scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
     },
   },
   {
-    // The landing page's permissions section, not the /privacy document above.
-    name: "privacy-section",
+    // The customisation section, not the /privacy document above.
+    name: "yours",
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.locator("#privacy").scrollIntoViewIfNeeded();
+      await page.locator("#yours").scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
     },
   },
