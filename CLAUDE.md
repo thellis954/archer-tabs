@@ -61,9 +61,30 @@ There is nothing to build or install. To run it:
 | `npm run og` | Regenerates `web/assets/og.png`, the social card. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
 | `npm run store` | Regenerates the Web Store screenshots and promo tiles into `store/`. |
+| `npm run live` | A **headed** Chromium on a real X display, photographed whole — browser chrome included. |
 | `npm run check` | lint + test — what CI runs. |
 
-`e2e`, `shots`, `icons` and `store` all need Playwright on the module path:
+**`npm run live` is the one that can see what the others cannot.** Everything else here drives
+*headless* Chromium, which never draws a toolbar, never resolves a native permission dialog, and
+never renders `chrome://newtab` through the override. Three things this project got wrong were
+invisible until someone looked at a real browser window:
+
+- the icons shipped blank for the project's whole life — headless has no toolbar to show them in;
+- `chrome.permissions.request()` hangs forever headless, which is why the granted-permission tests
+  need a fixture that skips consent;
+- the first tab of a session shows Chrome's own new tab, because the extension has not finished
+  loading yet. Not a bug — but it looks exactly like one.
+
+It needs `Xvfb`, `openbox`, `xwd`, ImageMagick and `xdotool` (`apt-get install x11-apps imagemagick
+xdotool openbox`), and it starts the display and window manager itself if they are not up.
+
+```sh
+npm run live                                        # photograph the new tab
+npm run live -- --url chrome://extensions --shot ext
+npm run live -- --keep                              # leave it up, CDP on :9222
+```
+
+`e2e`, `shots`, `icons`, `store` and `live` all need Playwright on the module path:
 
 ```sh
 mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright

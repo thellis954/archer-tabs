@@ -14,6 +14,7 @@
     "siteshots": "node tools/siteshots.mjs",
     "og": "node tools/ogcard.mjs",
     "store": "node tools/store.mjs",
+    "live": "node tools/live.mjs",
     "check": "npm run lint && npm test"
   }
 }
