@@ -17,7 +17,7 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
   src/       classify.js, router.js, conversations.js, history.js, rows.js, answer.js,
              clock.js, weather.js, favourites.js, dashboard.js, library.js, analytics.js,
-             browsing.js, settings.js, modemenu.js + the generated TLD list
+             browsing.js, settings.js, modemenu.js, extract.js + the generated TLD list
   options.*  the settings page — API key, model, budget
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
   app.js     wires the two live demos; imports from vendor/
@@ -53,7 +53,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 188 unit cases across the pure modules. No install needed. |
+| `npm test` | 230 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
@@ -118,14 +118,29 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
   pure functions so they can be tested without a network.
 - `src/clock.js`, `src/weather.js`, `src/favourites.js` — the dashboard's decisions. All pure;
   `src/dashboard.js` is the only part that touches the DOM or the network.
-- `src/modemenu.js` — the `Auto ⌄` listbox, and the `+` menu.
+- `src/modemenu.js` — the mode listbox in the top bar, and the `+` menu.
+- `src/extract.js` — an attached file → text a model can read. Unzips `.docx`/`.xlsx`/`.pptx` and
+  inflates PDF streams using `DecompressionStream`, which node has too, so all of it is unit-tested.
+  **It never pretends**: a file it cannot read still attaches, carrying a `note` saying why — a
+  scanned PDF reads "no text layer", not silence.
 - `src/permissions.js` — every optional permission, with the plain-language reason the settings
   page shows beside it. **Adding a capability that needs a permission means adding it here too** —
   an e2e case asserts this list accounts for every optional permission the manifest declares.
 
 **The destination pills and the top-bar menu are one setting.** Both write `mode`; both are kept in
-sync by `syncTargets()`. The pills carry four of the six modes — a mode with no pill presses none of
-them rather than showing a wrong one.
+sync by `syncTargets()`. The pills carry four of the seven modes — a mode with no pill presses none
+of them rather than showing a wrong one, which is why the fresh-install default is `google` and not
+`auto`: a page that opens with no pill pressed gives you nothing to read the next Enter off.
+
+**A pill that names a place goes to that place.** `google`, `chatgpt`, `claude` and `perplexity` are
+plain `?q=` navigations to a named destination. `auto` and `search` are the two that defer to
+`chrome.search` — the user's *default engine*, which Archer never changes and cannot read. Keep that
+line clean: the pill labelled "Search" used to be `data-mode="auto"`, so for anyone whose default was
+ChatGPT it reached ChatGPT. Anything on the page that says "your default search engine" — the hint
+under the box — must only appear in those two modes.
+
+**Adding a mode means adding its `<option>` to `options.html`.** The settings dropdown renders blank
+when the stored value matches no option; an e2e check asserts it covers every mode the menu offers.
 
 **Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
 this page runs in a privileged extension origin — a `javascript:` URL would execute *here*. A unit

@@ -30,17 +30,19 @@
       <div class="field">
         <label for="defaultMode">Send prompts to</label>
         <select id="defaultMode">
-          <option value="auto">Search — your default search engine</option>
+          <option value="google">Google</option>
           <option value="chatgpt">ChatGPT</option>
           <option value="claude">Claude</option>
           <option value="perplexity">Perplexity</option>
-          <option value="search">Search only — never treat what I type as a URL</option>
+          <option value="auto">Auto — your default search engine</option>
+          <option value="search">Default engine only — never treat what I type as a URL</option>
           <option value="answer">Answer here — needs an API key, below</option>
         </select>
         <p class="hint">
-          "Search" uses whatever engine Chrome is set to, rather than a search engine hardcoded into
-          Archer. That is a Chrome Web Store requirement for a new tab page, and it is also what lets
-          this route to ChatGPT for anyone using OpenAI's own search extension.
+          The first four go where they say, whatever your browser's default engine is.
+          <strong>Auto</strong> and <strong>Default engine only</strong> hand the query to whatever engine
+          Chrome is set to instead — so they follow your browser, and they route to ChatGPT for anyone
+          using OpenAI's own search extension. Archer never changes that setting.
         </p>
       </div>
       <p class="status" id="modeStatus" role="status"></p>

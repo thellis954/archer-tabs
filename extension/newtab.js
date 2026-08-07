@@ -1,5 +1,17 @@
 import { URL_KIND, PROMPT } from "./src/classify.js";
-import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO, MODES, placeholderFor } from "./src/router.js";
+import {
+  route,
+  NONE,
+  NAVIGATE,
+  SEARCH,
+  ASK,
+  ANSWER,
+  AUTO,
+  GOOGLE,
+  SEARCH_MODE,
+  MODES,
+  placeholderFor,
+} from "./src/router.js";
 import {
   loadSettings,
   saveMode,
@@ -29,6 +41,7 @@ import {
 import { renderRows, setActiveRow } from "./src/rows.js";
 import { findTemplates, nextPlaceholder, parseSlash } from "./src/library.js";
 import { startClock, refreshWeather, renderFavorites, wireFavoriteForm } from "./src/dashboard.js";
+import { extract, KIND_LABEL } from "./src/extract.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
@@ -41,7 +54,7 @@ const noMatches = document.getElementById("noMatches");
 
 // --- mode ---------------------------------------------------------------------
 
-let mode = AUTO;
+let mode = GOOGLE;
 /** Whether an API key is set. Answer mode degrades to Auto without one. */
 let canAnswer = false;
 
@@ -56,7 +69,7 @@ const menu = createModeMenu({
     // Picking a mode that needs setting up should take you to the setting up,
     // not silently do something else.
     if (next === "answer" && !canAnswer) {
-      globalThis.chrome?.runtime?.openOptionsPage?.();
+      openSettings();
       return;
     }
     input.focus();
@@ -68,9 +81,9 @@ const menu = createModeMenu({
 // first query of a session is routed by the mode the user actually chose.
 const ready = Promise.all([loadSettings(), loadAnswerSettings()]).then(([settings, answer]) => {
   mode = settings.mode;
+  nudgeDismissed = settings.nudgeDismissed;
   menu.setMode(settings.mode);
   syncTargets();
-  nudge.hidden = settings.nudgeDismissed;
 
   canAnswer = Boolean(answer.apiKey && answer.model);
   if (!canAnswer) {
@@ -101,22 +114,30 @@ document.getElementById("openSettings").addEventListener("click", openSettings);
 document.getElementById("weather").addEventListener("click", openSettings);
 
 /**
- * `chrome.runtime.openOptionsPage` is the polite way in, but it is a no-op if
- * the manifest has no options page registered — which is exactly what a stale
- * unpacked build looks like, and it fails silently. Navigating to the page is
- * the fallback, so the button always does something.
+ * Opens the settings page in a new tab.
+ *
+ * **Not `chrome.runtime.openOptionsPage()`**, which is the obvious call and the
+ * wrong one here. When the caller is the new tab page Chrome takes a special
+ * path and *replaces* that tab rather than opening one — measured directly with
+ * a real click in a headed browser: two tabs before, two after, and the new tab
+ * had become options.html. From the user's side that is indistinguishable from
+ * the button doing nothing, and it destroys the page they were on.
+ *
+ * `chrome.tabs.create` needs no permission (`tabs` gates *reading* a tab's
+ * url/title, not opening one) and always visibly does something.
  */
 function openSettings() {
+  const url = globalThis.chrome?.runtime?.getURL?.("options.html");
+  if (!url) return;
   try {
-    if (globalThis.chrome?.runtime?.openOptionsPage) {
-      chrome.runtime.openOptionsPage();
+    if (globalThis.chrome?.tabs?.create) {
+      chrome.tabs.create({ url });
       return;
     }
   } catch {
-    /* fall through */
+    /* fall through to replacing this page, which at least gets you there */
   }
-  const url = globalThis.chrome?.runtime?.getURL?.("options.html");
-  if (url) navigate(url);
+  navigate(url);
 }
 
 // --- the target pills ---------------------------------------------------------------
@@ -133,11 +154,19 @@ for (const pill of targets) {
   });
 }
 
-/** Keeps the pills, the top-bar menu and the placeholder showing one mode. */
+/** Whether the default-engine hint has been dismissed for good. */
+let nudgeDismissed = false;
+
+/** Keeps the pills, the top-bar menu, the placeholder and the hint on one mode. */
 function syncTargets() {
   for (const pill of targets) pill.setAttribute("aria-pressed", String(pill.dataset.mode === mode));
   // The box says where the next Enter goes. Nothing else on the page does.
   input.placeholder = placeholderFor(mode, canAnswer);
+  // The hint is about the default engine, so it only makes sense in the two
+  // modes that use one. In Google mode "prompts go to your default search
+  // engine" is simply untrue, and a page that contradicts its own buttons
+  // teaches you to stop reading it.
+  nudge.hidden = nudgeDismissed || !(mode === AUTO || mode === SEARCH_MODE);
 }
 
 async function refreshRows() {
@@ -305,12 +334,19 @@ async function runPlusAction(action) {
       return;
 
     case "settings":
-      globalThis.chrome?.runtime?.openOptionsPage?.();
+      // The same call as the gear, for the same reason — see openSettings().
+      openSettings();
   }
 }
 
-/** Text files only, and small ones: this goes into a prompt, not a database. */
-const MAX_ATTACH_BYTES = 256 * 1024;
+/**
+ * Big enough for a real document, small enough that it is still context.
+ *
+ * A 20-page PDF or a photo off a phone both land under 10 MB; a video does not,
+ * and should not. What actually reaches a model is capped separately, by
+ * MAX_TEXT_CHARS for text and by the hand-off budget below.
+ */
+const MAX_ATTACH_BYTES = 10 * 1024 * 1024;
 
 /**
  * How much attached text a hand-off can carry.
@@ -326,31 +362,28 @@ const HANDOFF_BUDGET = 4000;
 let attachments = [];
 
 document.getElementById("attachInput").addEventListener("change", async (event) => {
-  const file = event.target.files?.[0];
+  const files = [...(event.target.files ?? [])];
   event.target.value = ""; // so picking the same file twice still fires
-  if (!file) return;
+  if (!files.length) return;
 
-  if (file.size > MAX_ATTACH_BYTES) {
-    say(`${file.name} is ${Math.round(file.size / 1024)} KB. The limit is 256 KB.`);
-    return;
+  // Reading a PDF or a spreadsheet is not instant, and a picker that closes
+  // onto no visible change reads as a failure.
+  say(files.length === 1 ? `Reading ${files[0].name}\u2026` : `Reading ${files.length} files\u2026`);
+
+  for (const file of files) {
+    if (file.size > MAX_ATTACH_BYTES) {
+      say(`${file.name} is ${Math.round(file.size / 1024 / 1024)} MB. The limit is 10 MB.`);
+      continue;
+    }
+    try {
+      attachments.push(await extract(file));
+    } catch {
+      // extract() is written not to throw, so reaching here means the browser
+      // itself could not hand the file over — a disconnected drive, say.
+      say(`Could not read ${file.name}.`);
+    }
   }
 
-  let text;
-  try {
-    text = await file.text();
-  } catch {
-    say(`Could not read ${file.name}.`);
-    return;
-  }
-
-  // A file full of NUL bytes is a binary someone renamed. Say so rather than
-  // attaching mojibake.
-  if (text.slice(0, 4096).includes("\u0000")) {
-    say(`${file.name} does not look like text. Archer can only attach text files.`);
-    return;
-  }
-
-  attachments.push({ name: file.name, text: text.trim(), size: file.size });
   paintAttachments();
   syncSend();
   input.focus();
@@ -365,7 +398,12 @@ function paintAttachments() {
     const node = template.content.firstElementChild.cloneNode(true);
     // A filename is text the user's filesystem chose, not markup.
     node.querySelector(".chipName").textContent = file.name;
-    node.querySelector(".chipSize").textContent = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+    // What the chip says is what actually goes: the kind for a file that was
+    // read, and the reason for one that was not. A chip that reads "PDF" beside
+    // a scan nobody could extract would be a lie the model then answers from.
+    node.querySelector(".chipSize").textContent = file.note
+      ? `${KIND_LABEL[file.kind] ?? "file"} — ${file.note}`
+      : describeAttachment(file);
 
     const remove = node.querySelector(".chipRemove");
     remove.setAttribute("aria-label", `Remove ${file.name}`);
@@ -379,25 +417,51 @@ function paintAttachments() {
     list.append(node);
   }
 
-  if (attachments.length) {
-    say(`Attached. Type your question — the ${attachments.length === 1 ? "file goes" : "files go"} with it.`);
-  } else {
+  if (!attachments.length) {
     say("");
+    return;
+  }
+
+  const images = attachments.filter((f) => f.dataUrl).length;
+  if (images && !canAnswer) {
+    // An image can only be *sent* on the Answer-here path, which posts a request
+    // body. A hand-off puts the prompt in a URL, and a URL cannot carry a photo.
+    say("Set up Answer here in settings to send images — a website hand-off can only carry text.");
+  } else {
+    say(`Attached. Type your question — the ${attachments.length === 1 ? "file goes" : "files go"} with it.`);
   }
 }
+
+/** "Excel · 42 rows" is more use on a chip than "18 KB". */
+function describeAttachment(file) {
+  const kind = KIND_LABEL[file.kind] ?? "file";
+  if (file.dataUrl) return `${kind} — ${sizeOf(file.size)}`;
+  const words = file.text ? file.text.trim().split(/\s+/).length : 0;
+  return words ? `${kind} — ${words.toLocaleString()} words` : `${kind} — ${sizeOf(file.size)}`;
+}
+
+const sizeOf = (bytes) =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 /**
  * The prompt as actually sent: what you typed, then each file, fenced and named
  * so the model can tell instruction from attachment.
+ *
+ * Images are not in here — they travel as their own message part, not as text —
+ * and neither is the body of a file that could not be read. What a file that
+ * could not be read contributes instead is one honest line saying so, because
+ * the alternative is a model that answers about a document it never saw.
  */
 function composePrompt(typed, { budget = Infinity } = {}) {
-  if (!attachments.length) return { text: typed, trimmed: false };
+  const readable = attachments.filter((f) => f.text);
+  const unreadable = attachments.filter((f) => !f.text && !f.dataUrl);
+  if (!readable.length && !unreadable.length) return { text: typed, trimmed: false };
 
   let trimmed = false;
   let out = typed.trim();
   let room = budget - out.length;
 
-  for (const file of attachments) {
+  for (const file of readable) {
     let body = file.text;
     const frame = `\n\n--- ${file.name} ---\n\n--- end of ${file.name} ---`;
 
@@ -414,6 +478,16 @@ function composePrompt(typed, { budget = Infinity } = {}) {
       room -= frame.length + body.length;
     }
     out += `\n\n--- ${file.name} ---\n${body}\n--- end of ${file.name} ---`;
+  }
+
+  for (const file of unreadable) {
+    const line = `\n\n--- ${file.name} (${KIND_LABEL[file.kind] ?? "file"}: ${file.note ?? "not readable"}) ---`;
+    if (Number.isFinite(room) && room - line.length <= 0) {
+      trimmed = true;
+      break;
+    }
+    room -= line.length;
+    out += line;
   }
 
   return { text: out, trimmed };
@@ -563,12 +637,20 @@ async function go(raw, force) {
           "the whole file.",
       );
     }
+    // A hand-off is a URL, and a URL cannot carry a picture. Better to say the
+    // image is being left behind than to let it disappear between two screens.
+    if (verdict.action !== ANSWER && attachments.some((f) => f.dataUrl)) {
+      say("Images can only be sent by Answer here — a website hand-off carries text only.");
+    }
     const withFiles = route(composed.text, { mode, force: PROMPT, canAnswer });
+    // Read off before the list is cleared: only Answer here can carry them, and
+    // only because it posts a body rather than putting the prompt in a URL.
+    const images = withFiles.action === ANSWER ? attachments.filter((f) => f.dataUrl).map((f) => f.dataUrl) : [];
     await recordLaunch(raw.trim() || attachments[0].name);
     attachments = [];
     paintAttachments();
 
-    if (withFiles.action === ANSWER) return void (await answerHere(withFiles.text));
+    if (withFiles.action === ANSWER) return void (await answerHere(withFiles.text, images));
     if (withFiles.action === ASK) return void navigate(withFiles.url);
     return void runSearch(withFiles.text);
   }
@@ -610,7 +692,7 @@ const stopButton = document.getElementById("stopAnswer");
 let inFlight = null;
 let lastPrompt = "";
 
-async function answerHere(prompt) {
+async function answerHere(prompt, images = []) {
   const config = await loadAnswerSettings();
   lastPrompt = prompt;
 
@@ -640,6 +722,7 @@ async function answerHere(prompt) {
       key: config.apiKey,
       model: config.model,
       prompt,
+      images,
       signal: inFlight.signal,
       // Appending a text node rather than reassigning textContent keeps the
       // already-painted text on screen instead of reflowing it every frame.
@@ -736,6 +819,7 @@ function runSearch(text) {
 // to know what yours is — it says what Archer does and leaves the conclusion to
 // you. A hint, never a blocker (docs/ROADMAP.md Phase 2).
 document.getElementById("dismissNudge").addEventListener("click", () => {
+  nudgeDismissed = true;
   nudge.hidden = true;
   dismissEngineNudge();
   input.focus();

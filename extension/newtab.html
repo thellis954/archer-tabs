@@ -54,6 +54,10 @@
           <span class="modeName">Auto</span>
           <span class="modeHint">URLs open. Anything else goes to your default search engine.</span>
         </li>
+        <li role="option" data-mode="google" data-label="Google" tabindex="-1" aria-selected="false">
+          <span class="modeName">Google</span>
+          <span class="modeHint">URLs open. Anything else goes to Google, whatever your default engine is.</span>
+        </li>
         <li role="option" data-mode="chatgpt" data-label="ChatGPT" tabindex="-1" aria-selected="false">
           <span class="modeName">ChatGPT</span>
           <span class="modeHint">URLs open. Anything else goes to ChatGPT, whatever your default engine is.</span>
@@ -66,9 +70,9 @@
           <span class="modeName">Perplexity</span>
           <span class="modeHint">URLs open. Anything else goes to Perplexity.</span>
         </li>
-        <li role="option" data-mode="search" data-label="Search" tabindex="-1" aria-selected="false">
-          <span class="modeName">Search</span>
-          <span class="modeHint">Never navigate. Everything is a query, even if it looks like a URL.</span>
+        <li role="option" data-mode="search" data-label="Default engine" tabindex="-1" aria-selected="false">
+          <span class="modeName">Default engine</span>
+          <span class="modeHint">Never navigate. Everything is a query for your default search engine, even if it looks like a URL.</span>
         </li>
         <li role="option" data-mode="answer" data-label="Answer here" tabindex="-1" aria-selected="false">
           <span class="modeName">Answer here</span>
@@ -95,15 +99,16 @@
       <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
     </svg>
 
-    <!-- The three destinations worth one click. The full set, including Auto,
-         Perplexity and Answer here, stays in the menu in the top bar; both
-         controls read and write the same mode. -->
+    <!-- The four destinations worth one click, each a named place rather than a
+         setting: a pill says where the next Enter goes and nothing else. Auto,
+         your default engine and Answer here stay in the menu in the top bar;
+         both controls read and write the same mode. -->
     <div class="targets" role="group" aria-label="Where prompts go">
-      <button type="button" class="target" data-mode="auto" aria-pressed="false">
+      <button type="button" class="target" data-mode="google" aria-pressed="false">
         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
           <circle cx="9" cy="9" r="5.5"/><path d="M13 13l3.5 3.5"/>
         </svg>
-        Search
+        Google
       </button>
       <button type="button" class="target" data-mode="chatgpt" aria-pressed="false">
         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -167,9 +172,13 @@
         </div>
 
         <!-- Never shown; the + menu clicks it. An <input type=file> is the only
-             way to read a file without a permission, and it is entirely local. -->
-        <input type="file" id="attachInput" class="visuallyHidden" tabindex="-1" aria-hidden="true"
-               accept=".txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.sh,.sql,.log,text/*">
+             way to read a file without a permission, and it is entirely local.
+
+             No `accept` list, deliberately: the picker is not the place to say
+             no. An accept list greys out the very file someone came to attach,
+             with no explanation; src/extract.js reads what it can and says
+             plainly what it could not. -->
+        <input type="file" id="attachInput" class="visuallyHidden" tabindex="-1" aria-hidden="true" multiple>
 
         <input
           id="query"

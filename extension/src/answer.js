@@ -22,15 +22,32 @@ export class SpendCapReached extends Error {
 }
 
 /**
+ * A plain string when there is nothing but text, and the parts array only when
+ * there is an image.
+ *
+ * The distinction matters: the parts form is what the vision models want, and
+ * some older text-only models reject it outright. Sending the simple shape
+ * whenever it is sufficient keeps every model that ever worked still working.
+ */
+export function contentFor(prompt, images = []) {
+  if (!images.length) return prompt;
+  return [
+    { type: "text", text: prompt },
+    ...images.map((url) => ({ type: "image_url", image_url: { url } })),
+  ];
+}
+
+/**
  * @param {object} request
  * @param {string} request.key
  * @param {string} request.model
  * @param {string} request.prompt
+ * @param {string[]} [request.images]  data: URLs, sent alongside the prompt
  * @param {AbortSignal} [request.signal]
  * @param {(chunk: string) => void} request.onText  called with each delta
  * @returns {Promise<{text: string, usage: {prompt: number, completion: number, total: number}}>}
  */
-export async function streamAnswer({ key, model, prompt, signal, onText }) {
+export async function streamAnswer({ key, model, prompt, images = [], signal, onText }) {
   const response = await fetch(`${ENDPOINT}/chat/completions`, {
     method: "POST",
     signal,
@@ -44,7 +61,7 @@ export async function streamAnswer({ key, model, prompt, signal, onText }) {
       // Without this the final usage frame is omitted and the token counter has
       // nothing exact to report.
       stream_options: { include_usage: true },
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: contentFor(prompt, images) }],
     }),
   });
 
