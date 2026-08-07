@@ -40,6 +40,7 @@ const SHIPPED_JS = [
   "extension/src/modemenu.js",
   "extension/src/router.js",
   "extension/src/rows.js",
+  "extension/src/permissions.js",
   "extension/src/settings.js",
   "extension/src/weather.js",
   "extension/src/tlds.js",

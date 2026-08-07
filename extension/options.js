@@ -24,6 +24,7 @@ import { listModels, estimateCost, API_ORIGIN } from "./src/answer.js";
 import { findPlace, fetchWeather, WEATHER_ORIGINS } from "./src/weather.js";
 import { variableNames } from "./src/library.js";
 import { summarise, toMarkdown } from "./src/analytics.js";
+import { GRANTS, isGranted, grant, revoke } from "./src/permissions.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -391,4 +392,64 @@ async function showUsage() {
   const cap = settings.tokenCap > 0 ? ` of ${settings.tokenCap.toLocaleString()}` : " (no limit set)";
   const money = cost === null ? "" : ` — about $${cost.toFixed(4)} at your input rate`;
   $("usage").textContent = `Today: ${spend.tokens.toLocaleString()} tokens${cap}${money}.`;
+}
+
+
+// --- permissions -------------------------------------------------------------------
+
+await renderGrants();
+
+async function renderGrants() {
+  const list = $("grants");
+  list.replaceChildren();
+
+  for (const entry of GRANTS) {
+    const granted = await isGranted(entry);
+
+    const item = document.createElement("li");
+    item.className = "grant";
+    item.dataset.grant = entry.id;
+    item.classList.toggle("isOn", granted);
+
+    const head = document.createElement("div");
+    head.className = "grantHead";
+
+    const title = document.createElement("span");
+    title.className = "grantTitle";
+    title.textContent = entry.title;
+
+    const state = document.createElement("span");
+    state.className = "grantState";
+    state.textContent = granted ? "On" : "Off";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "grantToggle";
+    button.textContent = granted ? "Turn off" : "Turn on";
+    button.setAttribute("aria-label", `${granted ? "Turn off" : "Turn on"} ${entry.title}`);
+    button.addEventListener("click", async () => {
+      // Both inside the click: Chrome refuses a permission request without a
+      // user gesture, and refuses it silently.
+      if (granted) await revoke(entry);
+      else await grant(entry);
+      await renderGrants();
+    });
+
+    head.append(title, state, button);
+
+    const why = document.createElement("p");
+    why.className = "grantWhy";
+    why.textContent = entry.why;
+
+    item.append(head, why);
+
+    if (entry.cost) {
+      const cost = document.createElement("p");
+      cost.className = "grantCost";
+      cost.textContent = entry.cost;
+      item.append(cost);
+    }
+
+    list.append(item);
+  }
 }

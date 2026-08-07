@@ -11,6 +11,7 @@
     "lint": "node tools/lint.js",
     "icons": "node tools/genicons.mjs",
     "shots": "node tools/shots.mjs",
+    "store": "node tools/store.mjs",
     "check": "npm run lint && npm test"
   }
 }

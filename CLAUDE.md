@@ -52,9 +52,10 @@ There is nothing to build or install. To run it:
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
+| `npm run store` | Regenerates the Web Store screenshots and promo tiles into `store/`. |
 | `npm run check` | lint + test — what CI runs. |
 
-`e2e`, `shots` and `icons` all need Playwright on the module path:
+`e2e`, `shots`, `icons` and `store` all need Playwright on the module path:
 
 ```sh
 mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright
@@ -89,6 +90,9 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
 - `src/clock.js`, `src/weather.js`, `src/favourites.js` — the dashboard's decisions. All pure;
   `src/dashboard.js` is the only part that touches the DOM or the network.
 - `src/modemenu.js` — the `Auto ⌄` listbox, and the `+` menu.
+- `src/permissions.js` — every optional permission, with the plain-language reason the settings
+  page shows beside it. **Adding a capability that needs a permission means adding it here too** —
+  an e2e case asserts this list accounts for every optional permission the manifest declares.
 
 **The destination pills and the top-bar menu are one setting.** Both write `mode`; both are kept in
 sync by `syncTargets()`. The pills carry four of the six modes — a mode with no pill presses none of
