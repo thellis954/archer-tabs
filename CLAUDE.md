@@ -53,7 +53,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 230 unit cases across the pure modules. No install needed. |
+| `npm test` | 231 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |

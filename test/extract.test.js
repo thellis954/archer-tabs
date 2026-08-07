@@ -335,10 +335,19 @@ test("extract says so rather than attaching an empty scan", async () => {
 
 test("extract points at re-saving when handed a legacy .doc", async () => {
   // The old binary format is not a zip, so unzip throws and the note has to be
-  // the useful thing to say next rather than the exception.
-  const out = await extract(asFile("old.docx", new TextEncoder().encode("ÐÏà not a zip")));
+  // the useful thing to say next rather than the exception. Classifying .doc as
+  // an anonymous binary would lose that advice entirely, which is why the legacy
+  // extensions are routed to the Office path they are going to fail.
+  assert.equal(kindOf("old.doc", ""), "word");
+  const out = await extract(asFile("old.doc", new TextEncoder().encode("\u00d0\u00cf\u00e0 not a zip")));
   assert.equal(out.text, "");
-  assert.match(out.note, /\.docx/);
+  assert.match(out.note, /re-save it as \.docx/);
+});
+
+test("...and names the right modern format for each legacy one", async () => {
+  const stale = new TextEncoder().encode("\u00d0\u00cf\u00e0 not a zip");
+  assert.match((await extract(asFile("old.xls", stale))).note, /\.xlsx/);
+  assert.match((await extract(asFile("old.ppt", stale))).note, /\.pptx/);
 });
 
 test("extract calls a renamed binary what it is", async () => {

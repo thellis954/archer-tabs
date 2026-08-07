@@ -370,9 +370,15 @@ document.getElementById("attachInput").addEventListener("change", async (event) 
   // onto no visible change reads as a failure.
   say(files.length === 1 ? `Reading ${files[0].name}\u2026` : `Reading ${files.length} files\u2026`);
 
+  // Collected rather than said as they happen: paintAttachments() owns the status
+  // line and clears it when nothing is attached, so a message written inside this
+  // loop is wiped a moment later — and if *every* file was rejected, the only
+  // thing the user would see is a picker that closed and did nothing.
+  const refused = [];
+
   for (const file of files) {
     if (file.size > MAX_ATTACH_BYTES) {
-      say(`${file.name} is ${Math.round(file.size / 1024 / 1024)} MB. The limit is 10 MB.`);
+      refused.push(`${file.name} is ${Math.round(file.size / 1024 / 1024)} MB — the limit is 10 MB`);
       continue;
     }
     try {
@@ -380,11 +386,12 @@ document.getElementById("attachInput").addEventListener("change", async (event) 
     } catch {
       // extract() is written not to throw, so reaching here means the browser
       // itself could not hand the file over — a disconnected drive, say.
-      say(`Could not read ${file.name}.`);
+      refused.push(`${file.name} could not be read`);
     }
   }
 
   paintAttachments();
+  if (refused.length) say(refused.join(". ") + ".");
   syncSend();
   input.focus();
 });

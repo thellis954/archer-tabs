@@ -22,14 +22,24 @@ const TEXT_EXTENSIONS = new Set([
   "conf", "env", "log", "diff", "patch", "srt", "vtt", "tex", "bib", "gitignore",
 ]);
 
-/** Office formats that are really a zip of XML, and the part that holds the words. */
+/**
+ * Office formats, and the part of the package that holds the words.
+ *
+ * The legacy binary extensions are here too, even though they are not zips.
+ * They fail `unzip` and land on the note telling you to re-save as .docx — the
+ * one genuinely useful thing to say about a .doc, and something they would
+ * never hear if they classified as an anonymous binary.
+ */
 const ZIP_DOCS = {
   docx: "word",
   docm: "word",
+  doc: "word",
   xlsx: "sheet",
   xlsm: "sheet",
+  xls: "sheet",
   pptx: "slides",
   pptm: "slides",
+  ppt: "slides",
 };
 
 /** What a model can be shown directly, rather than read. */
@@ -410,8 +420,13 @@ export async function extract(file) {
       if (!text) return { ...base, text: "", note: "no text found in it" };
       return { ...base, text: clamp(text) };
     } catch {
-      // The old .doc/.xls binary formats land here, and so does a corrupt file.
-      return { ...base, text: "", note: "could not be opened — if it is an older .doc or .xls, re-save it as .docx or .xlsx" };
+      // The old binary formats land here, and so does a corrupt file.
+      const modern = { word: ".docx", sheet: ".xlsx", slides: ".pptx" }[kind];
+      return {
+        ...base,
+        text: "",
+        note: `could not be opened — if it is an older ${extensionOf(file.name) ? `.${extensionOf(file.name)}` : "Office"} file, re-save it as ${modern}`,
+      };
     }
   }
 

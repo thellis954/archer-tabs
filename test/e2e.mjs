@@ -1774,6 +1774,22 @@ check(
   }),
 );
 
+// A rejection has to survive the repaint. paintAttachments() owns the status line
+// and clears it when nothing is attached, so a message written while reading the
+// files was wiped a moment later — and if every file was rejected, all the user
+// saw was a picker that closed and did nothing.
+const HUGE = join(tmpdir(), "archer-huge.bin");
+writeFileSync(HUGE, Buffer.alloc(11 * 1024 * 1024));
+await dash.setInputFiles("#attachInput", HUGE);
+await dash.waitForTimeout(700);
+check("nothing attaches when the only file is too big", (await dash.locator(".chip").count()) === 0);
+check(
+  "...and the page says why, rather than closing the picker onto silence",
+  (await dash.locator("#attachStatus").innerText()).includes("10 MB"),
+  await dash.locator("#attachStatus").innerText(),
+);
+rmSync(HUGE, { force: true });
+
 // --- settings opens somewhere you can see -----------------------------------------
 //
 // chrome.runtime.openOptionsPage() takes a special path when the caller is the
