@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Atlas New Tab",
+  "version": "1.0.0",
+  "description": "Atlas-style New Tab page for Chrome",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}

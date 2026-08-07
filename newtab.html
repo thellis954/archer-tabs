@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="newtab.css">
+</head>
+
+<body>
+
+  <main class="page">
+
+    <div class="logo">◎</div>
+
+    <form id="searchForm">
+      <div class="searchBox">
+
+        <button type="button" class="plus">+</button>
+
+        <input
+          id="query"
+          type="text"
+          placeholder="Ask ChatGPT or type a URL"
+          autocomplete="off"
+          autofocus
+        >
+
+        <button type="button" class="mic">♩</button>
+
+      </div>
+    </form>
+
+    <div class="suggestions">
+
+      <button class="suggestion">
+        <span>📌</span>
+        <strong>ChatGPT</strong>
+        <span class="description">— Open ChatGPT</span>
+      </button>
+
+      <button class="suggestion">
+        <span>🔭</span>
+        <strong>GitHub</strong>
+        <span class="description">— Open GitHub</span>
+      </button>
+
+      <button class="suggestion">
+        <span>📁</span>
+        <strong>Notion</strong>
+        <span class="description">— Open Notion</span>
+      </button>
+
+    </div>
+
+  </main>
+
+  <script src="newtab.js"></script>
+
+</body>
+</html>
