@@ -75,11 +75,13 @@ different product rather than a knock-off, and it suits a name that evokes leath
 |---|---|---|
 | `--bg` | `#FBF7F0` | cream page ground |
 | `--surface` | `#FFFFFF` | search box, hover fills |
+| `--pressed` | `#F1EBE1` | the `:active` fill, one step past hover |
 | `--border` | `#E8E2D9` | hairlines |
 | `--text` | `#141416` | ink — body and titles |
-| `--muted` | `#8A8178` | descriptions, placeholder |
+| `--muted` | `#78706A` | descriptions, placeholder |
 | `--faint` | `#D9D2C7` | the oversized page mark |
-| `--accent` | `#B45309` | brass — mark, focus, hover |
+| `--accent` | `#B45309` | brass — mark, focus, hover, send |
+| `--onAccent` | `#FBF7F0` | the glyph inside a brass fill |
 
 ### Dark
 
@@ -87,19 +89,34 @@ different product rather than a knock-off, and it suits a name that evokes leath
 |---|---|---|
 | `--bg` | `#141416` | ink ground |
 | `--surface` | `#1D1D20` | search box, hover fills |
+| `--pressed` | `#26262A` | the `:active` fill |
 | `--border` | `#2C2C30` | hairlines |
 | `--text` | `#F2EFEA` | warm off-white |
 | `--muted` | `#948D84` | descriptions, placeholder |
 | `--faint` | `#292927` | the oversized page mark |
 | `--accent` | `#F59E0B` | brass lifts to amber to hold on ink |
+| `--onAccent` | `#141416` | the glyph inside an amber fill |
 
-**Contrast.** `#B45309` on `#FBF7F0` is ≈ 4.9:1 — passes AA for normal text, which is why brass is
-safe for hover titles and not just decoration. `#B45309` would fail on ink, hence the amber swap in
-dark; verify any new accent pairing before shipping it.
+**Contrast.** Descriptions and the placeholder are normal-size body text, so `--muted` owes AA
+(4.5:1) against `--bg` *and* against `--surface`, which is what a row sits on when hovered:
 
-**Accent discipline.** Brass appears on the mark, the focus ring, and hover — nowhere else. An early
-draft colored every suggestion title brass and the page turned into a column of shouting; titles are
-ink, and only *become* brass on hover.
+| Pair | Ratio | |
+|---|---|---|
+| light `--muted` on `--bg` | 4.55:1 | ✅ |
+| light `--muted` on `--surface` | 4.86:1 | ✅ |
+| light `--accent` on `--bg` | 4.70:1 | ✅ |
+| dark `--muted` on `--bg` | 5.61:1 | ✅ |
+| dark `--accent` on `--bg` | 8.57:1 | ✅ |
+
+Light `--muted` was `#8A8178` until Phase 1, which is **3.58:1** — a real failure that shipped,
+because contrast is invisible until someone measures it. `npm run e2e` now measures both themes from
+the painted pixels; don't add a text token without checking it there.
+
+**Accent discipline.** Brass appears on the mark, the focus ring, hover, and the send control —
+nowhere else. An early draft colored every suggestion title brass and the page turned into a column
+of shouting; titles are ink, and only *become* brass on hover. The send button is the exception that
+proves the rule: it is the page's primary action, and an outlined glyph there read as decoration
+rather than a control.
 
 ---
 
@@ -138,11 +155,14 @@ assets/icon-{16,32,48,128}.png                   — manifest, generated
 The page renders the mark inline in `newtab.html` rather than via `<img>`, so `currentColor` and the
 CSS custom properties can theme it. The `.svg` files exist for documentation and store listing use.
 
-**Regenerating the PNGs** — they're rendered by headless Chromium, so what ships is exactly what
+**Regenerating the PNGs** — they're rendered by a real Chromium, so what ships is exactly what
 Chrome paints:
 
 ```sh
-sh tools/genicons.sh
+npm run icons     # tools/genicons.mjs; needs playwright linked, see the file header
+npm run lint      # reads the pixels back and fails on a blank or clipped icon
 ```
 
-Re-run it after any change to the mark geometry or the ink/amber values.
+Re-run after any change to the mark geometry or the ink/amber values, and **look at the output** —
+the icons were ~60% transparent for the project's whole life before anyone opened one. `npm run
+lint` now catches that specific failure, but it can only check for blankness, not for ugliness.

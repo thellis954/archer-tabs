@@ -9,7 +9,8 @@
     "test": "node --test test/*.test.js",
     "e2e": "node test/e2e.mjs",
     "lint": "node tools/lint.js",
-    "icons": "sh tools/genicons.sh",
+    "icons": "node tools/genicons.mjs",
+    "shots": "node tools/shots.mjs",
     "check": "npm run lint && npm test"
   }
 }

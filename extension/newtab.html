@@ -32,7 +32,9 @@
 
   <main class="page">
 
-    <svg class="logo" viewBox="0 0 32 32" role="img" aria-label="Archer">
+    <!-- Decorative: the wordmark in the bar already names the product, so
+         announcing "Archer" a second time is noise on a page this small. -->
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
       <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
       <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
     </svg>
@@ -57,10 +59,13 @@
           autofocus
         >
 
-        <button type="button" class="mic" aria-label="Voice input">
+        <!-- Disabled until there is something to send. Replaced the decorative
+             mic glyph the reference has: a mic would need a permission and a
+             whole feature behind it, and no roadmap phase owns one, whereas
+             submitting is the page's actual job. See docs/ROADMAP.md Phase 1. -->
+        <button type="submit" id="send" class="send" aria-label="Go" disabled>
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <rect x="7.75" y="2.5" width="4.5" height="9" rx="2.25"/>
-            <path d="M4.75 9.25a5.25 5.25 0 0 0 10.5 0M10 14.5V17"/>
+            <path d="M4 10h11M10.5 5.5 15 10l-4.5 4.5"/>
           </svg>
         </button>
 
@@ -73,7 +78,7 @@
       log. Render that text with textContent, never innerHTML — page titles are
       attacker-influenceable.
     -->
-    <ul class="suggestions">
+    <ul class="suggestions" aria-label="Suggestions">
 
       <li><button class="suggestion" type="button">
         <span class="dot" aria-hidden="true"></span>

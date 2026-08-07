@@ -318,14 +318,46 @@ Sequenced so each phase ships something usable on its own.
   mocks. Note for whoever touches it: Playwright's default headless mode is the *headless shell*,
   which silently ignores `--load-extension`; `channel: "chromium"` is required.
 
-### Phase 1 — Pixel-accurate clone (~2–3 days) 🔴 ship before Aug 13
-The visual payload. Target: screenshot-diffable against the reference.
-- Top-left chrome: sidebar icon, wordmark, `Auto ⌄` dropdown (wired in Phase 2)
-- Replace `◎`/`♩` with inline SVG; behind the `brand` flag from §2.3
-- Real type scale, hover/active/focus-visible states, 44px suggestion pitch, ellipsis truncation
-- Dark mode via `prefers-color-scheme` + `<meta name="color-scheme">`
-- Fluid width: `min(795px, calc(100vw - 48px))`, top offset in `vh` with a `px` floor
-- Full a11y pass: labels, roles, aria, visible focus rings, contrast
+### Phase 1 — Pixel-accurate clone ✅ **done**
+- ✅ Top-left chrome: sidebar icon, wordmark, `Auto ⌄` dropdown (wired in Phase 2)
+- ✅ Inline SVG throughout; the neutral Archer mark, not `◎`/`♩`
+- ✅ Type scale, hover/active/focus-visible states, 44px suggestion pitch, ellipsis truncation
+- ✅ Dark mode via `prefers-color-scheme` + `<meta name="color-scheme">`
+- ✅ Fluid width, top offset in `vh` with a `px` floor
+- ✅ a11y pass: labels, roles, aria, visible focus rings, contrast
+
+**The shipped icons were blank, and had been since they were generated.** Every
+`extension/assets/icon-*.png` was roughly 60% transparent — the extensions bar and the new-tab
+settings entry drew almost nothing. The cause was in `tools/genicons.sh`: headless Chromium clips
+its paint to about *(window height − 88px)* while still writing a screenshot the full height of the
+`--window-size`, so a 16×16 window painted 0 usable rows and a 128×128 window painted 40. It is not
+a paint race — `--headless=new` and `--virtual-time-budget` produce byte-identical output — and no
+flag fixes it, because the screenshot canvas is sized by the window rather than by the caller.
+
+- **`tools/genicons.sh` → `tools/genicons.mjs`, on Playwright** (deviation from "tooling is
+  dependency-free"). A driver can size the canvas; a browser window cannot. Playwright is already
+  the e2e dependency, icon regeneration is a rare maintainer task, and CI does not run either.
+- **`tools/lint.js` now reads the icon pixels** (via a small dependency-free PNG reader,
+  `tools/png.js`) and fails on a canvas less than 70% painted, a transparent bottom edge, or a
+  missing cream/brass stroke. A truncated PNG is still a valid PNG of the right dimensions, which is
+  exactly why this shipped unnoticed for as long as it did.
+
+**Other deviations from the plan, deliberately:**
+- **The mic button is gone; the right-hand control is now a real submit button.** The reference has
+  a mic, but no roadmap phase owns one, and voice input would cost a permission and a feature. A
+  dead button is worse than no button, and submitting is the page's actual job — so the slot went to
+  the thing the page already does. It is `disabled` until there is something to send. Voice input is
+  parked in §4.5.
+- **Brass extends to the send control.** `docs/BRAND.md` had restricted the accent to the mark,
+  focus and hover; the primary action of the page is the one other place it earns its keep. An
+  outlined glyph there read as more decoration.
+- **`--muted` was failing WCAG AA and is now `#78706A`.** The old `#8A8178` is **3.58:1** on cream —
+  and it is the placeholder and every row description, i.e. normal-size body text needing 4.5:1. The
+  dark-mode value was always fine (5.6:1). `npm run e2e` now computes both from the painted pixels
+  in both themes, so a token cannot regress in one theme only.
+- **`npm run shots`** (`tools/shots.mjs`) renders the page in both themes, at two widths, plus a
+  filled-input/hovered-row state — the states the resting page does not show. Added because the
+  suggestion rows were misaligned under the search box and nothing but a render would have said so.
 
 ### Phase 2 — Real routing (~0.5 day) 🔴 this is the product, and it got much smaller
 Makes "Ask ChatGPT or type a URL" true, replacing the Google fallback. §0.5 does most of the work.
@@ -407,6 +439,7 @@ Raised while implementing; not scheduled. Revisit after Phase 6.
 | **"Ask again elsewhere"** | After a search, re-run the same query against a different target from the new tab, without retyping |
 | **Settings import/export** | A JSON blob of modes, pins, and prompt library. Makes a machine migration painless — and this project exists because of one |
 | **Localisation** | The UI is ~12 strings. Cheap to externalise now, expensive after Phase 5 |
+| **Voice input** | The mic the reference has, made real via the Web Speech API. Dropped in Phase 1 rather than shipped dead; it needs a microphone permission and a whole interaction model, so it is a feature, not a glyph |
 
 ## 5. Open questions
 

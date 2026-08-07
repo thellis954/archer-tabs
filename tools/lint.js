@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
+import { readPNG, pixelAt } from "./png.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // Everything the browser loads lives under extension/; tooling and docs do not.
@@ -24,7 +25,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 // Shipped = loaded by the extension page. Tooling is checked for syntax but is
 // exempt from the browser-facing rules below, since it never runs in a page.
 const SHIPPED_JS = ["extension/newtab.js", "extension/src/classify.js", "extension/src/tlds.js"];
-const JS_FILES = [...SHIPPED_JS, "tools/lint.js"];
+const JS_FILES = [...SHIPPED_JS, "tools/lint.js", "tools/png.js", "tools/genicons.mjs"];
 
 for (const f of JS_FILES) {
   try {
@@ -116,6 +117,67 @@ for (const m of html.matchAll(/(?:src|href)="(?!https?:|data:)([^"]+)"/g)) {
 
 if (/<script\b[^>]*\bsrc="newtab\.js"/.test(html) && !/<script\b[^>]*type="module"[^>]*\bsrc="newtab\.js"/.test(html)) {
   fail("extension/newtab.html", 'newtab.js uses import — its <script> needs type="module"');
+}
+
+// --- 7. the generated icons are actually drawn -------------------------------
+// The old shell generator shipped icons that were ~60% empty: headless Chromium
+// clips its paint to (window height - browser chrome) but writes a screenshot
+// the full height of the window. Nothing caught it, because a truncated PNG is
+// still a valid PNG of the right dimensions. So look at the pixels.
+
+const ICON_SIZES = [16, 32, 48, 128];
+const near = ([r, g, b], [tr, tg, tb], slack = 40) =>
+  Math.abs(r - tr) <= slack && Math.abs(g - tg) <= slack && Math.abs(b - tb) <= slack;
+
+const INK = [20, 20, 22];      // the tile
+const CREAM = [251, 247, 240]; // the legs
+const BRASS = [245, 158, 11];  // the bow
+
+for (const size of ICON_SIZES) {
+  const rel = `extension/assets/icon-${size}.png`;
+  if (!existsSync(join(ROOT, rel))) {
+    fail(rel, "missing — run `npm run icons`");
+    continue;
+  }
+
+  let img;
+  try {
+    img = readPNG(join(ROOT, rel));
+  } catch (e) {
+    fail(rel, e.message);
+    continue;
+  }
+
+  if (img.width !== size || img.height !== size) {
+    fail(rel, `is ${img.width}×${img.height}, but its name promises ${size}×${size}`);
+    continue;
+  }
+
+  // A rounded tile fills most of its box. Anything far below that means a
+  // partial paint — which is exactly the bug this check exists for.
+  let opaque = 0;
+  let cream = 0;
+  let brass = 0;
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const px = pixelAt(img, x, y);
+      if (px[3] < 128) continue;
+      opaque++;
+      if (near(px, CREAM)) cream++;
+      else if (near(px, BRASS)) brass++;
+    }
+  }
+
+  const coverage = opaque / (size * size);
+  if (coverage < 0.7) {
+    fail(rel, `only ${(coverage * 100).toFixed(0)}% of the canvas is painted — a partial render; re-run \`npm run icons\``);
+  }
+  // The bottom edge is the first thing a clipped render loses.
+  if (pixelAt(img, size >> 1, size - 1)[3] < 128) {
+    fail(rel, "the bottom edge of the tile is transparent — a clipped render");
+  }
+  if (cream === 0) fail(rel, "no cream pixels — the mark's legs did not draw");
+  if (brass === 0) fail(rel, "no brass pixels — the mark's bowstring did not draw");
 }
 
 // --- report ------------------------------------------------------------------

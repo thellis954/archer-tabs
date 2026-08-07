@@ -2,12 +2,14 @@ import { classify, EMPTY, URL_KIND, PROMPT } from "./src/classify.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
+const send = document.getElementById("send");
 
 // Enter is handled here rather than by form submit alone, because Cmd+Enter and
 // Shift+Enter do not reliably raise a submit event across platforms.
 input.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     input.value = "";
+    syncSend();
     return;
   }
   if (event.key !== "Enter") return;
@@ -21,6 +23,43 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   go(input.value, null);
 });
+
+// --- keyboard reach ----------------------------------------------------------
+
+// Chrome puts the caret in the address bar on ⌘T and an NTP override cannot
+// take it back (docs/ROADMAP.md §2.4). But focus does land on the page when the
+// tab is opened any other way, and then a keystroke should reach the input
+// rather than fall on the floor. Focusing during keydown is enough — the
+// character's default action runs afterwards, against the newly focused field.
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isTextField(event.target)) return;
+
+  if (event.key === "/") {
+    event.preventDefault(); // the slash is the gesture, not content
+    input.focus();
+    return;
+  }
+  // A single-character key is printable; "Shift", "Tab", "F3" and friends are not.
+  if (event.key.length === 1) input.focus();
+});
+
+function isTextField(node) {
+  return node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node?.isContentEditable;
+}
+
+// --- send button -------------------------------------------------------------
+
+input.addEventListener("input", syncSend);
+syncSend();
+
+/** The send control is the page's primary action, so it stays inert until
+    there is actually something to send. */
+function syncSend() {
+  send.disabled = input.value.trim() === "";
+}
+
+// --- routing -----------------------------------------------------------------
 
 function go(raw, force) {
   const verdict = classify(raw, force);
