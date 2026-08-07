@@ -1500,6 +1500,80 @@ check(
 await dashCtx.close();
 rmSync(dashFixture, { recursive: true, force: true });
 
+// --- Phase 7: the permissions panel -------------------------------------------------
+//
+// The listing's central claim is "off until you turn it on". That is only true
+// if the manifest says so and the panel tells the truth about it, so both are
+// asserted here rather than taken on trust.
+
+const shipCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, "--no-sandbox"],
+});
+const shipOptions = await shipCtx.newPage();
+await shipOptions.goto(`chrome-extension://${extensionId(EXT)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await shipOptions.waitForTimeout(500);
+
+const shipManifest = await shipOptions.evaluate(() => chrome.runtime.getManifest());
+check(
+  "the install prompt is still just search + storage, after seven phases",
+  JSON.stringify([...shipManifest.permissions].sort()) === JSON.stringify(["search", "storage"]),
+  JSON.stringify(shipManifest.permissions),
+);
+check("no host permission is required at install", !shipManifest.host_permissions?.length);
+
+const listed = await shipOptions.locator(".grant").evaluateAll((els) => els.map((e) => e.dataset.grant));
+check(
+  "every optional permission is listed in the panel",
+  listed.length === 6,
+  JSON.stringify(listed),
+);
+
+// Nothing is granted in a fresh profile, so the panel must say so for all of them.
+check(
+  "all of them read Off before anything is enabled",
+  (await shipOptions.locator(".grant .grantState").allInnerTexts()).every((t) => t.trim() === "OFF"),
+  JSON.stringify(await shipOptions.locator(".grant .grantState").allInnerTexts()),
+);
+check(
+  "...and each offers to turn it on",
+  (await shipOptions.locator(".grantToggle").allInnerTexts()).every((t) => t.trim() === "Turn on"),
+);
+
+// Every optional permission and origin in the manifest has to appear somewhere in
+// the panel, or the listing's claim is unverifiable for whatever was left out.
+const declared = [
+  ...(shipManifest.optional_permissions ?? []),
+  ...(shipManifest.optional_host_permissions ?? []),
+].sort();
+const covered = await shipOptions.evaluate(() =>
+  [...document.querySelectorAll(".grant")].map((e) => e.dataset.grant),
+);
+const { GRANTS } = await import("../extension/src/permissions.js");
+const explained = GRANTS.flatMap((g) => [...(g.permissions ?? []), ...(g.origins ?? [])]).sort();
+check(
+  "the panel accounts for every optional permission the manifest declares",
+  JSON.stringify(declared) === JSON.stringify(explained),
+  JSON.stringify({ declared, explained }),
+);
+check("...and every listed grant is rendered", covered.length === GRANTS.length);
+
+check(
+  "the heavier grant says why it is heavier",
+  (await shipOptions.locator('.grant[data-grant="closedTabs"] .grantCost').innerText()).includes(
+    "browsing history",
+  ),
+);
+check(
+  "every grant explains itself in a sentence, not a permission name",
+  (await shipOptions.locator(".grantWhy").allInnerTexts()).every((t) => t.trim().length > 40),
+);
+
+await shipCtx.close();
+
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.
 // Dark is where a missing token hides: the page still renders, just wrongly.

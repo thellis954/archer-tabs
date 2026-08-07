@@ -574,13 +574,38 @@ extension origin, so `javascript:` there would be exactly as dangerous as it is 
 - **The top bar lost its sidebar button.** It had no listener and no phase that owned one; the space
   went to the weather card. The Archer wordmark stays.
 
-### Phase 7 — Ship (~2 days) 🟢
-- ~~Neutral brand skin~~ ✅ done — Archer, `docs/BRAND.md`. Remaining: store screenshots, listing
-  copy, privacy policy ("all data stays on your device")
-- Per-permission opt-in with plain-language rationale — request `history` only when the user enables
-  the conversations feature, not at install
-- Playwright smoke test against a real Chromium profile with the extension loaded
-- Tag `1.0.0` → publish
+### Phase 7 — Ship ✅ **done**
+- ✅ Per-permission opt-in with plain-language rationale
+- ✅ Store listing copy, screenshots, privacy policy
+- ✅ Playwright smoke test against a real Chromium (arrived in Phase 0, grown every phase since)
+
+**The install prompt never grew.** Seven phases on, `manifest.json` still asks for `search` and
+`storage` and no host permission at all. Every capability added since — history, top sites, closed
+tabs, clipboard, the OpenAI API, the weather — is optional, requested at the click that switches the
+feature on. `npm run e2e` asserts the install set is exactly `["search", "storage"]`, so it cannot
+drift by accident.
+
+**`src/permissions.js` is the list, and the settings page renders it.** Each entry carries a plain
+title, a sentence saying what the feature does with it, and — where there is one — the part worth
+reading twice. An e2e case asserts the panel accounts for **every** optional permission and origin
+the manifest declares, so a future capability cannot be added without an explanation appearing
+beside it. Anything on the list can be revoked from the same panel.
+
+**New docs, both meant to be kept true rather than written once:**
+- `docs/PRIVACY.md` — what is stored, what leaves the device (four things, all opt-in), and what
+  each permission is for. The Web Store needs this at a *hosted* URL; publishing it is website work
+  and is tracked outside this repo, so the listing cannot be submitted until that page is live.
+- `docs/STORE.md` — listing copy, category, single-purpose statement, per-permission
+  justifications, the data-use answers, and a pre-submission checklist.
+
+**`npm run store`** generates the five 1280×800 screenshots and both promo tiles from a seeded
+profile, so a UI change is one command away from a correct listing, and the data in the shots is
+obviously illustrative rather than a real person's history.
+
+**Deviation: the tag is `1.7.0`, not `1.0.0`.** The plan said tag 1.0.0 at ship, but the extension
+has been at 1.0.0 since before Phase 1 and each phase bumped it — Chrome refuses to update an
+extension without an increasing version, so the numbers were already spent. Shipping as 1.7.0 is
+honest about that; a 1.0.0 tag now would be a version *decrease* against what is in the repo.
 
 ### Engineering foundation
 Stay dependency-light and zero-framework — this UI does not need React. ~~Introduce **esbuild** at
