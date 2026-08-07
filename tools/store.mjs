@@ -46,8 +46,10 @@ cpSync(EXT, fixture, { recursive: true });
 {
   const path = join(fixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
-  m.permissions = [...m.permissions, "topSites"];
-  m.optional_permissions = m.optional_permissions.filter((p) => p !== "topSites");
+  // history too: the lead screenshot should show the product working, not an
+  // offer to set it up.
+  m.permissions = [...m.permissions, "topSites", "history"];
+  m.optional_permissions = m.optional_permissions.filter((p) => !["topSites", "history"].includes(p));
   writeFileSync(path, JSON.stringify(m, null, 2));
 }
 
@@ -60,9 +62,9 @@ const SEED = {
   mode: "chatgpt",
   pinned: [],
   dismissed: [],
+  // Two, not four: the favorites bar has to fit inside 800px, and it is half
+  // the reason to look at the screenshot.
   launches: [
-    { text: "compare the coding tools", at: Date.now() - 400_000 },
-    { text: "why are there air quality alerts", at: Date.now() - 300_000 },
     { text: "how to fletch an arrow", at: Date.now() - 120_000 },
     { text: "sourdough starter ratios", at: Date.now() - 60_000 },
   ],
@@ -94,6 +96,12 @@ const SEED = {
   ].map(([host, name]) => ({ id: `https://${host}/`, url: `https://${host}/`, name })),
 };
 
+/** Illustrative conversations, across both assistants Archer can recall. */
+const CONVERSATIONS = [
+  ["https://chatgpt.com/c/0f9c2a41-1b3d-4c8e-9a77-5e2b6d0c4a19", "Evaluate Claude vs rivals"],
+  ["https://claude.ai/chat/3c5b7e21-8a4d-4f19-b6c0-2d9e1a7f3b85", "Fletching an arrow properly"],
+];
+
 async function withContext(scheme, run) {
   const ctx = await chromium.launchPersistentContext("", {
     headless: true,
@@ -102,13 +110,30 @@ async function withContext(scheme, run) {
     args: [`--disable-extensions-except=${fixture}`, `--load-extension=${fixture}`, "--no-sandbox"],
   });
 
+  // Real visits, so Chrome records real titles and the rows are real recall
+  // rather than something painted for the picture.
+  const browsing = await ctx.newPage();
+  await browsing.route(/^https?:/, (r) => {
+    const hit = CONVERSATIONS.find(([url]) => r.request().url() === url);
+    return r.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html><meta charset="utf-8"><title>${hit ? hit[1] : "x"}</title><p>x`,
+    });
+  });
+  for (const [url] of CONVERSATIONS) {
+    await browsing.goto(url, { waitUntil: "load" });
+    await browsing.waitForTimeout(120);
+  }
+  await browsing.close();
+
   const page = await ctx.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(NEWTAB, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(250);
   await page.evaluate((seed) => chrome.storage.local.set(seed), SEED);
   await page.goto(NEWTAB, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
 
   await run(page, ctx);
   await ctx.close();
