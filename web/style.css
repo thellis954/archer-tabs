@@ -641,6 +641,36 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .labChips ul:last-child { margin-bottom: 0; }
 .labChips button { background: var(--raised); }
 
+/* ------------------------------------------------------- the whole page -- */
+/* Image-led, and the only section that is. The screenshot is the argument. */
+.surface { max-width: var(--shell); margin: 0 auto; padding: var(--band) var(--gutter); }
+.surfaceHead { max-width: 62ch; margin-bottom: clamp(2.5rem, 5vw, 3.5rem); }
+
+.surfaceShot { margin: 0; }
+.surfaceShot picture {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  box-shadow: 0 1px 2px var(--scrim), 0 50px 90px -55px var(--scrim);
+}
+
+.surfaceList {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+}
+.surfaceList dt {
+  font-size: 15.5px; font-weight: 600; letter-spacing: -0.015em;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.surfaceList dd { margin: 0.5rem 0 0; color: var(--muted); font-size: 14.5px; }
+
+@media (max-width: 900px) { .surfaceList { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .surfaceList { grid-template-columns: 1fr; } }
+
 /* ----------------------------------------------------------- the modes --- */
 .modes { max-width: var(--shell); margin: 0 auto; padding: var(--band) var(--gutter); }
 .modesHead { max-width: 62ch; margin-bottom: clamp(2.5rem, 5vw, 4rem); }
@@ -784,14 +814,13 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 @media (max-width: 800px) { .ledger { grid-template-columns: 1fr; } }
 
 /* --------------------------------------------------------- the install --- */
+/* Steps only now: the screenshot that used to sit beside them moved up to
+   the page section, where it is the subject rather than a decoration. */
 .install {
   max-width: var(--shell); margin: 0 auto;
   padding: var(--band) var(--gutter);
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: clamp(2.5rem, 6vw, 5rem);
-  align-items: center;
 }
+.installCopy { max-width: 62ch; }
 .steps { margin-top: clamp(2rem, 4vw, 3rem); display: grid; gap: 1.5rem; counter-reset: s; }
 .steps li {
   counter-increment: s;
@@ -810,20 +839,7 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .steps p { grid-column: 2; margin-top: 0.35rem; color: var(--muted); font-size: 15px; }
 .install .cta { margin-top: clamp(2rem, 4vw, 3rem); }
 
-.installShot { margin: 0; }
-.installShot picture {
-  display: block;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  overflow: hidden;
-  box-shadow: 0 1px 2px var(--scrim), 0 40px 80px -50px var(--scrim);
-}
-.installShot figcaption {
-  margin-top: 0.9rem; color: var(--muted); font-size: 14px;
-  font-family: var(--mono);
-}
 
-@media (max-width: 900px) { .install { grid-template-columns: 1fr; } }
 
 /* ---------------------------------------------------------------- foot --- */
 footer {
@@ -886,12 +902,7 @@ footer {
      rather than showing nothing. */
   @supports (animation-timeline: view()) {
     .decisionHead, .labHead, .labPanel, .modesHead, .cell,
-    .privacyHead, .ledgerCol, .privacyClose, .installCopy, .installShot {
-      animation: reveal linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 22%;
-    }
-    @keyframes reveal {
+    .privacyHead, .ledgerCol, .privacyClose, .installCopy,     @keyframes reveal {
       from { opacity: 0; transform: translateY(26px); }
       to { opacity: 1; transform: none; }
     }

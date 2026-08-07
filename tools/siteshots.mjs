@@ -28,6 +28,7 @@ const TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8",
 };
@@ -99,6 +100,15 @@ const SHOTS = [
       await page.locator("#lab").scrollIntoViewIfNeeded();
       await page.click('.labChips button[data-q="google.com@evil.com"]');
       await page.waitForTimeout(400);
+    },
+  },
+  {
+    name: "page",
+    width: 1440,
+    height: 900,
+    async prepare(page) {
+      await page.locator("#page").scrollIntoViewIfNeeded();
+      await page.waitForTimeout(600);
     },
   },
   {

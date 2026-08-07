@@ -261,11 +261,27 @@ for (const f of ["web/app.js"]) {
 }
 
 // The site is one page and it references its own assets by absolute path.
+//
+// srcset is checked as well as src/href, and it is the case that actually
+// matters: every dark-theme asset on the page (the arc render, the product
+// screenshot) is reachable *only* from a <source srcset>, so a check that read
+// src alone would pass a site with no dark imagery at all.
 if (existsSync(join(ROOT, "web/index.html"))) {
   const site = read("web/index.html");
-  for (const m of site.matchAll(/(?:src|href)="\/([^"]+)"/g)) {
-    if (!existsSync(join(ROOT, "web", m[1]))) {
-      fail("web/index.html", `references missing file: /${m[1]}`);
+
+  const referenced = new Set();
+  for (const m of site.matchAll(/(?:src|href)="\/([^"]+)"/g)) referenced.add(m[1]);
+  for (const m of site.matchAll(/srcset="([^"]+)"/g)) {
+    // "a.webp 1x, b.webp 2x" -> the url is the first token of each candidate.
+    for (const candidate of m[1].split(",")) {
+      const url = candidate.trim().split(/\s+/)[0];
+      if (url.startsWith("/")) referenced.add(url.slice(1));
+    }
+  }
+
+  for (const rel of referenced) {
+    if (!existsSync(join(ROOT, "web", rel))) {
+      fail("web/index.html", `references missing file: /${rel}`);
     }
   }
 }
