@@ -12,6 +12,7 @@
     "icons": "node tools/genicons.mjs",
     "shots": "node tools/shots.mjs",
     "store": "node tools/store.mjs",
+    "live": "node tools/live.mjs",
     "check": "npm run lint && npm test"
   }
 }
