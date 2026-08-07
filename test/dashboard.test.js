@@ -8,9 +8,9 @@ import {
   nameFor,
   monogram,
   hueFor,
-  addFavourite,
-  removeFavourite,
-} from "../extension/src/favourites.js";
+  addFavorite,
+  removeFavorite,
+} from "../extension/src/favorites.js";
 
 // --- the clock ---------------------------------------------------------------
 
@@ -110,7 +110,7 @@ test("readings go stale on a schedule", () => {
   assert.equal(isStale({}, now), true);
 });
 
-// --- favourites ---------------------------------------------------------------
+// --- favorites ---------------------------------------------------------------
 
 test("a bare host becomes an https address", () => {
   assert.equal(normaliseURL("example.com"), "https://example.com/");
@@ -121,7 +121,7 @@ test("an explicit http address is kept as-is", () => {
   assert.equal(normaliseURL("http://localhost:3000"), "http://localhost:3000/");
 });
 
-test("a favourite can only ever be http(s)", () => {
+test("a favorite can only ever be http(s)", () => {
   // A tile is a link the user clicks, so this is the same rule the search box
   // enforces, for the same reason: this page is a privileged extension origin.
   for (const hostile of [
@@ -175,9 +175,9 @@ test("a hue is stable for a host and spread across the wheel", () => {
 });
 
 test("adding normalises and names in one step", () => {
-  const result = addFavourite([], { url: "github.com" });
+  const result = addFavorite([], { url: "github.com" });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.favourites[0], {
+  assert.deepEqual(result.favorites[0], {
     id: "https://github.com/",
     url: "https://github.com/",
     name: "Github",
@@ -185,21 +185,40 @@ test("adding normalises and names in one step", () => {
 });
 
 test("a duplicate is refused with a reason", () => {
-  const first = addFavourite([], { url: "github.com" });
-  const second = addFavourite(first.favourites, { url: "https://github.com" });
+  const first = addFavorite([], { url: "github.com" });
+  const second = addFavorite(first.favorites, { url: "https://github.com" });
   assert.equal(second.ok, false);
   assert.match(second.reason, /already/);
 });
 
 test("junk is refused with a reason rather than stored", () => {
-  const result = addFavourite([], { url: "javascript:alert(1)" });
+  const result = addFavorite([], { url: "javascript:alert(1)" });
   assert.equal(result.ok, false);
   assert.match(result.reason, /web address/);
 });
 
 test("removing takes the one asked for and nothing else", () => {
   const list = [{ id: "a" }, { id: "b" }];
-  assert.deepEqual(removeFavourite(list, "a"), [{ id: "b" }]);
-  assert.deepEqual(removeFavourite(list, "nope"), list);
-  assert.deepEqual(removeFavourite(null, "a"), []);
+  assert.deepEqual(removeFavorite(list, "a"), [{ id: "b" }]);
+  assert.deepEqual(removeFavorite(list, "nope"), list);
+  assert.deepEqual(removeFavorite(null, "a"), []);
+});
+
+// --- what a row may link to --------------------------------------------------
+
+const { isWebLink } = await import("../extension/src/browsing.js");
+
+test("only http(s) can become a top-site or closed-tab row", () => {
+  assert.equal(isWebLink("https://example.com/"), true);
+  assert.equal(isWebLink("http://localhost:3000/"), true);
+  for (const bad of ["chrome://newtab", "file:///etc/passwd", "javascript:alert(1)", "", null]) {
+    assert.equal(isWebLink(bad), false, String(bad));
+  }
+});
+
+test("the Web Store is excluded — an extension cannot navigate there", () => {
+  // Chrome's only default top site in a fresh profile, and clicking it killed
+  // the renderer.
+  assert.equal(isWebLink("https://chrome.google.com/webstore?hl=en"), false);
+  assert.equal(isWebLink("https://chromewebstore.google.com/detail/x"), false);
 });

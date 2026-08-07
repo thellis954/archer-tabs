@@ -342,3 +342,75 @@ test("contiguous matches outrank scattered ones", () => {
   });
   assert.equal(filterRows(rows, "claude")[0].text, "claude");
 });
+
+// --- multi-provider recall (the "recent chats aren't showing" fix) -----------
+
+test("a conversation with a custom GPT is recognised", () => {
+  // /g/g-xxxx/c/<uuid>. Matching only /c/<uuid> dropped every one of these.
+  const rows = buildRows({
+    visits: [{
+      url: `https://chatgpt.com/g/g-p-abc123/c/${UUID}`,
+      title: "Via a custom GPT",
+      lastVisitTime: T,
+    }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].url, `https://chatgpt.com/c/${UUID}`, "normalised to the canonical address");
+});
+
+test("the old chat.openai.com address still counts", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://chat.openai.com/c/${UUID}`, title: "An older chat", lastVisitTime: T }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].provider, "ChatGPT");
+});
+
+test("Claude conversations are recognised too, and labelled", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://claude.ai/chat/${UUID}`, title: "Fletching an arrow", lastVisitTime: T }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].provider, "Claude");
+  assert.equal(rows[0].url, `https://claude.ai/chat/${UUID}`);
+});
+
+test("a chat.openai.com visit and its chatgpt.com twin collapse to one row", () => {
+  const rows = buildRows({
+    visits: [
+      { url: `https://chat.openai.com/c/${UUID}`, title: "Same conversation", lastVisitTime: T },
+      { url: `https://chatgpt.com/c/${UUID}`, title: "Same conversation", lastVisitTime: T + 1000 },
+    ],
+  });
+  assert.equal(rows.length, 1);
+});
+
+test("look-alike hosts are still refused", () => {
+  for (const url of [
+    `https://chatgpt.com.evil.com/c/${UUID}`,
+    `https://evil.com/chatgpt.com/c/${UUID}`,
+    `https://claude.ai.evil.com/chat/${UUID}`,
+    `http://chatgpt.com/c/${UUID}`,
+    `https://notclaude.ai/chat/${UUID}`,
+  ]) {
+    assert.equal(conversationId(url), null, url);
+  }
+});
+
+test("a tab that was never named is dropped, whichever assistant it was", () => {
+  for (const [url, title] of [
+    [`https://chatgpt.com/c/${UUID}`, "ChatGPT"],
+    [`https://claude.ai/chat/${UUID}`, "Claude"],
+    [`https://claude.ai/chat/${UUID}`, "Claude.ai"],
+    [`https://chatgpt.com/c/${UUID}`, "New chat"],
+  ]) {
+    assert.equal(buildRows({ visits: [{ url, title, lastVisitTime: T }] }).length, 0, `${title}`);
+  }
+});
+
+test("a product-name suffix is stripped from the title", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://claude.ai/chat/${UUID}`, title: "Fletching an arrow - Claude", lastVisitTime: T }],
+  });
+  assert.equal(rows[0].title, "Fletching an arrow");
+});

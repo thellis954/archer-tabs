@@ -7,7 +7,7 @@
 // chatgpt.com conversation URLs and every other result is dropped before it is
 // looked at. See docs/ROADMAP.md §3.3 and the permissions ledger.
 
-import { conversationId } from "./conversations.js";
+import { identify, PROVIDERS } from "./conversations.js";
 
 const NEEDED = { permissions: ["history"] };
 
@@ -53,21 +53,34 @@ export async function revokeHistoryAccess() {
 export async function readConversationVisits() {
   if (!globalThis.chrome?.history?.search) return [];
 
+  // One query per host rather than one for "chatgpt.com/c/". Chrome's history
+  // search is a loose text match that tokenises on punctuation, so a query with
+  // slashes in it is unreliable — searching the bare host and filtering here is
+  // both broader and exact.
+  const queries = PROVIDERS.flatMap((p) => [p.query, ...(p.extraQueries ?? [])]);
+  const startTime = Date.now() - WINDOW_DAYS * 864e5;
+
   let results;
   try {
-    results = await chrome.history.search({
-      text: "chatgpt.com/c/",
-      startTime: Date.now() - WINDOW_DAYS * 864e5,
-      maxResults: MAX_RESULTS,
-    });
+    const batches = await Promise.all(
+      queries.map((text) =>
+        chrome.history.search({ text, startTime, maxResults: MAX_RESULTS }).catch(() => []),
+      ),
+    );
+    results = batches.flat();
   } catch {
     // Permission revoked between the check and the call.
     return [];
   }
 
-  // `text` is a loose full-text query, so narrow it to actual conversation URLs
-  // before anything else is read off these records.
-  const conversations = results.filter((item) => conversationId(item.url));
+  // Narrow to actual conversation URLs, and drop the duplicates the overlapping
+  // queries produce, before anything else is read off these records.
+  const seen = new Set();
+  const conversations = results.filter((item) => {
+    if (!identify(item.url) || seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
 
   // The *first* visit is what a launch has to precede to have caused it;
   // history.search only reports the last one.

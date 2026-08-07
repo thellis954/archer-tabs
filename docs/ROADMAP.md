@@ -644,6 +644,33 @@ Each one costs install-time trust; add only when its phase needs it.
 
 ---
 
+## 4.6 Bugs found by using it
+
+Fixed after Phase 7, in a QA pass done as an end user rather than as an author —
+click every control, at every width, and watch what the page actually does.
+
+| Symptom | Cause |
+|---|---|
+| The `+` menu rendered as raw inline text | Its items became `[role=menuitem]` in Phase 5; the CSS only styled `[role=option]`, so the whole menu silently lost its layout |
+| The top-bar menu ran 256px off the right edge | Anchored `left: 0` under a control that had moved to the far right of the bar |
+| Recent ChatGPT chats never appeared | The matcher only accepted `chatgpt.com/c/<uuid>` — it dropped every custom-GPT conversation (`/g/g-xxx/c/<uuid>`) and everything at the old `chat.openai.com`. The history query also used `"chatgpt.com/c/"`, and Chrome's history search tokenises on punctuation |
+| Favorites "didn't save" | They did. Chrome pre-renders the new tab page, so a tab built before the change showed the state as it was then. Nothing watched `chrome.storage.onChanged` |
+| The settings gear did nothing | `chrome.runtime.openOptionsPage()` is a silent no-op when the manifest has no options page registered — which is what a stale unpacked build looks like |
+| **A hand-off could navigate the wrong tab** | `chrome.tabs.update({url})` with no tab id navigates whatever tab is *active*, not the one running the page. Measured: the page's own tab id and the active tab id differ. It now resolves its own id with `chrome.tabs.getCurrent()` |
+| Clicking the "Web Store" top site killed the tab | Chrome forbids extensions from navigating there — and it is the *only* entry in `topSites` on a fresh profile, so it was the first thing a new user would click |
+| The page scrolled sideways at 360px | Four destination pills are wider than a phone-width window and the row would not wrap |
+
+**Two improvements that came out of the same pass:**
+- **The placeholder names the destination.** "Ask Claude, or type a URL" — the box is the only thing
+  on the page that can say where the next Enter goes. `docs/BRAND.md` fixed it at "Ask or type a URL"
+  so a *default* would not imply an affiliation; reflecting a destination the user just chose is the
+  opposite of that.
+- **Attachments are chips, not inlined text.** The first version pasted the file into the box and an
+  `<input type="text">` silently stripped every newline, so a Python file arrived as one mangled
+  line. A chip also means the file can be removed, and it survives while you type the question.
+  Hand-offs travel in a URL, so their attachment is trimmed to a budget and the page says so;
+  Answer mode posts a body and sends the whole file.
+
 ## 4.5 Parked ideas
 
 Raised while implementing; not scheduled. Revisit after Phase 6.

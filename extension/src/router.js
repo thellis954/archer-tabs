@@ -42,6 +42,26 @@ const TARGETS = {
 export const isHandoff = (mode) => Object.hasOwn(TARGETS, mode);
 
 /**
+ * What the search box should say in each mode.
+ *
+ * `docs/BRAND.md` fixed this at "Ask or type a URL" so a *default* placeholder
+ * would not imply an affiliation with a provider. Reflecting a destination the
+ * user has just chosen is the opposite: it is the box telling you where the
+ * next Enter goes, which is the single most useful thing it can say.
+ */
+const PLACEHOLDERS = {
+  [AUTO]: "Ask or type a URL",
+  [CHATGPT]: "Ask ChatGPT, or type a URL",
+  [CLAUDE]: "Ask Claude, or type a URL",
+  [PERPLEXITY]: "Ask Perplexity, or type a URL",
+  [SEARCH_MODE]: "Search the web",
+  [ANSWER_MODE]: "Ask, and the answer appears here",
+};
+
+export const placeholderFor = (mode, canAnswer = true) =>
+  PLACEHOLDERS[mode === ANSWER_MODE && !canAnswer ? AUTO : mode] ?? PLACEHOLDERS[AUTO];
+
+/**
  * @param {string} raw   what the user typed
  * @param {{mode?: string, force?: "url"|"prompt"|null, canAnswer?: boolean}} [options]
  * @param options.canAnswer  whether an API key is set. Answer mode degrades to

@@ -34,7 +34,7 @@ const SHIPPED_JS = [
   "extension/src/clock.js",
   "extension/src/conversations.js",
   "extension/src/dashboard.js",
-  "extension/src/favourites.js",
+  "extension/src/favorites.js",
   "extension/src/history.js",
   "extension/src/library.js",
   "extension/src/modemenu.js",

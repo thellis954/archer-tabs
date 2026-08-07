@@ -208,20 +208,23 @@ export async function saveLibrary(templates) {
 
 // --- the dashboard --------------------------------------------------------------
 
-const KEY_FAVOURITES = "favourites";
+const KEY_FAVORITES = "favorites";
+/** Pre-rename key. Read once so nothing anyone pinned is lost. */
+const KEY_FAVORITES_OLD = "favourites";
 const KEY_PLACE = "weatherPlace";
 const KEY_UNIT = "weatherUnit";
 const KEY_WEATHER = "weatherCache";
 
 /** @returns {Promise<Array<{id: string, url: string, name: string}>>} */
-export async function readFavourites() {
-  const { [KEY_FAVOURITES]: saved } = await store().get({ [KEY_FAVOURITES]: [] });
+export async function readFavorites() {
+  const raw = await store().get({ [KEY_FAVORITES]: null, [KEY_FAVORITES_OLD]: null });
+  const saved = raw[KEY_FAVORITES] ?? raw[KEY_FAVORITES_OLD];
   if (!Array.isArray(saved)) return [];
   return saved.filter((f) => f && typeof f.url === "string" && typeof f.name === "string");
 }
 
-export async function saveFavourites(favourites) {
-  await store().set({ [KEY_FAVOURITES]: favourites });
+export async function saveFavorites(favorites) {
+  await store().set({ [KEY_FAVORITES]: favorites });
 }
 
 /**

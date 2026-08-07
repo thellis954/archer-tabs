@@ -631,7 +631,7 @@ const paired = await convoPage.locator("#rows .row.is-conversation").evaluateAll
 );
 check(
   "each conversation gets the prompt that actually started it",
-  CONVOS.every((c) => paired[c.title] === `— ${c.prompt}`),
+  CONVOS.every((c) => paired[c.title] === `— ChatGPT · ${c.prompt}`),
   JSON.stringify(paired),
 );
 check(
@@ -1069,7 +1069,7 @@ check("the + button opens a menu", await power.locator("#plusMenu").isVisible())
 check("...announced as a menu", (await power.locator("#plusButton").getAttribute("aria-haspopup")) === "menu");
 check(
   "...whose items are menuitems, not options — it has no selection to claim",
-  (await power.locator("#plusMenu [role=menuitem]").count()) === 5 &&
+  (await power.locator("#plusMenu [role=menuitem]").count()) === 6 &&
     (await power.locator("#plusMenu [role=option]").count()) === 0,
 );
 
@@ -1098,12 +1098,21 @@ check(
 );
 
 const kinds = await power.locator("#rows .row").evaluateAll((rows) => rows.map((r) => r.dataset.kind));
-check("top sites join the rows once enabled", kinds.includes("site"), JSON.stringify(kinds));
-check("recently closed tabs join them too", kinds.includes("closed"), JSON.stringify(kinds));
+check("recently closed tabs join the rows once enabled", kinds.includes("closed"), JSON.stringify(kinds));
+check("a prompt still outranks them", kinds.indexOf("prompt") === 0, JSON.stringify(kinds));
+
+// Chrome's only default top site in a fresh profile is the Web Store, which an
+// extension is forbidden to navigate to — clicking that row killed the
+// renderer. It must never be offered.
+const rowTitlesNow = await power.locator("#rows .row .title").allInnerTexts();
 check(
-  "a prompt still outranks both",
-  kinds.indexOf("prompt") === 0,
-  JSON.stringify(kinds),
+  "the Web Store is never offered as a row — extensions cannot navigate to it",
+  !rowTitlesNow.some((t) => /web store/i.test(t)),
+  JSON.stringify(rowTitlesNow),
+);
+check(
+  "top sites really were granted",
+  await power.evaluate(() => chrome.permissions.contains({ permissions: ["topSites"] })),
 );
 
 const closedRow = power.locator("#rows .row.is-closed").first();
@@ -1341,7 +1350,7 @@ check("turning weather off removes the card", await dash.locator("#weather").isH
 
 // --- target pills ------------------------------------------------------------------
 
-await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: true, favourites: [] }));
+await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: true, favorites: [] }));
 await dash.reload({ waitUntil: "domcontentloaded" });
 await dash.waitForTimeout(400);
 
@@ -1415,16 +1424,16 @@ check(
   JSON.stringify(await pressed()),
 );
 
-// --- favourites ----------------------------------------------------------------------
+// --- favorites ----------------------------------------------------------------------
 
 await dash.locator("#modeButton").click();
 await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
 await dash.waitForTimeout(200);
 
-check("the favourites bar says when it is empty", await dash.locator("#favouritesEmpty").isVisible());
+check("the favorites bar says when it is empty", await dash.locator("#favoritesEmpty").isVisible());
 check("the add form starts closed", await dash.locator("#addTileForm").isHidden());
 
-await dash.locator("#addFavourite").click();
+await dash.locator("#addFavorite").click();
 await dash.waitForTimeout(150);
 check("Add opens the form", await dash.locator("#addTileForm").isVisible());
 
@@ -1432,7 +1441,7 @@ await dash.fill("#tileUrl", "javascript:alert(1)");
 await dash.locator(".tileSave").click();
 await dash.waitForTimeout(250);
 check(
-  "a javascript: favourite is refused",
+  "a javascript: favorite is refused",
   (await dash.locator("#tileStatus").innerText()).includes("web address") &&
     (await dash.locator(".tile").count()) === 0,
   await dash.locator("#tileStatus").innerText(),
@@ -1452,9 +1461,9 @@ check(
   (await dash.locator(".tileFace").innerText()) === "GI",
   await dash.locator(".tileFace").innerText(),
 );
-check("...and the empty line goes away", await dash.locator("#favouritesEmpty").isHidden());
+check("...and the empty line goes away", await dash.locator("#favoritesEmpty").isHidden());
 
-await dash.locator("#addFavourite").click();
+await dash.locator("#addFavorite").click();
 await dash.fill("#tileUrl", "youtube.com");
 await dash.fill("#tileName", "YouTube");
 await dash.locator(".tileSave").click();
@@ -1481,12 +1490,12 @@ check("removing a tile removes exactly one", (await dash.locator(".tile").count(
 
 await dash.reload({ waitUntil: "domcontentloaded" });
 await dash.waitForTimeout(500);
-check("favourites survive a reload", (await dash.locator(".tile").count()) === 1);
+check("favorites survive a reload", (await dash.locator(".tile").count()) === 1);
 
 // Titles come from the user, but a tile is still a rendered string.
 await dash.evaluate(() =>
   chrome.storage.local.set({
-    favourites: [{ id: "https://example.com/", url: "https://example.com/", name: "<img src=x onerror=alert(1)>" }],
+    favorites: [{ id: "https://example.com/", url: "https://example.com/", name: "<img src=x onerror=alert(1)>" }],
   }),
 );
 await dash.reload({ waitUntil: "domcontentloaded" });
@@ -1496,6 +1505,96 @@ check(
   (await dash.locator(".tileName").innerText()).includes("<img src=x") &&
     (await dash.locator(".tile").evaluate((n) => n.querySelectorAll("img").length)) === 0,
 );
+
+// --- the + menu, attachments, and the placeholder --------------------------------
+
+await dash.evaluate(() => chrome.storage.local.set({ mode: "chatgpt" }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+
+check(
+  "the placeholder names the destination you chose",
+  (await dash.locator("#query").getAttribute("placeholder")) === "Ask ChatGPT, or type a URL",
+  await dash.locator("#query").getAttribute("placeholder"),
+);
+await dash.locator('.target[data-mode="claude"]').click();
+await dash.waitForTimeout(200);
+check(
+  "...and follows when it changes",
+  (await dash.locator("#query").getAttribute("placeholder")) === "Ask Claude, or type a URL",
+  await dash.locator("#query").getAttribute("placeholder"),
+);
+
+// The + menu's items are menuitems; styling that only matched [role=option]
+// left the whole menu unstyled, which is invisible to every other check.
+await dash.locator("#plusButton").click();
+await dash.waitForTimeout(200);
+const menuItemLayout = await dash
+  .locator("#plusMenu [role=menuitem]")
+  .first()
+  .evaluate((n) => getComputedStyle(n).display);
+check("the + menu's items are laid out, not raw inline text", menuItemLayout === "grid", menuItemLayout);
+await dash.keyboard.press("Escape");
+
+// Attachments
+const ATTACH = join(tmpdir(), "archer-attach.py");
+writeFileSync(ATTACH, "def add(a, b):\n    return a + b\n");
+
+await dash.setInputFiles("#attachInput", ATTACH);
+await dash.waitForTimeout(400);
+check("attaching a file adds a chip", (await dash.locator(".chip").count()) === 1);
+check(
+  "...and does not paste the file into the box, which would strip its newlines",
+  (await dash.inputValue("#query")) === "",
+);
+check("...and arms send even with an empty box", await dash.locator("#send").isEnabled());
+
+dashNav.length = 0;
+await dash.fill("#query", "explain this");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(400);
+const sent = decodeURIComponent((dashNav[0] ?? "").replace(/^[^?]*\?q=/, ""));
+check(
+  "the file rides with the prompt, newlines intact",
+  sent.startsWith("explain this") && sent.includes("--- archer-attach.py ---") && sent.includes("\n    return a + b"),
+  JSON.stringify(sent.slice(0, 120)),
+);
+check("...and the chip is cleared afterwards", (await dash.locator(".chip").count()) === 0);
+
+await dash.fill("#query", "");
+await dash.setInputFiles("#attachInput", ATTACH);
+await dash.waitForTimeout(300);
+check("...and re-arms it on the next attachment", await dash.locator("#send").isEnabled());
+await dash.locator(".chipRemove").click();
+await dash.waitForTimeout(250);
+check("a chip can be removed", (await dash.locator(".chip").count()) === 0);
+check("...which disarms send again", await dash.locator("#send").isDisabled());
+rmSync(ATTACH, { force: true });
+
+// --- navigation targets this tab, not whichever one is active --------------------
+//
+// chrome.tabs.update({url}) with no id navigates the *active* tab. Chrome
+// pre-renders the new tab page, so a background new tab that submitted would
+// have sent some other tab somewhere.
+const bystander = await dashCtx.newPage();
+await bystander.goto("about:blank");
+await bystander.bringToFront();
+await dash.waitForTimeout(200);
+
+dashNav.length = 0;
+await dash.evaluate(() => {
+  document.getElementById("query").value = "example.com";
+  document.getElementById("searchForm").requestSubmit();
+});
+await dash.waitForTimeout(500);
+check(
+  "a submit from a background tab navigates that tab, not the active one",
+  bystander.url() === "about:blank" && dashNav.some((u) => u.startsWith("https://example.com")),
+  JSON.stringify({ bystander: bystander.url(), dashNav }),
+);
+await bystander.close();
+await dash.bringToFront();
 
 await dashCtx.close();
 rmSync(dashFixture, { recursive: true, force: true });
