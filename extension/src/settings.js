@@ -79,6 +79,11 @@ export async function recordLaunch(text, at = Date.now()) {
   await store().set({ [KEY_LAUNCHES]: next.slice(-LAUNCH_LIMIT) });
 }
 
+/** Forgets every logged prompt. Pins, saved prompts and settings are untouched. */
+export async function clearLaunches() {
+  await store().set({ [KEY_LAUNCHES]: [] });
+}
+
 /** @returns {Promise<Array<{text: string, at: number}>>} newest first. */
 export async function readLaunches() {
   const { [KEY_LAUNCHES]: log } = await store().get({ [KEY_LAUNCHES]: [] });
@@ -181,6 +186,24 @@ export async function addSpend(tokens, today = dayStamp()) {
   const next = { day: today, tokens: current.tokens + (Number(tokens) || 0) };
   await store().set({ [KEY_SPEND]: next });
   return next;
+}
+
+// --- the prompt library --------------------------------------------------------
+
+const KEY_LIBRARY = "library";
+
+/** @returns {Promise<Array<{id: string, name: string, text: string}>>} */
+export async function readLibrary() {
+  const { [KEY_LIBRARY]: saved } = await store().get({ [KEY_LIBRARY]: [] });
+  if (!Array.isArray(saved)) return [];
+
+  return saved
+    .filter((t) => t && typeof t.name === "string" && typeof t.text === "string")
+    .map((t) => ({ id: String(t.id ?? t.name), name: t.name, text: t.text }));
+}
+
+export async function saveLibrary(templates) {
+  await store().set({ [KEY_LIBRARY]: templates });
 }
 
 /** Local calendar day — the boundary a person means when they say "today". */

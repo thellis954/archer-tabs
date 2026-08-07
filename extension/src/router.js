@@ -19,15 +19,27 @@ export const ANSWER = "answer";
 
 export const AUTO = "auto";
 export const CHATGPT = "chatgpt";
+export const CLAUDE = "claude";
+export const PERPLEXITY = "perplexity";
 export const SEARCH_MODE = "search";
 export const ANSWER_MODE = "answer";
-export const MODES = [AUTO, CHATGPT, SEARCH_MODE, ANSWER_MODE];
+export const MODES = [AUTO, CHATGPT, CLAUDE, PERPLEXITY, SEARCH_MODE, ANSWER_MODE];
 
-// `?q=` prefills the composer but does not reliably submit on its own — see the
-// deferred content-script note in docs/ROADMAP.md Phase 2. Landing in the
-// composer with the text already there is the honest degrade; a dead button
-// would not be.
-const CHATGPT_URL = "https://chatgpt.com/?q=";
+/**
+ * Where a prompt goes in each hand-off mode. Every one is a plain `?q=`
+ * navigation — no content script, no host permission, and the query arrives in
+ * the composer whether or not the site chooses to submit it for you.
+ *
+ * Naming these is nominative use: it is a list of destinations, the way a
+ * browser's settings name search engines. No mark or styling of theirs is used.
+ */
+const TARGETS = {
+  [CHATGPT]: "https://chatgpt.com/?q=",
+  [CLAUDE]: "https://claude.ai/new?q=",
+  [PERPLEXITY]: "https://www.perplexity.ai/search?q=",
+};
+
+export const isHandoff = (mode) => Object.hasOwn(TARGETS, mode);
 
 /**
  * @param {string} raw   what the user typed
@@ -51,8 +63,16 @@ export function route(raw, { mode = AUTO, force = null, canAnswer = false } = {}
   if (verdict.kind === EMPTY) return { action: NONE };
   if (verdict.kind === URL_KIND) return { action: NAVIGATE, url: verdict.url };
 
-  if (effectiveMode === CHATGPT) {
-    return { action: ASK, url: CHATGPT_URL + encodeURIComponent(verdict.text), text: verdict.text };
+  if (isHandoff(effectiveMode)) {
+    // `?q=` prefills the composer but does not reliably submit on its own — see
+    // the deferred content-script note in docs/ROADMAP.md Phase 2. Landing in
+    // the composer with the text already there is the honest degrade; a dead
+    // button would not be.
+    return {
+      action: ASK,
+      url: TARGETS[effectiveMode] + encodeURIComponent(verdict.text),
+      text: verdict.text,
+    };
   }
   if (effectiveMode === ANSWER_MODE) {
     return { action: ANSWER, text: verdict.text };

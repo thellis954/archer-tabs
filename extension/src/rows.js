@@ -7,7 +7,15 @@
 // code path in this module that can produce an element from text.
 // `tools/lint.js` fails the build on innerHTML anywhere in extension/.
 
-import { CONVERSATION } from "./conversations.js";
+import { CONVERSATION, PROMPT_ROW, SITE, CLOSED } from "./conversations.js";
+
+
+/** What each row kind says after its title, when it has nothing of its own. */
+const SUFFIX = {
+  [PROMPT_ROW]: "— ask again",
+  [SITE]: "— you visit this a lot",
+  [CLOSED]: "— recently closed",
+};
 
 const template = () => document.getElementById("rowTemplate");
 
@@ -25,8 +33,10 @@ export function renderRows(list, rows, { onOpen, onPin, onDismiss }) {
     node.id = `row-${index}`;
     node.dataset.rowId = row.id;
     node.dataset.index = String(index);
-    node.classList.toggle("isConversation", row.kind === CONVERSATION);
-    node.classList.toggle("isPrompt", row.kind !== CONVERSATION);
+    node.dataset.kind = row.kind;
+    // Derived from the kind rather than enumerated, so a new row kind cannot be
+    // added without its class arriving with it.
+    node.classList.add(`is-${row.kind}`);
     node.classList.toggle("isPinned", Boolean(row.pinned));
 
     const title = node.querySelector(".title");
@@ -37,10 +47,14 @@ export function renderRows(list, rows, { onOpen, onPin, onDismiss }) {
       // An em dash only reads as a separator when there is something after it.
       description.textContent = row.prompt ? `— ${row.prompt}` : "";
       node.setAttribute("aria-label", row.prompt ? `${row.title} — ${row.prompt}` : row.title);
-    } else {
+    } else if (row.kind === PROMPT_ROW) {
       title.textContent = row.text;
-      description.textContent = "— ask again";
+      description.textContent = SUFFIX[PROMPT_ROW];
       node.setAttribute("aria-label", `Ask again: ${row.text}`);
+    } else {
+      title.textContent = row.title;
+      description.textContent = SUFFIX[row.kind] ?? "";
+      node.setAttribute("aria-label", `${row.title} ${SUFFIX[row.kind] ?? ""}`.trim());
     }
 
     const pin = node.querySelector(".pin");
@@ -66,7 +80,7 @@ export function renderRows(list, rows, { onOpen, onPin, onDismiss }) {
   });
 }
 
-const plain = (row) => (row.kind === CONVERSATION ? row.title : row.text);
+const plain = (row) => row.title || row.text || "";
 
 /** Moves the visual and assistive-tech selection to `index`, or clears it at -1. */
 export function setActiveRow(list, input, index) {

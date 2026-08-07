@@ -4,8 +4,19 @@
 // and the error strings come back from the API too — neither is ours to trust
 // as markup.
 
-import { loadAnswerSettings, saveAnswerSettings, readSpend, DEFAULT_TOKEN_CAP } from "./src/settings.js";
+import {
+  loadAnswerSettings,
+  saveAnswerSettings,
+  readSpend,
+  DEFAULT_TOKEN_CAP,
+  readLibrary,
+  saveLibrary,
+  readLaunches,
+  clearLaunches,
+} from "./src/settings.js";
 import { listModels, estimateCost, API_ORIGIN } from "./src/answer.js";
+import { variableNames } from "./src/library.js";
+import { summarise, toMarkdown } from "./src/analytics.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,6 +50,159 @@ function say(node, message, isError = false) {
   node.textContent = message;
   node.classList.toggle("isError", isError);
 }
+
+// --- saved prompts --------------------------------------------------------------
+
+const templateList = $("templates");
+
+await renderTemplates();
+
+async function renderTemplates() {
+  const templates = await readLibrary();
+  templateList.replaceChildren();
+
+  if (!templates.length) {
+    const empty = document.createElement("li");
+    empty.className = "templateEmpty";
+    empty.textContent = "No saved prompts yet.";
+    templateList.append(empty);
+    return;
+  }
+
+  for (const template of templates) {
+    const item = document.createElement("li");
+    item.className = "template";
+
+    const name = document.createElement("span");
+    name.className = "templateName";
+    name.textContent = `/${template.name}`;
+
+    const text = document.createElement("span");
+    text.className = "templateText";
+    text.textContent = template.text;
+
+    const blanks = variableNames(template.text);
+    const meta = document.createElement("span");
+    meta.className = "templateMeta";
+    meta.textContent = blanks.length ? blanks.map((b) => `{{${b}}}`).join(" ") : "";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "rowBtn";
+    remove.setAttribute("aria-label", `Delete ${template.name}`);
+    remove.textContent = "✕";
+    remove.addEventListener("click", async () => {
+      const rest = (await readLibrary()).filter((t) => t.id !== template.id);
+      await saveLibrary(rest);
+      await renderTemplates();
+      say($("templateStatus"), `Deleted /${template.name}.`);
+    });
+
+    item.append(name, text, meta, remove);
+    templateList.append(item);
+  }
+}
+
+$("addTemplate").addEventListener("click", async () => {
+  // A name with whitespace could never be typed after a slash, so it is
+  // normalised rather than rejected.
+  const name = $("templateName").value.trim().replace(/\s+/g, "-").toLowerCase();
+  const text = $("templateText").value.trim();
+
+  if (!name || !text) {
+    say($("templateStatus"), "A saved prompt needs both a name and some text.", true);
+    return;
+  }
+
+  const templates = await readLibrary();
+  const existing = templates.findIndex((t) => t.name === name);
+  const entry = { id: existing >= 0 ? templates[existing].id : `${name}-${templates.length}`, name, text };
+
+  if (existing >= 0) templates[existing] = entry;
+  else templates.push(entry);
+
+  await saveLibrary(templates);
+  $("templateName").value = "";
+  $("templateText").value = "";
+  await renderTemplates();
+  say($("templateStatus"), existing >= 0 ? `Updated /${name}.` : `Saved /${name}.`);
+});
+
+// --- analytics and export ---------------------------------------------------------
+
+await renderAnalytics();
+
+async function renderAnalytics() {
+  const launches = await readLaunches();
+  const summary = summarise(launches);
+  const box = $("analytics");
+  box.replaceChildren();
+
+  if (!summary.total) {
+    const empty = document.createElement("p");
+    empty.className = "prose";
+    empty.textContent = "Nothing asked from the new tab page yet.";
+    box.append(empty);
+    return;
+  }
+
+  const stats = [
+    ["Prompts", summary.total.toLocaleString()],
+    ["Per day", String(summary.perDay)],
+    ["Words each", String(summary.averageWords)],
+    ["Busiest hour", `${String(summary.busiestHour).padStart(2, "0")}:00`],
+  ];
+
+  const grid = document.createElement("dl");
+  grid.className = "stats";
+  for (const [label, value] of stats) {
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.textContent = value;
+    grid.append(term, detail);
+  }
+  box.append(grid);
+
+  if (summary.topWords.length) {
+    const heading = document.createElement("p");
+    heading.className = "hint";
+    heading.textContent = "What you ask about most";
+    box.append(heading);
+
+    const words = document.createElement("ul");
+    words.className = "words";
+    for (const { word, count } of summary.topWords) {
+      const item = document.createElement("li");
+      // A word out of the launch log is text the user typed, not markup.
+      item.textContent = `${word} · ${count}`;
+      words.append(item);
+    }
+    box.append(words);
+  }
+}
+
+$("exportMarkdown").addEventListener("click", async () => {
+  const launches = await readLaunches();
+  const markdown = toMarkdown(launches, { now: Date.now() });
+
+  // A blob and a synthetic click: no `downloads` permission needed, and the
+  // file never leaves the machine on its way to disk.
+  const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `archer-prompts-${new Date().toISOString().slice(0, 10)}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+
+  say($("dataStatus"), `Exported ${launches.length} prompt${launches.length === 1 ? "" : "s"}.`);
+});
+
+$("clearHistory").addEventListener("click", async () => {
+  await clearLaunches();
+  await renderAnalytics();
+  say($("dataStatus"), "Prompt history cleared. Saved prompts and pins are untouched.");
+});
 
 // --- the key ------------------------------------------------------------------
 

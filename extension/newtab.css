@@ -100,7 +100,22 @@ body {
 
 /* ---------- mode menu ---------- */
 
-.modeWrap { position: relative; }
+.modeWrap, .plusWrap { position: relative; }
+
+/* Hangs off the `+`, which sits inside the rounded box rather than in the bar. */
+.plusMenu {
+  top: calc(100% + 10px);
+  left: -6px;
+  width: min(320px, calc(100vw - 60px));
+}
+
+.plusMenu kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: .95em;
+}
 
 .modeMenu {
   position: absolute;
@@ -309,9 +324,15 @@ body {
   stroke-linejoin: round;
 }
 
-/* One icon per row kind, both in the template, one shown. */
-.row.isConversation .iconPrompt,
-.row.isPrompt .iconChat { display: none; }
+/* One icon per row kind: every glyph is in the template, and the row's kind
+   class picks the one that shows. */
+.rowIcon svg { display: none; }
+.row.is-conversation .iconChat,
+.row.is-prompt .iconPrompt,
+.row.is-site .iconSite,
+.row.is-closed .iconClosed,
+.row.is-template .iconTemplate { display: block; }
+.onboard .rowIcon svg { display: block; }
 
 .row.isPinned .rowIcon { color: var(--accent); }
 

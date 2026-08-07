@@ -491,14 +491,41 @@ after the mode was chosen.
 straight from the page. There is no Archer server to proxy it through, which is the only reason
 bring-your-own-key is worth building at all (§3.4).
 
-### Phase 5 — Power features (~1 week) 🟢 the differentiators
-Ordered by my estimate of value per unit of work:
-1. **Working `+` button** — attach current tab URL, page selection, or clipboard as prompt context. The single most-missed affordance in the current build.
-2. **Prompt library** — saved prompts with `{{variables}}`, invoked by `/slash` in the omnibox.
-3. **Multi-target routing** — Tab to cycle ChatGPT / Claude / Perplexity / default search; same query, chosen destination.
-4. **Top sites & recently-closed tabs** — `chrome.topSites`, `chrome.sessions`. Atlas's NTP has neither, and a new tab page is exactly where they belong.
-5. **Local prompt analytics** — what you actually ask, computed on-device.
-6. **Export to Markdown** — prompt history out as `.md`; a natural drop into an Obsidian vault.
+### Phase 5 — Power features ✅ **done**
+1. ✅ **Working `+` button** — paste, saved prompts, the two browsing opt-ins, settings
+2. ✅ **Prompt library** — `{{variables}}`, invoked by `/slash`
+3. ✅ **Multi-target routing** — ChatGPT / Claude / Perplexity / default search
+4. ✅ **Top sites & recently-closed tabs**
+5. ✅ **Local prompt analytics**
+6. ✅ **Export to Markdown**
+
+**`chrome.sessions` does not work without `tabs`, and that changed the design.** A closed tab comes
+back from `getRecentlyClosed()` with **no `url` and no `title`** unless the extension also holds
+`tabs` — verified directly: with `sessions` alone the result is `[{}]`. So recently-closed tabs
+genuinely cost the *"Read your browsing history"* prompt that Phase 2 went out of its way to avoid.
+Rather than bundle that into one innocuous-sounding click, the `+` menu offers **top sites** and
+**recently closed tabs** as two separate opt-ins, and the second one says what it costs. Both are
+optional, so the install prompt is still `search` + `storage`.
+
+**Deviations from the plan, deliberately:**
+- **Alt+↑/↓ cycles the target, not Tab.** Tab is how a keyboard user leaves a text field; taking it
+  from the search box to save a trip to a menu that is right there is a bad trade. Tab *is* bound
+  inside the box, but only while a saved prompt still has `{{blanks}}` left to fill — once they are
+  gone it goes back to being Tab, and there is an e2e case pinning exactly that.
+- **The `+` does not attach the current tab's URL.** On a new tab page there is no current page, and
+  reading *other* tabs' URLs is the `tabs` permission again. It offers paste, saved prompts, the
+  browsing opt-ins, and settings — all of which a new tab can actually do.
+- **Top sites and closed tabs are row kinds, not a separate tile strip.** They inherit the filtering,
+  the arrow keys, pinning and dismissing that the rows already had, instead of a second surface with
+  its own model. Pinning outranks everything; below that, what you *asked* beats where you have
+  *been*, since this is a recall surface first. The row cap grew 6 → 8 to leave them room.
+- **The prompt library shares the row list.** `/` turns the rows into the library rather than opening
+  a second popup with its own focus handling.
+- **Export fences every prompt** rather than inlining it. Prompts routinely contain `#`, `-`, `|` and
+  backticks; a prompt that silently becomes a heading in someone's notes is a worse export than a
+  plainer one.
+- **A "clear prompt history" button** came with the analytics. Showing someone a computed profile of
+  what they ask about, with no way to erase the input, would have been the wrong thing to build.
 
 ### Phase 6 — Ship (~2 days) 🟢
 - ~~Neutral brand skin~~ ✅ done — Archer, `docs/BRAND.md`. Remaining: store screenshots, listing
@@ -537,7 +564,9 @@ Each one costs install-time trust; add only when its phase needs it.
 | ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
 | `history` *(optional)* | 3 | Recent ChatGPT conversations. Requested at the click that turns them on, never at install — so it is absent from the install prompt entirely |
 | `optional_host_permissions: api.openai.com` | 4 | Inline answers. Optional, requested when a key is saved — never at install |
-| `topSites`, `sessions` | 5 | Tiles, recently-closed |
+| `topSites` *(optional)* | 5 | Top sites among the rows |
+| `sessions` + `tabs` *(optional)* | 5 | Recently-closed tabs. `sessions` alone returns no url or title — the pair is requested together, in its own opt-in, because it costs the "Read your browsing history" prompt |
+| `clipboardRead` *(optional)* | 5 | The `+` menu's paste |
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
 
 ---

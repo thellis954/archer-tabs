@@ -1,5 +1,5 @@
 import { URL_KIND, PROMPT } from "./src/classify.js";
-import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO } from "./src/router.js";
+import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO, MODES } from "./src/router.js";
 import {
   loadSettings,
   saveMode,
@@ -13,11 +13,21 @@ import {
   readSpend,
   addSpend,
 } from "./src/settings.js";
+import { readLibrary } from "./src/settings.js";
 import { streamAnswer, estimateCost, checkCap } from "./src/answer.js";
 import { createModeMenu } from "./src/modemenu.js";
-import { buildRows, filterRows, CONVERSATION } from "./src/conversations.js";
+import { buildRows, filterRows, LINK_KINDS } from "./src/conversations.js";
 import { hasHistoryAccess, requestHistoryAccess, readConversationVisits } from "./src/history.js";
+import {
+  hasTilesAccess,
+  requestTilesAccess,
+  hasClosedTabsAccess,
+  requestClosedTabsAccess,
+  readTopSites,
+  readRecentlyClosed,
+} from "./src/browsing.js";
 import { renderRows, setActiveRow } from "./src/rows.js";
+import { findTemplates, nextPlaceholder, parseSlash } from "./src/library.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
@@ -78,18 +88,50 @@ let visible = [];
 refreshRows();
 
 async function refreshRows() {
-  const granted = await hasHistoryAccess();
+  const [granted, tiles, closedTabs] = await Promise.all([
+    hasHistoryAccess(),
+    hasTilesAccess(),
+    hasClosedTabsAccess(),
+  ]);
   onboarding.hidden = granted;
 
-  const [launches, { pinned, dismissed }] = await Promise.all([readLaunches(), readRowState()]);
-  const visits = granted ? await readConversationVisits() : [];
+  const [launches, { pinned, dismissed }, library] = await Promise.all([
+    readLaunches(),
+    readRowState(),
+    readLibrary(),
+  ]);
 
-  allRows = buildRows({ visits, launches, pinned, dismissed });
+  const [visits, sites, closed] = await Promise.all([
+    granted ? readConversationVisits() : [],
+    tiles ? readTopSites() : [],
+    closedTabs ? readRecentlyClosed() : [],
+  ]);
+
+  templates = library;
+  allRows = buildRows({ visits, launches, sites, closed, pinned, dismissed });
   paint();
 }
 
+/** Saved prompts, kept in memory so `/` can filter them without a round trip. */
+let templates = [];
+
 function paint() {
-  visible = filterRows(allRows, input.value);
+  // A leading slash turns the row list into the prompt library. The rows and
+  // the library are the same surface — one list, one set of arrow keys — rather
+  // than a second popup with its own focus model.
+  const slash = parseSlash(input.value);
+  if (slash) {
+    visible = findTemplates(templates, slash.name).map((t) => ({
+      kind: "template",
+      id: `template:${t.id}`,
+      title: t.name,
+      text: t.text,
+      template: t,
+      at: 0,
+    }));
+  } else {
+    visible = filterRows(allRows, input.value);
+  }
   active = -1;
 
   renderRows(list, visible, {
@@ -115,8 +157,12 @@ function paint() {
 }
 
 function open(row) {
-  if (row.kind === CONVERSATION) {
+  if (LINK_KINDS.has(row.kind)) {
     navigate(row.url);
+    return;
+  }
+  if (row.kind === "template") {
+    useTemplate(row.template);
     return;
   }
   // A prompt row re-asks, through whatever mode is current — the destination is
@@ -124,6 +170,94 @@ function open(row) {
   input.value = row.text;
   syncSend();
   go(row.text, null);
+}
+
+/**
+ * Drops a saved prompt into the box and selects its first `{{blank}}`, so the
+ * next thing typed replaces it. Tab moves to the next blank.
+ */
+function useTemplate(template) {
+  input.value = template.text;
+  input.focus();
+  syncSend();
+  paint();
+  selectPlaceholder(0);
+}
+
+function selectPlaceholder(from) {
+  const slot = nextPlaceholder(input.value, from);
+  if (!slot) {
+    input.setSelectionRange(input.value.length, input.value.length);
+    return false;
+  }
+  input.setSelectionRange(slot.start, slot.end);
+  return true;
+}
+
+// --- the + menu ----------------------------------------------------------------
+
+const plusMenu = createModeMenu({
+  button: document.getElementById("plusButton"),
+  menu: document.getElementById("plusMenu"),
+  // The + button is an icon, so there is no label to keep in sync; a throwaway
+  // node absorbs the writes the menu makes.
+  label: document.createElement("span"),
+  onSelect: (action) => runPlusAction(action),
+});
+
+async function runPlusAction(action) {
+  switch (action) {
+    case "paste": {
+      const text = await readClipboard();
+      if (text) {
+        // Appended, not replaced: the + is for adding context to what you were
+        // already writing.
+        input.value = input.value ? `${input.value.trimEnd()} ${text}` : text;
+        syncSend();
+        paint();
+      }
+      input.focus();
+      return;
+    }
+
+    case "library":
+      input.value = "/";
+      input.focus();
+      syncSend();
+      paint();
+      return;
+
+    case "tiles":
+      await requestTilesAccess();
+      await refreshRows();
+      input.focus();
+      return;
+
+    case "closed":
+      // Kept separate from top sites because it costs strictly more: closed-tab
+      // titles are gated on `tabs`, whose prompt reads "Read your browsing
+      // history". Bundling it into one click would have hidden that.
+      await requestClosedTabsAccess();
+      await refreshRows();
+      input.focus();
+      return;
+
+    case "settings":
+      globalThis.chrome?.runtime?.openOptionsPage?.();
+  }
+}
+
+async function readClipboard() {
+  try {
+    if (globalThis.chrome?.permissions?.request) {
+      const granted = await chrome.permissions.request({ permissions: ["clipboardRead"] });
+      if (!granted) return "";
+    }
+    return (await navigator.clipboard.readText()).trim();
+  } catch {
+    // Denied, or nothing readable on the clipboard. Nothing useful to say.
+    return "";
+  }
 }
 
 document.getElementById("enableHistory").addEventListener("click", async () => {
@@ -140,14 +274,28 @@ document.getElementById("enableHistory").addEventListener("click", async () => {
 // Shift+Enter do not reliably raise a submit event across platforms.
 input.addEventListener("keydown", (event) => {
   switch (event.key) {
+    case "Tab":
+      // Only while a template still has blanks left — otherwise Tab has to stay
+      // Tab, or the search box becomes a place keyboard users cannot leave.
+      if (!event.shiftKey && nextPlaceholder(input.value, input.selectionEnd)) {
+        event.preventDefault();
+        selectPlaceholder(input.selectionEnd);
+      }
+      return;
+
     case "ArrowDown":
       event.preventDefault();
-      moveActive(1);
+      // Alt+↑/↓ cycles the destination. The roadmap wanted Tab for this; Tab is
+      // how keyboard users leave a text field, and taking it costs more than
+      // the shortcut is worth when the mode menu is right there.
+      if (event.altKey) cycleMode(1);
+      else moveActive(1);
       return;
 
     case "ArrowUp":
       event.preventDefault();
-      moveActive(-1);
+      if (event.altKey) cycleMode(-1);
+      else moveActive(-1);
       return;
 
     case "Escape":
@@ -175,6 +323,14 @@ input.addEventListener("keydown", (event) => {
     }
   }
 });
+
+function cycleMode(delta) {
+  const at = MODES.indexOf(mode);
+  const next = MODES[(at + delta + MODES.length) % MODES.length];
+  mode = next;
+  menu.setMode(next);
+  saveMode(next);
+}
 
 function moveActive(delta) {
   if (!visible.length) return;

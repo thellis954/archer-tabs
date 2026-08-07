@@ -393,12 +393,12 @@ await page.waitForTimeout(400);
 check("the onboarding row is offered when history is not granted", await page.locator("#onboarding").isVisible());
 check(
   "prompt rows appear with no permission at all",
-  (await page.locator("#rows .row.isPrompt").count()) > 0,
+  (await page.locator("#rows .row.is-prompt").count()) > 0,
   `${await page.locator("#rows .row").count()} rows`,
 );
 check(
   "no conversation rows without history access",
-  (await page.locator("#rows .row.isConversation").count()) === 0,
+  (await page.locator("#rows .row.is-conversation").count()) === 0,
 );
 
 // Every row's text came from a prompt or a page title. If any of it were ever
@@ -547,8 +547,10 @@ cpSync(EXT, fixture, { recursive: true });
 {
   const path = join(fixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
-  m.permissions = [...m.permissions, ...m.optional_permissions];
-  delete m.optional_permissions;
+  // Only `history` — promoting every optional permission would light up top
+  // sites too, and this fixture is meant to isolate the conversations path.
+  m.permissions = [...m.permissions, "history"];
+  m.optional_permissions = m.optional_permissions.filter((p) => p !== "history");
   writeFileSync(path, JSON.stringify(m, null, 2));
 }
 
@@ -607,7 +609,7 @@ await convoPage.waitForTimeout(700);
 
 check("the onboarding row is gone once access is granted", await convoPage.locator("#onboarding").isHidden());
 
-const convoTitles = await convoPage.locator("#rows .row.isConversation .title").allInnerTexts();
+const convoTitles = await convoPage.locator("#rows .row.is-conversation .title").allInnerTexts();
 check(
   "recent conversations render, titled from history",
   CONVOS.every((c) => convoTitles.includes(c.title)),
@@ -622,7 +624,7 @@ check(
 // Pairing, not just presence: the launches here are fired in a burst before
 // any conversation resolves, which is exactly the case where a "nearest
 // timestamp" rule pairs everything backwards.
-const paired = await convoPage.locator("#rows .row.isConversation").evaluateAll((rows) =>
+const paired = await convoPage.locator("#rows .row.is-conversation").evaluateAll((rows) =>
   Object.fromEntries(
     rows.map((r) => [r.querySelector(".title").textContent, r.querySelector(".description").textContent]),
   ),
@@ -634,8 +636,8 @@ check(
 );
 check(
   "a bound launch does not also appear as its own ask-again row",
-  (await convoPage.locator("#rows .row.isPrompt").count()) === 0,
-  `${await convoPage.locator("#rows .row.isPrompt").count()} prompt rows`,
+  (await convoPage.locator("#rows .row.is-prompt").count()) === 0,
+  `${await convoPage.locator("#rows .row.is-prompt").count()} prompt rows`,
 );
 
 // Opening a row must go to the conversation, and to a URL rebuilt from the id.
@@ -644,7 +646,7 @@ await convoPage.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) convoNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
-await convoPage.locator("#rows .row.isConversation").first().click();
+await convoPage.locator("#rows .row.is-conversation").first().click();
 await convoPage.waitForTimeout(300);
 check(
   "clicking a conversation opens it",
@@ -872,6 +874,335 @@ check(
 
 await answerCtx.close();
 rmSync(answerFixture, { recursive: true, force: true });
+
+// --- Phase 5: power features ----------------------------------------------------
+
+const powerFixture = mkdtempSync(join(tmpdir(), "archer-power-"));
+cpSync(EXT, powerFixture, { recursive: true });
+{
+  // topSites and sessions are optional, and the grant dialog never resolves
+  // headless — same fixture trick as history and api.openai.com.
+  const path = join(powerFixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  m.permissions = [...m.permissions, "topSites", "sessions", "tabs"];
+  m.optional_permissions = m.optional_permissions.filter(
+    (p) => !["topSites", "sessions", "tabs"].includes(p),
+  );
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+
+const powerCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${powerFixture}`, `--load-extension=${powerFixture}`, "--no-sandbox"],
+});
+const POWER_NEWTAB = `chrome-extension://${extensionId(powerFixture)}/newtab.html`;
+
+// A closed tab we control, so the row below has a known title and a known link
+// target. Chrome's own top-sites list in a fresh profile is only the Web Store,
+// which extensions are forbidden to navigate to — clicking that row kills the
+// renderer, which is how this was found.
+const doomed = await powerCtx.newPage();
+await doomed.route(/^https?:/, (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><meta charset=utf-8><title>Fletching guide</title><p>x",
+  }),
+);
+await doomed.goto("https://example.com/fletching", { waitUntil: "load" });
+await doomed.waitForTimeout(200);
+await doomed.close();
+
+const power = await powerCtx.newPage();
+await power.goto(POWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await power.waitForTimeout(300);
+
+await power.evaluate(() =>
+  chrome.storage.local.set({
+    engineNudgeDismissed: true,
+    mode: "auto",
+    pinned: [],
+    dismissed: [],
+    launches: [{ text: "sourdough starter ratios", at: Date.now() - 1000 }],
+    library: [
+      { id: "t1", name: "translate", text: "Translate {{text}} into {{language}}" },
+      { id: "t2", name: "review", text: "Review this code for bugs" },
+    ],
+  }),
+);
+await power.goto(POWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await power.waitForTimeout(500);
+
+const powerNav = [];
+await power.route(/^https?:/, (r) => {
+  if (r.request().isNavigationRequest()) powerNav.push(r.request().url());
+  return r.fulfill({ status: 204, body: "" });
+});
+
+async function powerSubmit(text, mods = []) {
+  powerNav.length = 0;
+  await power.fill("#query", text);
+  await power.locator("#query").press([...mods, "Enter"].join("+"));
+  await power.waitForTimeout(250);
+  return powerNav.slice();
+}
+
+// --- multi-target routing -------------------------------------------------------
+
+async function pickMode(mode) {
+  await power.locator("#modeButton").click();
+  await power.locator(`#modeMenu [role=option][data-mode="${mode}"]`).click();
+  await power.waitForTimeout(150);
+}
+
+await pickMode("claude");
+let out = await powerSubmit("what is a nock");
+check(
+  "Claude mode hands the prompt to claude.ai",
+  out[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
+  JSON.stringify(out),
+);
+
+await pickMode("perplexity");
+out = await powerSubmit("what is a nock");
+check(
+  "Perplexity mode hands the prompt to perplexity.ai",
+  out[0] === "https://www.perplexity.ai/search?q=what%20is%20a%20nock",
+  JSON.stringify(out),
+);
+
+out = await powerSubmit("example.com");
+check("a URL still opens in a hand-off mode", out[0]?.startsWith("https://example.com"), JSON.stringify(out));
+
+// Alt+arrow cycles the target without going near the menu.
+await pickMode("auto");
+await power.fill("#query", "x");
+await power.locator("#query").press("Alt+ArrowDown");
+await power.waitForTimeout(150);
+check(
+  "Alt+ArrowDown cycles to the next target",
+  (await power.locator("#modeLabel").innerText()).trim() === "ChatGPT",
+  await power.locator("#modeLabel").innerText(),
+);
+
+await power.locator("#query").press("Alt+ArrowUp");
+await power.waitForTimeout(150);
+check("Alt+ArrowUp cycles back", (await power.locator("#modeLabel").innerText()).trim() === "Auto");
+
+await power.fill("#query", ""); // "x" from the cycle check above matches no row
+await power.locator("#query").press("ArrowDown");
+await power.waitForTimeout(120);
+check(
+  "a plain ArrowDown still walks the rows rather than the modes",
+  (await power.locator("#modeLabel").innerText()).trim() === "Auto" &&
+    (await power.locator("#rows .row.isActive").count()) === 1,
+);
+await power.locator("#query").press("Escape");
+
+// --- the prompt library ----------------------------------------------------------
+
+await power.fill("#query", "/");
+await power.waitForTimeout(200);
+check(
+  "a leading slash lists the saved prompts",
+  (await power.locator("#rows .row.is-template .title").allInnerTexts()).join("|") === "translate|review",
+  JSON.stringify(await power.locator("#rows .row .title").allInnerTexts()),
+);
+
+await power.fill("#query", "/rev");
+await power.waitForTimeout(200);
+check(
+  "typing after the slash filters them",
+  (await power.locator("#rows .row .title").allInnerTexts()).join("|") === "review",
+);
+
+await power.fill("#query", "and/or something");
+await power.waitForTimeout(200);
+check(
+  "a slash that is not leading is just text",
+  (await power.locator("#rows .row.is-template").count()) === 0,
+);
+
+await power.fill("#query", "/translate");
+await power.waitForTimeout(200);
+await power.locator("#query").press("ArrowDown");
+await power.locator("#query").press("Enter");
+await power.waitForTimeout(250);
+
+check(
+  "choosing a saved prompt puts its text in the box",
+  (await power.inputValue("#query")) === "Translate {{text}} into {{language}}",
+  await power.inputValue("#query"),
+);
+
+const selection = () =>
+  power.locator("#query").evaluate((n) => n.value.slice(n.selectionStart, n.selectionEnd));
+check("...with the first blank selected to type over", (await selection()) === "{{text}}", await selection());
+
+await power.locator("#query").press("Tab");
+await power.waitForTimeout(120);
+check("Tab moves to the next blank", (await selection()) === "{{language}}", await selection());
+
+await power.keyboard.type("French");
+await power.waitForTimeout(120);
+check(
+  "typing replaces the selected blank",
+  (await power.inputValue("#query")) === "Translate {{text}} into French",
+  await power.inputValue("#query"),
+);
+
+// Tab has to stay Tab once the blanks are gone, or the box traps keyboard users.
+await power.fill("#query", "no blanks here");
+await power.locator("#query").press("Tab");
+await power.waitForTimeout(120);
+check(
+  "Tab leaves the field when there is no blank left",
+  await power.evaluate(() => document.activeElement?.id !== "query"),
+);
+
+// --- the + menu -------------------------------------------------------------------
+
+await power.locator("#plusButton").click();
+await power.waitForTimeout(150);
+check("the + button opens a menu", await power.locator("#plusMenu").isVisible());
+check("...announced as a menu", (await power.locator("#plusButton").getAttribute("aria-haspopup")) === "menu");
+check(
+  "...whose items are menuitems, not options — it has no selection to claim",
+  (await power.locator("#plusMenu [role=menuitem]").count()) === 5 &&
+    (await power.locator("#plusMenu [role=option]").count()) === 0,
+);
+
+await power.locator('#plusMenu [data-action="library"]').click();
+await power.waitForTimeout(250);
+check(
+  "the Saved prompts item opens the library in the box",
+  (await power.inputValue("#query")) === "/" &&
+    (await power.locator("#rows .row.is-template").count()) === 2,
+);
+
+// --- top sites and closed tabs ----------------------------------------------------
+
+await power.fill("#query", "");
+await power.locator("#plusButton").click();
+await power.locator('#plusMenu [data-action="tiles"]').click();
+await power.waitForTimeout(500);
+await power.locator("#plusButton").click();
+await power.locator('#plusMenu [data-action="closed"]').click();
+await power.waitForTimeout(700);
+
+check(
+  "top sites and closed tabs are separate opt-ins",
+  (await power.locator('#plusMenu [data-action="tiles"]').count()) === 1 &&
+    (await power.locator('#plusMenu [data-action="closed"]').count()) === 1,
+);
+
+const kinds = await power.locator("#rows .row").evaluateAll((rows) => rows.map((r) => r.dataset.kind));
+check("top sites join the rows once enabled", kinds.includes("site"), JSON.stringify(kinds));
+check("recently closed tabs join them too", kinds.includes("closed"), JSON.stringify(kinds));
+check(
+  "a prompt still outranks both",
+  kinds.indexOf("prompt") === 0,
+  JSON.stringify(kinds),
+);
+
+const closedRow = power.locator("#rows .row.is-closed").first();
+check(
+  "a closed tab carries the title Chrome recorded",
+  (await closedRow.locator(".title").innerText()) === "Fletching guide",
+  await closedRow.locator(".title").innerText(),
+);
+
+powerNav.length = 0;
+await closedRow.click();
+await power.waitForTimeout(300);
+check(
+  "clicking it reopens that page",
+  powerNav[0] === "https://example.com/fletching",
+  JSON.stringify(powerNav),
+);
+
+// --- the options page: library, analytics, export ---------------------------------
+
+const powerOptions = await powerCtx.newPage();
+await powerOptions.goto(`chrome-extension://${extensionId(powerFixture)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await powerOptions.waitForTimeout(400);
+
+check(
+  "saved prompts are listed with their blanks",
+  (await powerOptions.locator(".template .templateName").allInnerTexts()).join("|") === "/translate|/review",
+  JSON.stringify(await powerOptions.locator(".template .templateName").allInnerTexts()),
+);
+check(
+  "...and the blanks are named",
+  (await powerOptions.locator(".template").first().locator(".templateMeta").innerText()).includes("{{text}}"),
+);
+
+await powerOptions.fill("#templateName", "Two Words");
+await powerOptions.fill("#templateText", "A prompt about {{thing}}");
+await powerOptions.locator("#addTemplate").click();
+await powerOptions.waitForTimeout(250);
+check(
+  "a name with spaces is normalised so it can be typed after a slash",
+  (await powerOptions.locator(".template .templateName").allInnerTexts()).includes("/two-words"),
+  JSON.stringify(await powerOptions.locator(".template .templateName").allInnerTexts()),
+);
+
+await powerOptions.fill("#templateName", "review");
+await powerOptions.fill("#templateText", "Review this for security bugs");
+await powerOptions.locator("#addTemplate").click();
+await powerOptions.waitForTimeout(250);
+check(
+  "saving an existing name updates rather than duplicates",
+  (await powerOptions.locator(".template").count()) === 3,
+  `${await powerOptions.locator(".template").count()} templates`,
+);
+
+await powerOptions.fill("#templateName", "");
+await powerOptions.fill("#templateText", "");
+await powerOptions.locator("#addTemplate").click();
+await powerOptions.waitForTimeout(200);
+check(
+  "an incomplete saved prompt is refused",
+  (await powerOptions.locator("#templateStatus").innerText()).includes("needs both"),
+);
+
+check(
+  "the analytics panel reports what was asked",
+  (await powerOptions.locator(".stats").count()) === 1 &&
+    (await powerOptions.locator(".words li").allInnerTexts()).some((t) => t.startsWith("sourdough")),
+  JSON.stringify(await powerOptions.locator(".words li").allInnerTexts()),
+);
+
+const download = powerOptions.waitForEvent("download", { timeout: 5000 }).catch(() => null);
+await powerOptions.locator("#exportMarkdown").click();
+const file = await download;
+check("the Markdown export downloads", Boolean(file), file ? file.suggestedFilename() : "no download event");
+if (file) {
+  check(
+    "...named for the day it was taken",
+    /^archer-prompts-\d{4}-\d{2}-\d{2}\.md$/.test(file.suggestedFilename()),
+    file.suggestedFilename(),
+  );
+}
+
+await powerOptions.locator("#clearHistory").click();
+await powerOptions.waitForTimeout(300);
+check(
+  "clearing prompt history empties the log",
+  (await powerOptions.evaluate(() =>
+    chrome.storage.local.get({ launches: ["x"] }).then((r) => r.launches.length),
+  )) === 0,
+);
+check(
+  "...but leaves the saved prompts alone",
+  (await powerOptions.locator(".template").count()) === 3,
+);
+
+await powerCtx.close();
+rmSync(powerFixture, { recursive: true, force: true });
 
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.

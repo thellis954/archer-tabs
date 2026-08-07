@@ -1,20 +1,27 @@
-// The `Auto ⌄` control in the top bar, as a real listbox.
+// The `Auto ⌄` control in the top bar and the `+` menu inside the search box.
 //
 // Small enough not to want a framework, fussy enough to be worth isolating:
 // roving tabindex, the arrow-key model, click-outside, and returning focus to
 // the button on close are all things that are easy to half-do.
+//
+// Two shapes share it. A *listbox* has a current selection to reflect back into
+// a label (the routing mode); a *menu* just runs an action and forgets. Pass a
+// `label` element for the first, omit it for the second — a menu that marked
+// one of its items "selected" would be claiming a state it does not have.
 
 const OPEN = "open";
 
 /**
  * @param {object} parts
  * @param {HTMLButtonElement} parts.button
- * @param {HTMLElement} parts.menu      a [role=listbox] whose children are [role=option][data-mode]
- * @param {HTMLElement} parts.label     the text node inside the button
- * @param {(mode: string) => void} parts.onSelect
+ * @param {HTMLElement} parts.menu   [role=listbox] of [role=option][data-mode],
+ *                                   or [role=menu] of [role=menuitem][data-action]
+ * @param {HTMLElement} [parts.label] the text node inside the button; omit for a menu
+ * @param {(value: string) => void} parts.onSelect
  */
-export function createModeMenu({ button, menu, label, onSelect }) {
-  const options = () => [...menu.querySelectorAll("[role=option]")];
+export function createModeMenu({ button, menu, label = null, onSelect }) {
+  const options = () => [...menu.querySelectorAll("[role=option], [role=menuitem]")];
+  const valueOf = (option) => option.dataset.mode ?? option.dataset.action;
 
   let current = null;
 
@@ -26,7 +33,7 @@ export function createModeMenu({ button, menu, label, onSelect }) {
     button.setAttribute("aria-expanded", "true");
     menu.hidden = false;
     menu.classList.add(OPEN);
-    (options().find((o) => o.dataset.mode === current) ?? options()[0])?.focus();
+    (options().find((o) => valueOf(o) === current) ?? options()[0])?.focus();
   }
 
   function close({ refocus = true } = {}) {
@@ -37,17 +44,19 @@ export function createModeMenu({ button, menu, label, onSelect }) {
     if (refocus) button.focus();
   }
 
-  function select(mode) {
-    setMode(mode);
-    onSelect?.(mode);
+  function select(value) {
+    setMode(value);
+    onSelect?.(value);
     close();
   }
 
-  /** Reflects a mode into the UI without reporting it back — used on load. */
-  function setMode(mode) {
-    current = mode;
+  /** Reflects a selection into the UI without reporting it back — used on load. */
+  function setMode(value) {
+    current = value;
+    if (!label) return; // an action menu has nothing to reflect
+
     for (const option of options()) {
-      const chosen = option.dataset.mode === mode;
+      const chosen = valueOf(option) === value;
       option.setAttribute("aria-selected", String(chosen));
       // Roving tabindex: exactly one option is in the tab order at a time.
       option.tabIndex = chosen ? 0 : -1;
@@ -65,12 +74,12 @@ export function createModeMenu({ button, menu, label, onSelect }) {
   button.addEventListener("click", () => (isOpen() ? close() : open()));
 
   menu.addEventListener("click", (event) => {
-    const option = event.target.closest("[role=option]");
-    if (option) select(option.dataset.mode);
+    const option = event.target.closest("[role=option], [role=menuitem]");
+    if (option) select(valueOf(option));
   });
 
   menu.addEventListener("keydown", (event) => {
-    const option = event.target.closest("[role=option]");
+    const option = event.target.closest("[role=option], [role=menuitem]");
     if (!option) return;
 
     switch (event.key) {
@@ -79,7 +88,7 @@ export function createModeMenu({ button, menu, label, onSelect }) {
       case "Home": options()[0]?.focus(); break;
       case "End": options().at(-1)?.focus(); break;
       case "Enter":
-      case " ": select(option.dataset.mode); break;
+      case " ": select(valueOf(option)); break;
       case "Escape": close(); break;
       case "Tab": close({ refocus: false }); return; // let Tab do its job
       default: return;

@@ -27,10 +27,13 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const SHIPPED_JS = [
   "extension/newtab.js",
   "extension/options.js",
+  "extension/src/analytics.js",
   "extension/src/answer.js",
+  "extension/src/browsing.js",
   "extension/src/classify.js",
   "extension/src/conversations.js",
   "extension/src/history.js",
+  "extension/src/library.js",
   "extension/src/modemenu.js",
   "extension/src/router.js",
   "extension/src/rows.js",
