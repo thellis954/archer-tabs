@@ -167,9 +167,10 @@ A faithful clone wants the OpenAI knot logo, the `ChatGPT` wordmark, and the exa
 Chrome Web Store listing it is trademark infringement and trips the store's impersonation policy —
 the likeliest outcome is takedown, and the name "Atlas New Tab" compounds it.
 
-**Recommendation:** keep two skins behind one flag. `brand: "faithful"` for local use; `brand:
-"neutral"` for any public listing — own mark, own name, placeholder reading *"Ask AI or type a
-URL"*, and a listing description that says "inspired by" rather than implying affiliation.
+**Resolved — see `docs/BRAND.md`.** The project is now **Archer**, with its own mark (an *A* whose
+crossbar is a drawn bowstring), a warm cream/ink/brass palette, and the placeholder *"Ask or type a
+URL"*. The two-skin idea was dropped: maintaining a "faithful" mode meant keeping infringing assets
+in the tree for no real gain, and the neutral identity is the better-looking of the two anyway.
 
 ### 2.4 The focus problem (the hard one)
 
@@ -350,7 +351,8 @@ Ordered by my estimate of value per unit of work:
 6. **Export to Markdown** — prompt history out as `.md`; a natural drop into an Obsidian vault.
 
 ### Phase 6 — Ship (~2 days) 🟢
-- Neutral brand skin (§2.3), store assets, privacy policy ("all data stays on your device")
+- ~~Neutral brand skin~~ ✅ done — Archer, `docs/BRAND.md`. Remaining: store screenshots, listing
+  copy, privacy policy ("all data stays on your device")
 - Per-permission opt-in with plain-language rationale — request `history` only when the user enables
   the conversations feature, not at install
 - Playwright smoke test against a real Chromium profile with the extension loaded

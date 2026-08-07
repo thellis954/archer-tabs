@@ -1,83 +1,197 @@
-* {
-  box-sizing: border-box;
+/* Archer — see docs/BRAND.md for the palette rationale.
+   Light is the default; every token is redefined once for dark. */
+
+:root {
+  --bg:        #FBF7F0;   /* cream — warm, not Atlas's clinical white */
+  --surface:   #FFFFFF;
+  --border:    #E8E2D9;
+  --text:      #141416;   /* ink */
+  --muted:     #8A8178;
+  --faint:     #D9D2C7;   /* the oversized page mark */
+  --accent:    #B45309;   /* brass — 4.9:1 on cream, passes AA */
+  --ring:      #B4530933;
+
+  --shadow: 0 1px 2px rgb(20 20 22 / .04), 0 4px 14px rgb(20 20 22 / .06);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #141416;
+    --surface: #1D1D20;
+    --border:  #2C2C30;
+    --text:    #F2EFEA;
+    --muted:   #948D84;
+    --faint:   #292927;
+    --accent:  #F59E0B;   /* brass lifts to amber so it holds on ink */
+    --ring:    #F59E0B3D;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 14px rgb(0 0 0 / .35);
+  }
+}
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: #fff;
-  color: #2f2f2f;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
+.visuallyHidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- top bar ---------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+}
+
+.brand { display: flex; align-items: center; gap: 8px; }
+
+.brandMark { width: 20px; height: 20px; }
+
+.brandName {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+}
+
+.legs { fill: none; stroke: currentColor;    stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.bow  { fill: none; stroke: var(--accent);   stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+.mode {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  padding: 4px 6px 4px 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mode svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mode:hover { background: var(--surface); color: var(--text); }
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.iconBtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.iconBtn:hover { background: var(--surface); color: var(--text); }
+
+/* ---------- page ---------- */
+
 .page {
-  width: 100%;
-  min-height: 100vh;
-  padding-top: 155px;
+  /* Sits high like the reference, but never collides on a short window. */
+  padding: max(8vh, 64px) 24px 64px;
 }
 
 .logo {
-  text-align: center;
-  font-size: 52px;
-  color: #d5d5d5;
-  margin-bottom: 52px;
+  display: block;
+  width: 72px; height: 72px;
+  margin: 0 auto 44px;
+  color: var(--faint);
 }
 
-#searchForm {
-  width: 100%;
-}
+/* The oversized page mark drops the accent — at this scale it reads as
+   decoration, and two colors would fight the search box for attention. */
+.logo .bow { stroke: var(--faint); }
+
+/* ---------- search ---------- */
 
 .searchBox {
-  width: 795px;
+  width: min(795px, 100%);
   height: 58px;
   margin: 0 auto;
 
   display: flex;
   align-items: center;
+  gap: 2px;
+  padding: 0 6px;
 
-  border: 1px solid #e2e2e2;
+  border: 1px solid var(--border);
   border-radius: 30px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 
-  background: white;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
 
-  box-shadow:
-    0 1px 2px rgba(0,0,0,.04),
-    0 2px 5px rgba(0,0,0,.05);
+.searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), 0 0 0 3px var(--ring);
 }
 
 .searchBox input {
   flex: 1;
+  min-width: 0;
+  height: 100%;
   border: none;
   outline: none;
-
-  font-size: 16px;
-  color: #333;
-}
-
-.searchBox input::placeholder {
-  color: #9b9b9b;
-}
-
-.plus,
-.mic {
-  border: none;
   background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.searchBox input::placeholder { color: var(--muted); }
+
+.plus, .mic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px; height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
-
-  width: 54px;
-  height: 54px;
-
-  font-size: 27px;
-  color: #333;
 }
 
-.mic {
-  font-size: 18px;
+.plus svg, .mic svg {
+  width: 20px; height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
+
+.plus:hover, .mic:hover { background: var(--bg); color: var(--text); }
+
+/* ---------- suggestions ---------- */
 
 .suggestions {
-  width: 760px;
-  margin: 22px auto;
+  width: min(760px, 100%);
+  margin: 22px auto 0;
+  padding: 0;
+  list-style: none;
 }
 
 .suggestion {
@@ -86,22 +200,56 @@ body {
 
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 0 12px;
 
   border: none;
+  border-radius: 10px;
   background: transparent;
 
-  text-align: left;
+  color: var(--text);
+  font: inherit;
   font-size: 14px;
-
+  text-align: left;
   cursor: pointer;
 }
 
-.suggestion:hover {
-  background: #f7f7f7;
-  border-radius: 8px;
+.suggestion:hover { background: var(--surface); }
+
+.dot {
+  flex: none;
+  width: 16px; height: 16px;
+  border-radius: 5px;
+  background: var(--border);
 }
 
+/* Brass is reserved for the mark, focus, and hover. A whole column of accent
+   titles out-shouts the search box, which is the actual subject of the page. */
+.title {
+  flex: none;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.suggestion:hover .title { color: var(--accent); }
+
+/* Long conversation titles truncate rather than wrap the row. */
 .description {
-  color: #999;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- focus ---------- */
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.searchBox:focus-within input:focus-visible { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }

@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Chrome Manifest V3 extension that replaces the browser's New Tab page with an Atlas/ChatGPT-styled
-search page. Four files, no dependencies, no build step, no test suite — the source *is* the shipped
-artifact, and the browser loads these files verbatim.
+**Archer** — a Chrome Manifest V3 extension that replaces the browser's New Tab page with a calm
+ask-or-navigate search page, in the spirit of the (now retired) ChatGPT Atlas new tab. No
+dependencies, no build step, no test suite — the source *is* the shipped artifact, and the browser
+loads these files verbatim.
+
+The repo directory is still `atlas-new-tab` for historical reasons; the product is Archer. Don't
+reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — see `docs/BRAND.md`.
 
 **Read `docs/ROADMAP.md` before making substantive changes.** It carries the audit of the current
 build (including known bugs in the URL/prompt classifier), the constraints that bound the design —
@@ -42,11 +46,17 @@ Anything else falls through to a Google search URL. Navigation is done by assign
 
 Two things in the UI are **currently decorative** — know this before "fixing" what looks broken:
 
-- The `.plus` and `.mic` buttons are `type="button"` with no listeners.
-- The three `.suggestion` buttons (ChatGPT / GitHub / Notion) are static markup; nothing wires them
-  to their destinations.
+- The `.plus`, `.mic`, `.mode` and sidebar buttons are `type="button"` with no listeners.
+- The three `.suggestion` rows are placeholder copy. Roadmap Phase 3 replaces them with real recent
+  conversations; when it does, render that text with `textContent`, never `innerHTML` — page titles
+  are attacker-influenceable.
 
 Wiring them up is real work, not a bug fix.
+
+`newtab.css` is a token system: every color is a custom property on `:root`, redefined once under
+`prefers-color-scheme: dark`. Add colors as tokens, never as literals in a rule — a hard-coded hex
+is invisible in one of the two themes. `docs/BRAND.md` explains what each token is for and why brass
+is restricted to the mark, focus, and hover.
 
 ## Constraints worth knowing
 
@@ -57,9 +67,10 @@ Wiring them up is real work, not a bug fix.
   `permissions` in the manifest. Anything beyond same-page navigation (search suggestions, favicons,
   history/topSites access) requires adding the relevant permission and will change the extension's
   install-time consent prompt.
-- The layout uses fixed pixel widths (`795px` search box, `760px` suggestion list) and a fixed
-  `155px` top offset. It is deliberately not responsive; changing one width means changing the other
-  to keep them aligned.
+- The search box and suggestion list are capped at `795px` / `760px` but fluid below that. Keep the
+  pair proportional — the rows are meant to sit visually inside the box's width.
+- **`assets/icon-*.png` are generated, not hand-drawn.** Edit the mark geometry in `docs/BRAND.md` +
+  `tools/genicons.sh`, then re-run `sh tools/genicons.sh`. Editing the PNGs directly gets overwritten.
 - Bump `version` in `manifest.json` for any change intended to ship — Chrome refuses to update an
   unpacked or packed extension without a version increase.
 
