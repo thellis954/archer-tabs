@@ -206,6 +206,56 @@ export async function saveLibrary(templates) {
   await store().set({ [KEY_LIBRARY]: templates });
 }
 
+// --- the dashboard --------------------------------------------------------------
+
+const KEY_FAVORITES = "favorites";
+/** Pre-rename key. Read once so nothing anyone pinned is lost. */
+const KEY_FAVORITES_OLD = "favourites";
+const KEY_PLACE = "weatherPlace";
+const KEY_UNIT = "weatherUnit";
+const KEY_WEATHER = "weatherCache";
+
+/** @returns {Promise<Array<{id: string, url: string, name: string}>>} */
+export async function readFavorites() {
+  const raw = await store().get({ [KEY_FAVORITES]: null, [KEY_FAVORITES_OLD]: null });
+  const saved = raw[KEY_FAVORITES] ?? raw[KEY_FAVORITES_OLD];
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((f) => f && typeof f.url === "string" && typeof f.name === "string");
+}
+
+export async function saveFavorites(favorites) {
+  await store().set({ [KEY_FAVORITES]: favorites });
+}
+
+/**
+ * The saved place is a name plus the coordinates it resolved to, so the widget
+ * refreshes without geocoding the same string every half hour.
+ * @returns {Promise<{place: object|null, unit: string}>}
+ */
+export async function readWeatherSettings() {
+  const raw = await store().get({ [KEY_PLACE]: null, [KEY_UNIT]: "celsius" });
+  return {
+    place: raw[KEY_PLACE] && typeof raw[KEY_PLACE].name === "string" ? raw[KEY_PLACE] : null,
+    unit: raw[KEY_UNIT] === "fahrenheit" ? "fahrenheit" : "celsius",
+  };
+}
+
+export async function saveWeatherSettings({ place, unit }) {
+  const patch = {};
+  if (place !== undefined) patch[KEY_PLACE] = place;
+  if (unit !== undefined) patch[KEY_UNIT] = unit === "fahrenheit" ? "fahrenheit" : "celsius";
+  await store().set(patch);
+}
+
+export async function readWeatherCache() {
+  const { [KEY_WEATHER]: cached } = await store().get({ [KEY_WEATHER]: null });
+  return cached ?? null;
+}
+
+export async function saveWeatherCache(reading) {
+  await store().set({ [KEY_WEATHER]: reading });
+}
+
 /** Local calendar day — the boundary a person means when they say "today". */
 export function dayStamp(at = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");

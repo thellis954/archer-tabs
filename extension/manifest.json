@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archer",
-  "version": "1.5.0",
+  "version": "1.7.1",
   "description": "A calm new tab page. Ask a question or type a URL — Archer works out which you meant.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
@@ -25,6 +25,8 @@
   ],
   "options_page": "options.html",
   "optional_host_permissions": [
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://api.open-meteo.com/*",
+    "https://geocoding-api.open-meteo.com/*"
   ]
 }

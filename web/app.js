@@ -9,7 +9,7 @@
 // No scroll listeners anywhere. IntersectionObserver drives the scrollytelling
 // and the reveals, so nothing runs per frame.
 
-import { route, NAVIGATE, SEARCH, ASK, ANSWER, NONE } from "./vendor/router.js";
+import { route, placeholderFor, NAVIGATE, SEARCH, ASK, ANSWER, NONE } from "./vendor/router.js";
 import { classify, URL_KIND, PROMPT, EMPTY } from "./vendor/classify.js";
 
 const $ = (id) => document.getElementById(id);
@@ -80,6 +80,11 @@ let pendingOpen = null;
 
 function paintDemo() {
   const mode = demoMode.value;
+
+  // The extension rewrites its placeholder to name the destination you picked,
+  // so the box tells you where the next Enter goes. Same function, same result.
+  demoInput.placeholder = placeholderFor(mode, true);
+
   const out = describe(demoInput.value, mode);
 
   demoVerdict.dataset.state = out.state;

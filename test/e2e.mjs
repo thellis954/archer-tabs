@@ -631,7 +631,7 @@ const paired = await convoPage.locator("#rows .row.is-conversation").evaluateAll
 );
 check(
   "each conversation gets the prompt that actually started it",
-  CONVOS.every((c) => paired[c.title] === `— ${c.prompt}`),
+  CONVOS.every((c) => paired[c.title] === `— ChatGPT · ${c.prompt}`),
   JSON.stringify(paired),
 );
 check(
@@ -1069,7 +1069,7 @@ check("the + button opens a menu", await power.locator("#plusMenu").isVisible())
 check("...announced as a menu", (await power.locator("#plusButton").getAttribute("aria-haspopup")) === "menu");
 check(
   "...whose items are menuitems, not options — it has no selection to claim",
-  (await power.locator("#plusMenu [role=menuitem]").count()) === 5 &&
+  (await power.locator("#plusMenu [role=menuitem]").count()) === 6 &&
     (await power.locator("#plusMenu [role=option]").count()) === 0,
 );
 
@@ -1098,12 +1098,21 @@ check(
 );
 
 const kinds = await power.locator("#rows .row").evaluateAll((rows) => rows.map((r) => r.dataset.kind));
-check("top sites join the rows once enabled", kinds.includes("site"), JSON.stringify(kinds));
-check("recently closed tabs join them too", kinds.includes("closed"), JSON.stringify(kinds));
+check("recently closed tabs join the rows once enabled", kinds.includes("closed"), JSON.stringify(kinds));
+check("a prompt still outranks them", kinds.indexOf("prompt") === 0, JSON.stringify(kinds));
+
+// Chrome's only default top site in a fresh profile is the Web Store, which an
+// extension is forbidden to navigate to — clicking that row killed the
+// renderer. It must never be offered.
+const rowTitlesNow = await power.locator("#rows .row .title").allInnerTexts();
 check(
-  "a prompt still outranks both",
-  kinds.indexOf("prompt") === 0,
-  JSON.stringify(kinds),
+  "the Web Store is never offered as a row — extensions cannot navigate to it",
+  !rowTitlesNow.some((t) => /web store/i.test(t)),
+  JSON.stringify(rowTitlesNow),
+);
+check(
+  "top sites really were granted",
+  await power.evaluate(() => chrome.permissions.contains({ permissions: ["topSites"] })),
 );
 
 const closedRow = power.locator("#rows .row.is-closed").first();
@@ -1203,6 +1212,466 @@ check(
 
 await powerCtx.close();
 rmSync(powerFixture, { recursive: true, force: true });
+
+// --- Phase 6: the dashboard -------------------------------------------------------
+
+const dashFixture = mkdtempSync(join(tmpdir(), "archer-dash-"));
+cpSync(EXT, dashFixture, { recursive: true });
+{
+  // Open-Meteo is an optional host permission; the grant dialog never resolves
+  // headless, so the fixture holds it outright.
+  const path = join(dashFixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  m.host_permissions = m.optional_host_permissions.filter((o) => o.includes("open-meteo"));
+  m.optional_host_permissions = m.optional_host_permissions.filter((o) => !o.includes("open-meteo"));
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+
+const dashCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${dashFixture}`, `--load-extension=${dashFixture}`, "--no-sandbox"],
+});
+const DASH_NEWTAB = `chrome-extension://${extensionId(dashFixture)}/newtab.html`;
+
+const dash = await dashCtx.newPage();
+await dash.route("https://geocoding-api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      results: [{ name: "Brighton", admin1: "England", country_code: "GB", latitude: 50.82, longitude: -0.14 }],
+    }),
+  }),
+);
+await dash.route("https://api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      current: { temperature_2m: 21.6, weather_code: 2 },
+      daily: { temperature_2m_max: [28.9], temperature_2m_min: [19.5] },
+    }),
+  }),
+);
+
+await dash.goto(DASH_NEWTAB, { waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(400);
+
+// --- clock ---------------------------------------------------------------------
+
+check(
+  "the clock shows a time",
+  /\d{1,2}[:.]\d{2}/.test(await dash.locator("#clockTime").innerText()),
+  await dash.locator("#clockTime").innerText(),
+);
+check(
+  "...a greeting",
+  /^Good (morning|afternoon|evening|night)$/.test(await dash.locator("#clockGreeting").innerText()),
+  await dash.locator("#clockGreeting").innerText(),
+);
+check(
+  "...and a date with the zone",
+  (await dash.locator("#clockDate").innerText()).includes("·"),
+  await dash.locator("#clockDate").innerText(),
+);
+
+// --- weather ---------------------------------------------------------------------
+
+check("the weather card is hidden until a place is set", await dash.locator("#weather").isHidden());
+
+const dashOptions = await dashCtx.newPage();
+await dashOptions.route("https://geocoding-api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      results: [{ name: "Brighton", admin1: "England", country_code: "GB", latitude: 50.82, longitude: -0.14 }],
+    }),
+  }),
+);
+await dashOptions.route("https://api.open-meteo.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      current: { temperature_2m: 21.6, weather_code: 2 },
+      daily: { temperature_2m_max: [28.9], temperature_2m_min: [19.5] },
+    }),
+  }),
+);
+await dashOptions.goto(`chrome-extension://${extensionId(dashFixture)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await dashOptions.waitForTimeout(300);
+
+await dashOptions.locator("#savePlace").click();
+await dashOptions.waitForTimeout(200);
+check(
+  "saving an empty place is refused",
+  (await dashOptions.locator("#placeStatus").innerText()).includes("town or city"),
+);
+
+await dashOptions.fill("#place", "Brighton");
+await dashOptions.locator("#savePlace").click();
+await dashOptions.waitForTimeout(600);
+check(
+  "a place is resolved and confirmed",
+  (await dashOptions.locator("#placeStatus").innerText()).includes("Brighton, England, GB"),
+  await dashOptions.locator("#placeStatus").innerText(),
+);
+
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(600);
+
+check("the weather card appears once a place is set", await dash.locator("#weather").isVisible());
+check(
+  "...with the temperature rounded",
+  (await dash.locator("#weatherTemp").innerText()) === "22°C",
+  await dash.locator("#weatherTemp").innerText(),
+);
+check(
+  "...the condition named",
+  (await dash.locator("#weatherText").innerText()) === "Partly cloudy",
+  await dash.locator("#weatherText").innerText(),
+);
+check(
+  "...and the day's range",
+  (await dash.locator("#weatherRange").innerText()) === "H:29° L:20°",
+  await dash.locator("#weatherRange").innerText(),
+);
+check("the card carries an icon", (await dash.locator("#weatherIcon svg").count()) === 1);
+
+await dashOptions.locator("#clearPlace").click();
+await dashOptions.waitForTimeout(300);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check("turning weather off removes the card", await dash.locator("#weather").isHidden());
+
+// --- target pills ------------------------------------------------------------------
+
+await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: true, favorites: [] }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(400);
+
+const pressed = () =>
+  dash.locator('.target[aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.dataset.mode));
+
+check("exactly one pill is pressed at a time", (await pressed()).length === 1, JSON.stringify(await pressed()));
+check("...and it matches the stored mode", (await pressed())[0] === "auto");
+
+await dash.locator('.target[data-mode="claude"]').click();
+await dash.waitForTimeout(200);
+check("clicking a pill selects it", (await pressed())[0] === "claude", JSON.stringify(await pressed()));
+check(
+  "...and the top-bar menu follows, since both are one setting",
+  (await dash.locator("#modeLabel").innerText()).trim() === "Claude",
+);
+
+await dash.bringToFront();
+
+const dashNav = [];
+await dash.route(/^https?:(?!\/\/(api|geocoding-api)\.open-meteo)/, (r) => {
+  if (r.request().isNavigationRequest()) dashNav.push(r.request().url());
+  return r.fulfill({ status: 204, body: "" });
+});
+
+await dash.fill("#query", "what is a nock");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(300);
+check(
+  "the pill actually routes the query",
+  dashNav[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
+  JSON.stringify(dashNav),
+);
+
+// Choosing in the menu has to move the pill back the other way.
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
+await dash.waitForTimeout(200);
+check("choosing in the menu moves the pill", (await pressed())[0] === "auto", JSON.stringify(await pressed()));
+
+check(
+  "all four destinations have a pill",
+  (await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))).join() ===
+    "auto,chatgpt,claude,perplexity",
+  JSON.stringify(await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))),
+);
+
+// A mode with no pill leaves them all unpressed rather than lying about one.
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="search"]').click();
+await dash.waitForTimeout(200);
+check("a mode with no pill presses none of them", (await pressed()).length === 0, JSON.stringify(await pressed()));
+
+// The default is one setting reachable from two places.
+await dashOptions.reload({ waitUntil: "domcontentloaded" });
+await dashOptions.waitForTimeout(300);
+check(
+  "settings shows the destination the page is using",
+  (await dashOptions.locator("#defaultMode").inputValue()) === "search",
+  await dashOptions.locator("#defaultMode").inputValue(),
+);
+
+await dashOptions.selectOption("#defaultMode", "perplexity");
+await dashOptions.waitForTimeout(250);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+check(
+  "changing the default there changes what a new tab uses",
+  (await pressed())[0] === "perplexity",
+  JSON.stringify(await pressed()),
+);
+
+// --- favorites ----------------------------------------------------------------------
+
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
+await dash.waitForTimeout(200);
+
+check("the favorites bar says when it is empty", await dash.locator("#favoritesEmpty").isVisible());
+check("the add form starts closed", await dash.locator("#addTileForm").isHidden());
+
+await dash.locator("#addFavorite").click();
+await dash.waitForTimeout(150);
+check("Add opens the form", await dash.locator("#addTileForm").isVisible());
+
+await dash.fill("#tileUrl", "javascript:alert(1)");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(250);
+check(
+  "a javascript: favorite is refused",
+  (await dash.locator("#tileStatus").innerText()).includes("web address") &&
+    (await dash.locator(".tile").count()) === 0,
+  await dash.locator("#tileStatus").innerText(),
+);
+
+await dash.fill("#tileUrl", "github.com");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(300);
+check("a bare host becomes a tile", (await dash.locator(".tile").count()) === 1);
+check(
+  "...named from the site",
+  (await dash.locator(".tileName").innerText()) === "Github",
+  await dash.locator(".tileName").innerText(),
+);
+check(
+  "...with a monogram face",
+  (await dash.locator(".tileFace").innerText()) === "GI",
+  await dash.locator(".tileFace").innerText(),
+);
+check("...and the empty line goes away", await dash.locator("#favoritesEmpty").isHidden());
+
+await dash.locator("#addFavorite").click();
+await dash.fill("#tileUrl", "youtube.com");
+await dash.fill("#tileName", "YouTube");
+await dash.locator(".tileSave").click();
+await dash.waitForTimeout(300);
+check("a given name is kept", (await dash.locator(".tileName").allInnerTexts()).includes("YouTube"));
+check(
+  "...and drives the monogram",
+  (await dash.locator(".tile").last().locator(".tileFace").innerText()) === "YT",
+);
+
+dashNav.length = 0;
+await dash.bringToFront();
+await dash.locator(".tile").first().locator(".tileLink").click();
+await dash.waitForTimeout(300);
+check(
+  "clicking a tile opens it",
+  dashNav[0] === "https://github.com/",
+  JSON.stringify(dashNav),
+);
+
+await dash.locator(".tile").first().locator(".tileRemove").click();
+await dash.waitForTimeout(300);
+check("removing a tile removes exactly one", (await dash.locator(".tile").count()) === 1);
+
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check("favorites survive a reload", (await dash.locator(".tile").count()) === 1);
+
+// Titles come from the user, but a tile is still a rendered string.
+await dash.evaluate(() =>
+  chrome.storage.local.set({
+    favorites: [{ id: "https://example.com/", url: "https://example.com/", name: "<img src=x onerror=alert(1)>" }],
+  }),
+);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.waitForTimeout(500);
+check(
+  "a tile name is text, never markup",
+  (await dash.locator(".tileName").innerText()).includes("<img src=x") &&
+    (await dash.locator(".tile").evaluate((n) => n.querySelectorAll("img").length)) === 0,
+);
+
+// --- the + menu, attachments, and the placeholder --------------------------------
+
+await dash.evaluate(() => chrome.storage.local.set({ mode: "chatgpt" }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+
+check(
+  "the placeholder names the destination you chose",
+  (await dash.locator("#query").getAttribute("placeholder")) === "Ask ChatGPT, or type a URL",
+  await dash.locator("#query").getAttribute("placeholder"),
+);
+await dash.locator('.target[data-mode="claude"]').click();
+await dash.waitForTimeout(200);
+check(
+  "...and follows when it changes",
+  (await dash.locator("#query").getAttribute("placeholder")) === "Ask Claude, or type a URL",
+  await dash.locator("#query").getAttribute("placeholder"),
+);
+
+// The + menu's items are menuitems; styling that only matched [role=option]
+// left the whole menu unstyled, which is invisible to every other check.
+await dash.locator("#plusButton").click();
+await dash.waitForTimeout(200);
+const menuItemLayout = await dash
+  .locator("#plusMenu [role=menuitem]")
+  .first()
+  .evaluate((n) => getComputedStyle(n).display);
+check("the + menu's items are laid out, not raw inline text", menuItemLayout === "grid", menuItemLayout);
+await dash.keyboard.press("Escape");
+
+// Attachments
+const ATTACH = join(tmpdir(), "archer-attach.py");
+writeFileSync(ATTACH, "def add(a, b):\n    return a + b\n");
+
+await dash.setInputFiles("#attachInput", ATTACH);
+await dash.waitForTimeout(400);
+check("attaching a file adds a chip", (await dash.locator(".chip").count()) === 1);
+check(
+  "...and does not paste the file into the box, which would strip its newlines",
+  (await dash.inputValue("#query")) === "",
+);
+check("...and arms send even with an empty box", await dash.locator("#send").isEnabled());
+
+dashNav.length = 0;
+await dash.fill("#query", "explain this");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(400);
+const sent = decodeURIComponent((dashNav[0] ?? "").replace(/^[^?]*\?q=/, ""));
+check(
+  "the file rides with the prompt, newlines intact",
+  sent.startsWith("explain this") && sent.includes("--- archer-attach.py ---") && sent.includes("\n    return a + b"),
+  JSON.stringify(sent.slice(0, 120)),
+);
+check("...and the chip is cleared afterwards", (await dash.locator(".chip").count()) === 0);
+
+await dash.fill("#query", "");
+await dash.setInputFiles("#attachInput", ATTACH);
+await dash.waitForTimeout(300);
+check("...and re-arms it on the next attachment", await dash.locator("#send").isEnabled());
+await dash.locator(".chipRemove").click();
+await dash.waitForTimeout(250);
+check("a chip can be removed", (await dash.locator(".chip").count()) === 0);
+check("...which disarms send again", await dash.locator("#send").isDisabled());
+rmSync(ATTACH, { force: true });
+
+// --- navigation targets this tab, not whichever one is active --------------------
+//
+// chrome.tabs.update({url}) with no id navigates the *active* tab. Chrome
+// pre-renders the new tab page, so a background new tab that submitted would
+// have sent some other tab somewhere.
+const bystander = await dashCtx.newPage();
+await bystander.goto("about:blank");
+await bystander.bringToFront();
+await dash.waitForTimeout(200);
+
+dashNav.length = 0;
+await dash.evaluate(() => {
+  document.getElementById("query").value = "example.com";
+  document.getElementById("searchForm").requestSubmit();
+});
+await dash.waitForTimeout(500);
+check(
+  "a submit from a background tab navigates that tab, not the active one",
+  bystander.url() === "about:blank" && dashNav.some((u) => u.startsWith("https://example.com")),
+  JSON.stringify({ bystander: bystander.url(), dashNav }),
+);
+await bystander.close();
+await dash.bringToFront();
+
+await dashCtx.close();
+rmSync(dashFixture, { recursive: true, force: true });
+
+// --- Phase 7: the permissions panel -------------------------------------------------
+//
+// The listing's central claim is "off until you turn it on". That is only true
+// if the manifest says so and the panel tells the truth about it, so both are
+// asserted here rather than taken on trust.
+
+const shipCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, "--no-sandbox"],
+});
+const shipOptions = await shipCtx.newPage();
+await shipOptions.goto(`chrome-extension://${extensionId(EXT)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await shipOptions.waitForTimeout(500);
+
+const shipManifest = await shipOptions.evaluate(() => chrome.runtime.getManifest());
+check(
+  "the install prompt is still just search + storage, after seven phases",
+  JSON.stringify([...shipManifest.permissions].sort()) === JSON.stringify(["search", "storage"]),
+  JSON.stringify(shipManifest.permissions),
+);
+check("no host permission is required at install", !shipManifest.host_permissions?.length);
+
+const listed = await shipOptions.locator(".grant").evaluateAll((els) => els.map((e) => e.dataset.grant));
+check(
+  "every optional permission is listed in the panel",
+  listed.length === 6,
+  JSON.stringify(listed),
+);
+
+// Nothing is granted in a fresh profile, so the panel must say so for all of them.
+check(
+  "all of them read Off before anything is enabled",
+  (await shipOptions.locator(".grant .grantState").allInnerTexts()).every((t) => t.trim() === "OFF"),
+  JSON.stringify(await shipOptions.locator(".grant .grantState").allInnerTexts()),
+);
+check(
+  "...and each offers to turn it on",
+  (await shipOptions.locator(".grantToggle").allInnerTexts()).every((t) => t.trim() === "Turn on"),
+);
+
+// Every optional permission and origin in the manifest has to appear somewhere in
+// the panel, or the listing's claim is unverifiable for whatever was left out.
+const declared = [
+  ...(shipManifest.optional_permissions ?? []),
+  ...(shipManifest.optional_host_permissions ?? []),
+].sort();
+const covered = await shipOptions.evaluate(() =>
+  [...document.querySelectorAll(".grant")].map((e) => e.dataset.grant),
+);
+const { GRANTS } = await import("../extension/src/permissions.js");
+const explained = GRANTS.flatMap((g) => [...(g.permissions ?? []), ...(g.origins ?? [])]).sort();
+check(
+  "the panel accounts for every optional permission the manifest declares",
+  JSON.stringify(declared) === JSON.stringify(explained),
+  JSON.stringify({ declared, explained }),
+);
+check("...and every listed grant is rendered", covered.length === GRANTS.length);
+
+check(
+  "the heavier grant says why it is heavier",
+  (await shipOptions.locator('.grant[data-grant="closedTabs"] .grantCost').innerText()).includes(
+    "browsing history",
+  ),
+);
+check(
+  "every grant explains itself in a sentence, not a permission name",
+  (await shipOptions.locator(".grantWhy").allInnerTexts()).every((t) => t.trim().length > 40),
+);
+
+await shipCtx.close();
 
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.

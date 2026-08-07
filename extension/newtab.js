@@ -1,5 +1,5 @@
 import { URL_KIND, PROMPT } from "./src/classify.js";
-import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO, MODES } from "./src/router.js";
+import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO, MODES, placeholderFor } from "./src/router.js";
 import {
   loadSettings,
   saveMode,
@@ -28,6 +28,7 @@ import {
 } from "./src/browsing.js";
 import { renderRows, setActiveRow } from "./src/rows.js";
 import { findTemplates, nextPlaceholder, parseSlash } from "./src/library.js";
+import { startClock, refreshWeather, renderFavorites, wireFavoriteForm } from "./src/dashboard.js";
 
 const form = document.getElementById("searchForm");
 const input = document.getElementById("query");
@@ -51,6 +52,7 @@ const menu = createModeMenu({
   onSelect(next) {
     mode = next;
     saveMode(next);
+    syncTargets();
     // Picking a mode that needs setting up should take you to the setting up,
     // not silently do something else.
     if (next === "answer" && !canAnswer) {
@@ -67,6 +69,7 @@ const menu = createModeMenu({
 const ready = Promise.all([loadSettings(), loadAnswerSettings()]).then(([settings, answer]) => {
   mode = settings.mode;
   menu.setMode(settings.mode);
+  syncTargets();
   nudge.hidden = settings.nudgeDismissed;
 
   canAnswer = Boolean(answer.apiKey && answer.model);
@@ -86,6 +89,56 @@ let visible = [];
 
 // Not awaited: the listeners below must be attached before history resolves.
 refreshRows();
+
+// --- dashboard -------------------------------------------------------------------
+
+startClock();
+refreshWeather();
+renderFavorites({ onNavigate: navigate });
+wireFavoriteForm({ onNavigate: navigate });
+
+document.getElementById("openSettings").addEventListener("click", openSettings);
+document.getElementById("weather").addEventListener("click", openSettings);
+
+/**
+ * `chrome.runtime.openOptionsPage` is the polite way in, but it is a no-op if
+ * the manifest has no options page registered — which is exactly what a stale
+ * unpacked build looks like, and it fails silently. Navigating to the page is
+ * the fallback, so the button always does something.
+ */
+function openSettings() {
+  try {
+    if (globalThis.chrome?.runtime?.openOptionsPage) {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  const url = globalThis.chrome?.runtime?.getURL?.("options.html");
+  if (url) navigate(url);
+}
+
+// --- the target pills ---------------------------------------------------------------
+
+const targets = [...document.querySelectorAll(".target")];
+
+for (const pill of targets) {
+  pill.addEventListener("click", () => {
+    mode = pill.dataset.mode;
+    menu.setMode(mode);
+    saveMode(mode);
+    syncTargets();
+    input.focus();
+  });
+}
+
+/** Keeps the pills, the top-bar menu and the placeholder showing one mode. */
+function syncTargets() {
+  for (const pill of targets) pill.setAttribute("aria-pressed", String(pill.dataset.mode === mode));
+  // The box says where the next Enter goes. Nothing else on the page does.
+  input.placeholder = placeholderFor(mode, canAnswer);
+}
 
 async function refreshRows() {
   const [granted, tiles, closedTabs] = await Promise.all([
@@ -153,7 +206,10 @@ function paint() {
   // "Nothing yet" and "nothing matches" are different states and deserve
   // different words; the onboarding row is its own third answer.
   emptyState.hidden = visible.length > 0 || query !== "" || !onboarding.hidden;
-  noMatches.hidden = visible.length > 0 || query === "" || allRows.length === 0;
+  // Only while the typing still looks like a filter. Past that you are writing a
+  // prompt, and "no rows match" on every fresh question is noise.
+  const looksLikeFilter = query.length > 0 && query.length <= 24;
+  noMatches.hidden = visible.length > 0 || !looksLikeFilter || allRows.length === 0;
 }
 
 function open(row) {
@@ -207,6 +263,12 @@ const plusMenu = createModeMenu({
 
 async function runPlusAction(action) {
   switch (action) {
+    case "attach":
+      // The click on the hidden input has to happen inside this one, or Chrome
+      // treats the picker as unrequested and ignores it.
+      document.getElementById("attachInput").click();
+      return;
+
     case "paste": {
       const text = await readClipboard();
       if (text) {
@@ -247,6 +309,123 @@ async function runPlusAction(action) {
   }
 }
 
+/** Text files only, and small ones: this goes into a prompt, not a database. */
+const MAX_ATTACH_BYTES = 256 * 1024;
+
+/**
+ * How much attached text a hand-off can carry.
+ *
+ * ChatGPT, Claude and Perplexity are reached by putting the prompt in a URL,
+ * and a URL is not a file transport — Chrome and the sites themselves give up
+ * somewhere past a few thousand characters. Answer mode has no such limit
+ * because it posts a request body, so the whole file goes.
+ */
+const HANDOFF_BUDGET = 4000;
+
+/** In-memory only: an attachment is for the next send, not a saved document. */
+let attachments = [];
+
+document.getElementById("attachInput").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = ""; // so picking the same file twice still fires
+  if (!file) return;
+
+  if (file.size > MAX_ATTACH_BYTES) {
+    say(`${file.name} is ${Math.round(file.size / 1024)} KB. The limit is 256 KB.`);
+    return;
+  }
+
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    say(`Could not read ${file.name}.`);
+    return;
+  }
+
+  // A file full of NUL bytes is a binary someone renamed. Say so rather than
+  // attaching mojibake.
+  if (text.slice(0, 4096).includes("\u0000")) {
+    say(`${file.name} does not look like text. Archer can only attach text files.`);
+    return;
+  }
+
+  attachments.push({ name: file.name, text: text.trim(), size: file.size });
+  paintAttachments();
+  syncSend();
+  input.focus();
+});
+
+function paintAttachments() {
+  const list = document.getElementById("attachments");
+  const template = document.getElementById("chipTemplate");
+  list.replaceChildren();
+
+  for (const [index, file] of attachments.entries()) {
+    const node = template.content.firstElementChild.cloneNode(true);
+    // A filename is text the user's filesystem chose, not markup.
+    node.querySelector(".chipName").textContent = file.name;
+    node.querySelector(".chipSize").textContent = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+    const remove = node.querySelector(".chipRemove");
+    remove.setAttribute("aria-label", `Remove ${file.name}`);
+    remove.addEventListener("click", () => {
+      attachments.splice(index, 1);
+      paintAttachments();
+      syncSend();
+      input.focus();
+    });
+
+    list.append(node);
+  }
+
+  if (attachments.length) {
+    say(`Attached. Type your question — the ${attachments.length === 1 ? "file goes" : "files go"} with it.`);
+  } else {
+    say("");
+  }
+}
+
+/**
+ * The prompt as actually sent: what you typed, then each file, fenced and named
+ * so the model can tell instruction from attachment.
+ */
+function composePrompt(typed, { budget = Infinity } = {}) {
+  if (!attachments.length) return { text: typed, trimmed: false };
+
+  let trimmed = false;
+  let out = typed.trim();
+  let room = budget - out.length;
+
+  for (const file of attachments) {
+    let body = file.text;
+    const frame = `\n\n--- ${file.name} ---\n\n--- end of ${file.name} ---`;
+
+    if (Number.isFinite(room)) {
+      const available = room - frame.length;
+      if (available <= 0) {
+        trimmed = true;
+        break;
+      }
+      if (body.length > available) {
+        body = body.slice(0, available);
+        trimmed = true;
+      }
+      room -= frame.length + body.length;
+    }
+    out += `\n\n--- ${file.name} ---\n${body}\n--- end of ${file.name} ---`;
+  }
+
+  return { text: out, trimmed };
+}
+
+/** One line under the box, for things that are not errors but need saying. */
+function say(message) {
+  const node = document.getElementById("attachStatus");
+  node.textContent = message;
+  node.hidden = !message;
+}
+
 async function readClipboard() {
   try {
     if (globalThis.chrome?.permissions?.request) {
@@ -259,6 +438,27 @@ async function readClipboard() {
     return "";
   }
 }
+
+// Chrome keeps a pre-rendered new tab page around, so a tab created before a
+// change would show the state as it was when it was built. Watching storage
+// means every open tab agrees with every other one.
+globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== "local") return;
+
+  if ("favorites" in changes || "favourites" in changes) renderFavorites({ onNavigate: navigate });
+  if ("weatherCache" in changes || "weatherPlace" in changes || "weatherUnit" in changes) refreshWeather();
+  if ("launches" in changes || "pinned" in changes || "dismissed" in changes || "library" in changes) {
+    refreshRows();
+  }
+  if ("mode" in changes) {
+    const next = changes.mode.newValue;
+    if (typeof next === "string" && next !== mode) {
+      mode = next;
+      menu.setMode(next);
+      syncTargets();
+    }
+  }
+});
 
 document.getElementById("enableHistory").addEventListener("click", async () => {
   // Must stay inside the click: Chrome refuses a permission request that is not
@@ -330,6 +530,7 @@ function cycleMode(delta) {
   mode = next;
   menu.setMode(next);
   saveMode(next);
+  syncTargets();
 }
 
 function moveActive(delta) {
@@ -349,6 +550,28 @@ form.addEventListener("submit", (event) => {
 async function go(raw, force) {
   await ready;
   const verdict = route(raw, { mode, force, canAnswer });
+
+  // Attachments ride with a prompt, never with a URL — "open this address" has
+  // nothing to attach to.
+  if (attachments.length && (verdict.action === SEARCH || verdict.action === ANSWER || verdict.action === ASK)) {
+    const budget = verdict.action === ANSWER ? Infinity : HANDOFF_BUDGET;
+    const composed = composePrompt(raw, { budget });
+
+    if (composed.trimmed) {
+      say(
+        "The attachment was trimmed to fit the address bar. Set up Answer here in settings to send " +
+          "the whole file.",
+      );
+    }
+    const withFiles = route(composed.text, { mode, force: PROMPT, canAnswer });
+    await recordLaunch(raw.trim() || attachments[0].name);
+    attachments = [];
+    paintAttachments();
+
+    if (withFiles.action === ANSWER) return void (await answerHere(withFiles.text));
+    if (withFiles.action === ASK) return void navigate(withFiles.url);
+    return void runSearch(withFiles.text);
+  }
 
   switch (verdict.action) {
     case NONE:
@@ -467,14 +690,24 @@ document.getElementById("continueInChatGPT").addEventListener("click", () => {
  * `chrome.tabs.update` rather than `location.assign` so the new tab page is
  * replaced instead of pushed onto session history (docs/ROADMAP.md §2.5 #7).
  *
- * Note this does *not* need the `tabs` permission: that permission gates
- * reading a tab's url/title/favicon, not setting the current tab's address.
- * See the permissions ledger in docs/ROADMAP.md.
+ * **The tab id is not optional.** `chrome.tabs.update({url})` with no id
+ * navigates whatever tab is *active*, which is not necessarily the one running
+ * this page — Chrome pre-renders the new tab page, and a background new tab
+ * that submits would send some other tab somewhere. Measured directly: the
+ * page's own tab id and the active tab id differ.
+ *
+ * Neither `getCurrent` nor `update` needs the `tabs` permission; that permission
+ * gates *reading* a tab's url/title/favicon, which this never does.
  */
-function navigate(url) {
-  if (globalThis.chrome?.tabs?.update) {
-    chrome.tabs.update({ url });
-    return;
+async function navigate(url) {
+  try {
+    const tab = await globalThis.chrome?.tabs?.getCurrent?.();
+    if (tab?.id != null && chrome.tabs?.update) {
+      chrome.tabs.update(tab.id, { url });
+      return;
+    }
+  } catch {
+    /* fall through to the plain navigation below */
   }
   window.location.assign(url);
 }
@@ -543,5 +776,5 @@ syncSend();
 /** The send control is the page's primary action, so it stays inert until
     there is actually something to send. */
 function syncSend() {
-  send.disabled = input.value.trim() === "";
+  send.disabled = input.value.trim() === "" && attachments.length === 0;
 }

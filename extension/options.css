@@ -232,3 +232,69 @@ kbd {
   border-radius: 999px;
   font-size: 12.5px;
 }
+
+/* ---------- permissions ---------- */
+
+.grants {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grant {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.grant:first-child { border-top: none; padding-top: 4px; }
+
+.grantHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.grantTitle { font-size: 14px; font-weight: 500; }
+
+.grantState {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.grant.isOn .grantState { background: var(--accent); color: var(--onAccent); }
+
+.grantToggle {
+  margin-left: auto;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.grantToggle:hover { border-color: var(--accent); }
+
+.grantWhy,
+.grantCost {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* The one worth reading twice gets a rule beside it rather than a colour: this
+   is information, not a warning, and a red panel would overstate it. */
+.grantCost {
+  padding-left: 11px;
+  border-left: 2px solid var(--border);
+}

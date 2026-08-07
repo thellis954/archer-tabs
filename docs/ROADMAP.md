@@ -527,13 +527,85 @@ optional, so the install prompt is still `search` + `storage`.
 - **A "clear prompt history" button** came with the analytics. Showing someone a computed profile of
   what they ask about, with no way to erase the input, would have been the wrong thing to build.
 
-### Phase 6 — Ship (~2 days) 🟢
-- ~~Neutral brand skin~~ ✅ done — Archer, `docs/BRAND.md`. Remaining: store screenshots, listing
-  copy, privacy policy ("all data stays on your device")
-- Per-permission opt-in with plain-language rationale — request `history` only when the user enables
-  the conversations feature, not at install
-- Playwright smoke test against a real Chromium profile with the extension loaded
-- Tag `1.0.0` → publish
+### Phase 6 — The dashboard ✅ **done**
+
+**Not in the original plan** — asked for during Phase 5, against a reference screenshot of a
+different new tab page. Inserted here rather than appended, so the store screenshots in Phase 7 show
+what actually ships.
+
+- ✅ Clock, greeting and date with the time zone
+- ✅ Weather card, from Open-Meteo
+- ✅ Favourites bar with monogram tiles
+- ✅ Destination pills above the search box — Search / ChatGPT / Claude / Perplexity
+- ✅ A "default destination" setting
+
+**The pills and the top-bar menu are one setting, in two places.** The pills carry the four
+destinations worth a single click; the menu still carries all six, including `Search only` and
+`Answer here`. Either control moves the other, and a mode with no pill leaves all four unpressed
+rather than lying about one. The same value is a select on the settings page, labelled as the
+default a new tab starts from.
+
+**The "Search" pill is not a "Google" pill, deliberately.** It routes through `chrome.search`, i.e.
+*the user's own default engine*. Hardcoding Google is the exact thing §2.2 says gets an NTP override
+pulled from the Web Store — and it would also break §0.5, where the whole point is that someone
+running OpenAI's search extension gets ChatGPT from this pill for free. The settings page says so
+in as many words.
+
+**Weather uses a place name, not the browser's geolocation.** `geolocation` never enters the
+permission list, the user picks how precise they are willing to be, and Open-Meteo needs no account
+and no API key — so there is no credential to store or leak. Two optional host permissions,
+requested at the click that saves a place. Readings are cached for 30 minutes, and a stale reading
+is shown in preference to an error: this page's job is to get out of the way.
+
+**Tiles are monograms, not favicons.** A real favicon needs the `favicon` permission or a network
+fetch per tile; two letters drawn from the site's own name work offline, in both themes, at any
+size, and cost nothing. The hue is derived from the host so a site keeps its colour between
+sessions. `GitHub` → `GH` rather than `GI`, because an internal capital is almost always the second
+half of a compound name.
+
+A favourite goes through the same rule the search box enforces: **only `http(s)` is ever stored**,
+and userinfo in the authority is refused. A tile is a link the user clicks from a privileged
+extension origin, so `javascript:` there would be exactly as dangerous as it is in the box.
+
+**Deviations:**
+- **The site-name fallback carries a nine-entry suffix list** (`co`, `com`, `ac`, …) so `bbc.co.uk`
+  is "Bbc" and not "Co". The correct answer is the Public Suffix List, which is ~15k entries — far
+  too much weight for a name the user can overwrite by typing one.
+- **The top bar lost its sidebar button.** It had no listener and no phase that owned one; the space
+  went to the weather card. The Archer wordmark stays.
+
+### Phase 7 — Ship ✅ **done**
+- ✅ Per-permission opt-in with plain-language rationale
+- ✅ Store listing copy, screenshots, privacy policy
+- ✅ Playwright smoke test against a real Chromium (arrived in Phase 0, grown every phase since)
+
+**The install prompt never grew.** Seven phases on, `manifest.json` still asks for `search` and
+`storage` and no host permission at all. Every capability added since — history, top sites, closed
+tabs, clipboard, the OpenAI API, the weather — is optional, requested at the click that switches the
+feature on. `npm run e2e` asserts the install set is exactly `["search", "storage"]`, so it cannot
+drift by accident.
+
+**`src/permissions.js` is the list, and the settings page renders it.** Each entry carries a plain
+title, a sentence saying what the feature does with it, and — where there is one — the part worth
+reading twice. An e2e case asserts the panel accounts for **every** optional permission and origin
+the manifest declares, so a future capability cannot be added without an explanation appearing
+beside it. Anything on the list can be revoked from the same panel.
+
+**New docs, both meant to be kept true rather than written once:**
+- `docs/PRIVACY.md` — what is stored, what leaves the device (four things, all opt-in), and what
+  each permission is for. The Web Store needs this at a *hosted* URL; publishing it is website work
+  and is tracked outside this repo, so the listing cannot be submitted until that page is live.
+- `docs/STORE.md` — listing copy, category, single-purpose statement, per-permission
+  justifications, the data-use answers, and a pre-submission checklist.
+
+**`npm run store`** generates the five 1280×800 screenshots and both promo tiles from a seeded
+profile, so a UI change is one command away from a correct listing, and the data in the shots is
+obviously illustrative rather than a real person's history.
+
+**Deviation: the tag is `1.7.0`, not `1.0.0`.** The plan said tag 1.0.0 at ship, but the extension
+has been at 1.0.0 since before Phase 1 and each phase bumped it — Chrome refuses to update an
+extension without an increasing version, so the numbers were already spent. Shipping as 1.7.0 is
+honest about that; a 1.0.0 tag now would be a version *decrease* against what is in the repo.
 
 ### Engineering foundation
 Stay dependency-light and zero-framework — this UI does not need React. ~~Introduce **esbuild** at
@@ -564,12 +636,40 @@ Each one costs install-time trust; add only when its phase needs it.
 | ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
 | `history` *(optional)* | 3 | Recent ChatGPT conversations. Requested at the click that turns them on, never at install — so it is absent from the install prompt entirely |
 | `optional_host_permissions: api.openai.com` | 4 | Inline answers. Optional, requested when a key is saved — never at install |
+| `optional_host_permissions: *.open-meteo.com` | 6 | Weather. Optional, requested when a place is saved. No account and no API key, so there is no credential to store |
 | `topSites` *(optional)* | 5 | Top sites among the rows |
 | `sessions` + `tabs` *(optional)* | 5 | Recently-closed tabs. `sessions` alone returns no url or title — the pair is requested together, in its own opt-in, because it costs the "Read your browsing history" prompt |
 | `clipboardRead` *(optional)* | 5 | The `+` menu's paste |
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
 
 ---
+
+## 4.6 Bugs found by using it
+
+Fixed after Phase 7, in a QA pass done as an end user rather than as an author —
+click every control, at every width, and watch what the page actually does.
+
+| Symptom | Cause |
+|---|---|
+| The `+` menu rendered as raw inline text | Its items became `[role=menuitem]` in Phase 5; the CSS only styled `[role=option]`, so the whole menu silently lost its layout |
+| The top-bar menu ran 256px off the right edge | Anchored `left: 0` under a control that had moved to the far right of the bar |
+| Recent ChatGPT chats never appeared | The matcher only accepted `chatgpt.com/c/<uuid>` — it dropped every custom-GPT conversation (`/g/g-xxx/c/<uuid>`) and everything at the old `chat.openai.com`. The history query also used `"chatgpt.com/c/"`, and Chrome's history search tokenises on punctuation |
+| Favorites "didn't save" | They did. Chrome pre-renders the new tab page, so a tab built before the change showed the state as it was then. Nothing watched `chrome.storage.onChanged` |
+| The settings gear did nothing | `chrome.runtime.openOptionsPage()` is a silent no-op when the manifest has no options page registered — which is what a stale unpacked build looks like |
+| **A hand-off could navigate the wrong tab** | `chrome.tabs.update({url})` with no tab id navigates whatever tab is *active*, not the one running the page. Measured: the page's own tab id and the active tab id differ. It now resolves its own id with `chrome.tabs.getCurrent()` |
+| Clicking the "Web Store" top site killed the tab | Chrome forbids extensions from navigating there — and it is the *only* entry in `topSites` on a fresh profile, so it was the first thing a new user would click |
+| The page scrolled sideways at 360px | Four destination pills are wider than a phone-width window and the row would not wrap |
+
+**Two improvements that came out of the same pass:**
+- **The placeholder names the destination.** "Ask Claude, or type a URL" — the box is the only thing
+  on the page that can say where the next Enter goes. `docs/BRAND.md` fixed it at "Ask or type a URL"
+  so a *default* would not imply an affiliation; reflecting a destination the user just chose is the
+  opposite of that.
+- **Attachments are chips, not inlined text.** The first version pasted the file into the box and an
+  `<input type="text">` silently stripped every newline, so a Python file arrived as one mangled
+  line. A chip also means the file can be removed, and it survives while you type the question.
+  Hand-offs travel in a URL, so their attachment is trimmed to a budget and the page says so;
+  Answer mode posts a body and sends the whole file.
 
 ## 4.5 Parked ideas
 

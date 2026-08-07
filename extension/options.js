@@ -13,10 +13,18 @@ import {
   saveLibrary,
   readLaunches,
   clearLaunches,
+  readWeatherSettings,
+  saveWeatherSettings,
+  saveWeatherCache,
+  loadSettings,
+  saveMode,
 } from "./src/settings.js";
 import { listModels, estimateCost, API_ORIGIN } from "./src/answer.js";
+
+import { findPlace, fetchWeather, WEATHER_ORIGINS } from "./src/weather.js";
 import { variableNames } from "./src/library.js";
 import { summarise, toMarkdown } from "./src/analytics.js";
+import { GRANTS, isGranted, grant, revoke } from "./src/permissions.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -49,6 +57,71 @@ function render() {
 function say(node, message, isError = false) {
   node.textContent = message;
   node.classList.toggle("isError", isError);
+}
+
+// --- default destination -------------------------------------------------------------
+
+const defaultMode = $("defaultMode");
+defaultMode.value = (await loadSettings()).mode;
+
+defaultMode.addEventListener("change", async () => {
+  await saveMode(defaultMode.value);
+  const label = defaultMode.selectedOptions[0]?.textContent ?? defaultMode.value;
+  say($("modeStatus"), `New tabs will use ${label.split(" — ")[0]}.`);
+});
+
+// --- weather ----------------------------------------------------------------------
+
+const weather = await readWeatherSettings();
+$("place").value = weather.place?.name ?? "";
+$("unit").value = weather.unit;
+
+$("savePlace").addEventListener("click", async () => {
+  const query = $("place").value.trim();
+  if (!query) {
+    say($("placeStatus"), "Type a town or city first.", true);
+    return;
+  }
+
+  // Inside the click: Chrome refuses a permission request without a gesture.
+  const granted = await requestWeatherAccess();
+  if (!granted) {
+    say($("placeStatus"), "Archer needs permission to reach Open-Meteo before it can show weather.", true);
+    return;
+  }
+
+  say($("placeStatus"), "Looking that up…");
+  try {
+    const unit = $("unit").value;
+    const place = await findPlace(query);
+    // Fetched before saving, so a place that resolves but has no forecast never
+    // becomes a permanently blank card on the new tab.
+    const reading = await fetchWeather({ ...place, unit });
+
+    await saveWeatherSettings({ place, unit });
+    await saveWeatherCache(reading);
+    $("place").value = place.name;
+    say($("placeStatus"), `Showing weather for ${place.name}.`);
+  } catch (error) {
+    say($("placeStatus"), error.message, true);
+  }
+});
+
+$("clearPlace").addEventListener("click", async () => {
+  await saveWeatherSettings({ place: null });
+  await saveWeatherCache(null);
+  $("place").value = "";
+  say($("placeStatus"), "Weather turned off. The card disappears from the new tab.");
+});
+
+async function requestWeatherAccess() {
+  if (!globalThis.chrome?.permissions?.request) return true; // plain-file dev
+  try {
+    if (await chrome.permissions.contains({ origins: WEATHER_ORIGINS })) return true;
+    return await chrome.permissions.request({ origins: WEATHER_ORIGINS });
+  } catch {
+    return false;
+  }
 }
 
 // --- saved prompts --------------------------------------------------------------
@@ -319,4 +392,64 @@ async function showUsage() {
   const cap = settings.tokenCap > 0 ? ` of ${settings.tokenCap.toLocaleString()}` : " (no limit set)";
   const money = cost === null ? "" : ` — about $${cost.toFixed(4)} at your input rate`;
   $("usage").textContent = `Today: ${spend.tokens.toLocaleString()} tokens${cap}${money}.`;
+}
+
+
+// --- permissions -------------------------------------------------------------------
+
+await renderGrants();
+
+async function renderGrants() {
+  const list = $("grants");
+  list.replaceChildren();
+
+  for (const entry of GRANTS) {
+    const granted = await isGranted(entry);
+
+    const item = document.createElement("li");
+    item.className = "grant";
+    item.dataset.grant = entry.id;
+    item.classList.toggle("isOn", granted);
+
+    const head = document.createElement("div");
+    head.className = "grantHead";
+
+    const title = document.createElement("span");
+    title.className = "grantTitle";
+    title.textContent = entry.title;
+
+    const state = document.createElement("span");
+    state.className = "grantState";
+    state.textContent = granted ? "On" : "Off";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "grantToggle";
+    button.textContent = granted ? "Turn off" : "Turn on";
+    button.setAttribute("aria-label", `${granted ? "Turn off" : "Turn on"} ${entry.title}`);
+    button.addEventListener("click", async () => {
+      // Both inside the click: Chrome refuses a permission request without a
+      // user gesture, and refuses it silently.
+      if (granted) await revoke(entry);
+      else await grant(entry);
+      await renderGrants();
+    });
+
+    head.append(title, state, button);
+
+    const why = document.createElement("p");
+    why.className = "grantWhy";
+    why.textContent = entry.why;
+
+    item.append(head, why);
+
+    if (entry.cost) {
+      const cost = document.createElement("p");
+      cost.className = "grantCost";
+      cost.textContent = entry.cost;
+      item.append(cost);
+    }
+
+    list.append(item);
+  }
 }

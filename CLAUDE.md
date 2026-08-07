@@ -15,8 +15,9 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 
 ```
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
-  src/       classify.js, router.js, conversations.js, history.js, rows.js,
-             answer.js, settings.js, modemenu.js + the generated TLD list
+  src/       classify.js, router.js, conversations.js, history.js, rows.js, answer.js,
+             clock.js, weather.js, favourites.js, dashboard.js, library.js, analytics.js,
+             browsing.js, settings.js, modemenu.js + the generated TLD list
   options.*  the settings page — API key, model, budget
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
   app.js     wires the two live demos; imports from vendor/
@@ -52,16 +53,17 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 154 unit cases (classifier, router, conversations, answer, library). No install needed. |
+| `npm test` | 188 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
 | `npm run siteshots` | Renders the marketing site to `shots/site/` — both themes, three widths, and the demo/scrollytell/lab mid-interaction. |
 | `npm run og` | Regenerates `web/assets/og.png`, the social card. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
+| `npm run store` | Regenerates the Web Store screenshots and promo tiles into `store/`. |
 | `npm run check` | lint + test — what CI runs. |
 
-`e2e`, `shots` and `icons` all need Playwright on the module path:
+`e2e`, `shots`, `icons` and `store` all need Playwright on the module path:
 
 ```sh
 mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright
@@ -93,7 +95,16 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
 - `src/rows.js` — paints the rows.
 - `src/answer.js` — the only caller of `api.openai.com`. The SSE framing and the budget maths are
   pure functions so they can be tested without a network.
-- `src/modemenu.js` — the `Auto ⌄` listbox.
+- `src/clock.js`, `src/weather.js`, `src/favourites.js` — the dashboard's decisions. All pure;
+  `src/dashboard.js` is the only part that touches the DOM or the network.
+- `src/modemenu.js` — the `Auto ⌄` listbox, and the `+` menu.
+- `src/permissions.js` — every optional permission, with the plain-language reason the settings
+  page shows beside it. **Adding a capability that needs a permission means adding it here too** —
+  an e2e case asserts this list accounts for every optional permission the manifest declares.
+
+**The destination pills and the top-bar menu are one setting.** Both write `mode`; both are kept in
+sync by `syncTargets()`. The pills carry four of the six modes — a mode with no pill presses none of
+them rather than showing a wrong one.
 
 **Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
 this page runs in a privileged extension origin — a `javascript:` URL would execute *here*. A unit
