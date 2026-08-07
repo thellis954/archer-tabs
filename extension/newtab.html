@@ -46,6 +46,10 @@
           <span class="modeName">Search</span>
           <span class="modeHint">Never navigate. Everything is a query, even if it looks like a URL.</span>
         </li>
+        <li role="option" data-mode="answer" data-label="Answer here" tabindex="-1" aria-selected="false">
+          <span class="modeName">Answer here</span>
+          <span class="modeHint" id="answerModeHint">URLs open. Anything else is answered on this page, using your own API key.</span>
+        </li>
       </ul>
     </div>
   </header>
@@ -95,6 +99,19 @@
 
       </div>
     </form>
+
+    <!-- The streamed answer. Text only: everything in here comes back from the
+         API, and is written with textContent. -->
+    <section class="answer" id="answer" hidden>
+      <p class="answerStatus" id="answerStatus" role="status"></p>
+      <p class="answerText" id="answerText"></p>
+      <p class="answerMeta" id="answerMeta"></p>
+      <div class="answerActions">
+        <button type="button" id="stopAnswer" hidden>Stop</button>
+        <button type="button" id="continueInChatGPT">Continue in ChatGPT</button>
+        <button type="button" id="closeAnswer">Close</button>
+      </div>
+    </section>
 
     <!--
       Filled by src/rows.js from chrome.history + the local launch log. Every

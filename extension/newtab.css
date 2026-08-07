@@ -353,6 +353,66 @@ body {
 
 .row.isPinned .pin { color: var(--accent); }
 
+/* ---------- inline answer ---------- */
+
+.answer {
+  width: min(795px, 100%);
+  margin: 20px auto 0;
+  padding: 18px 21px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.answerStatus {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.answerText {
+  margin: 0;
+  /* The API returns plain text with real newlines in it. Honouring them is the
+     whole of the "formatting" here — nothing in this string is ever parsed. */
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.answerText:empty { display: none; }
+
+.answerMeta {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.answerMeta:empty { display: none; }
+
+.answerActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.answerActions button {
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.answerActions button:hover  { background: var(--pressed); }
+.answerActions button:active { background: var(--pressed); }
+
 /* ---------- empty states ---------- */
 
 .empty {

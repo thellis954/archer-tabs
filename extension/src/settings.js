@@ -117,3 +117,74 @@ export async function dismissRow(id) {
 }
 
 const list = (value) => (Array.isArray(value) ? value.filter((x) => typeof x === "string") : []);
+
+// --- inline answers -----------------------------------------------------------
+
+const KEY_API = "apiKey";
+const KEY_MODEL = "model";
+const KEY_CAP = "tokenCap";
+const KEY_RATE_IN = "rateInPerM";
+const KEY_RATE_OUT = "rateOutPerM";
+const KEY_SPEND = "spend";
+
+/** Generous enough not to nag, small enough to notice a runaway. */
+export const DEFAULT_TOKEN_CAP = 50_000;
+
+/**
+ * The key lives in chrome.storage.local and is read by the new tab page and the
+ * options page only. It is never sent anywhere but api.openai.com, and there is
+ * no server in this project to send it to.
+ */
+export async function loadAnswerSettings() {
+  const raw = await store().get({
+    [KEY_API]: "",
+    [KEY_MODEL]: "",
+    [KEY_CAP]: DEFAULT_TOKEN_CAP,
+    [KEY_RATE_IN]: 0,
+    [KEY_RATE_OUT]: 0,
+  });
+  return {
+    apiKey: typeof raw[KEY_API] === "string" ? raw[KEY_API] : "",
+    model: typeof raw[KEY_MODEL] === "string" ? raw[KEY_MODEL] : "",
+    tokenCap: Number(raw[KEY_CAP]) >= 0 ? Number(raw[KEY_CAP]) : DEFAULT_TOKEN_CAP,
+    rateInPerM: Number(raw[KEY_RATE_IN]) || 0,
+    rateOutPerM: Number(raw[KEY_RATE_OUT]) || 0,
+  };
+}
+
+export async function saveAnswerSettings(values) {
+  const patch = {};
+  if ("apiKey" in values) patch[KEY_API] = String(values.apiKey ?? "");
+  if ("model" in values) patch[KEY_MODEL] = String(values.model ?? "");
+  if ("tokenCap" in values) patch[KEY_CAP] = Math.max(0, Number(values.tokenCap) || 0);
+  if ("rateInPerM" in values) patch[KEY_RATE_IN] = Math.max(0, Number(values.rateInPerM) || 0);
+  if ("rateOutPerM" in values) patch[KEY_RATE_OUT] = Math.max(0, Number(values.rateOutPerM) || 0);
+  await store().set(patch);
+}
+
+/**
+ * The budget resets daily.
+ *
+ * The roadmap asked for a *per-session* cap, but a new tab page has no session:
+ * every tab is a fresh document, and "this browser run" is not observable
+ * without a service worker we otherwise do not need. A day is the honest
+ * reading, and it is the one a person can actually reason about.
+ */
+export async function readSpend(today = dayStamp()) {
+  const { [KEY_SPEND]: spend } = await store().get({ [KEY_SPEND]: null });
+  if (!spend || spend.day !== today) return { day: today, tokens: 0 };
+  return { day: today, tokens: Number(spend.tokens) || 0 };
+}
+
+export async function addSpend(tokens, today = dayStamp()) {
+  const current = await readSpend(today);
+  const next = { day: today, tokens: current.tokens + (Number(tokens) || 0) };
+  await store().set({ [KEY_SPEND]: next });
+  return next;
+}
+
+/** Local calendar day — the boundary a person means when they say "today". */
+export function dayStamp(at = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}

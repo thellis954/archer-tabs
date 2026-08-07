@@ -76,5 +76,14 @@ for (const scheme of ["light", "dark"]) {
     await page.close();
   }
 
+  const options = await ctx.newPage();
+  await options.setViewportSize({ width: 900, height: 800 });
+  await options.goto(`chrome-extension://${extensionId(EXT)}/options.html`, { waitUntil: "domcontentloaded" });
+  await options.waitForTimeout(200);
+  const optionsPath = join(OUT, `options-${scheme}.png`);
+  await options.screenshot({ path: optionsPath, fullPage: true });
+  console.log(optionsPath);
+  await options.close();
+
   await ctx.close();
 }

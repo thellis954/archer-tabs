@@ -458,11 +458,38 @@ of a prompt, and every extra minute lets another unrelated launch compete to exp
   `chrome.history`, real page titles recorded by real navigations; only the consent click is skipped,
   and that click is asserted separately.
 
-### Phase 4 — Inline answers (~3 days) 🟡 exceeds Atlas
-- BYO Platform API key, stored locally, never proxied (§3.4)
-- Stream the answer directly onto the new tab; "Continue in ChatGPT" hands off to a full conversation
-- Model picker, token/cost counter, per-session spend cap
-- Degrades cleanly to Phase 2 navigation when no key is set
+### Phase 4 — Inline answers ✅ **done**
+- ✅ BYO Platform API key, stored locally, never proxied (§3.4)
+- ✅ Streams the answer onto the new tab; "Continue in ChatGPT" hands off to a full conversation
+- ✅ Model picker, token counter, budget
+- ✅ Degrades cleanly when no key is set
+
+A fourth mode, **Answer here**. URLs still open; prompts are answered on the page. Choosing it
+without a key set opens the settings page rather than silently doing something else, and a *cleared*
+key doesn't strand the mode — `route()` degrades it to Auto, because the key can be removed long
+after the mode was chosen.
+
+**Deviations from the plan, deliberately:**
+- **The budget is counted in tokens, not dollars.** A cost figure needs a price table, and a price
+  table hardcoded into a browser extension is wrong the first time OpenAI reprices anything —
+  quietly, and in the direction of *understating* what the user is spending. Tokens are what the API
+  reports exactly (`stream_options.include_usage`). A dollar estimate appears only if the user enters
+  their own $/1M rates, and then it is their number, not ours.
+- **"Per-session" became per-day.** A new tab page has no session: every tab is a fresh document, and
+  "this browser run" is not observable without a service worker we otherwise do not need. A local
+  calendar day is the honest reading and the one a person can reason about.
+- **The model list is fetched from the key** (`GET /v1/models`), not hardcoded. It is then what *that
+  account* can actually reach, and there is no list in the repo to go stale.
+- **`https://api.openai.com/*` is an `optional_host_permission`**, requested at the click that saves
+  a key — so it is absent from the install prompt, like `history`. The key is validated against the
+  API *before* it is stored: a saved key that 401s would be a silent failure on the new tab later.
+- **A second page, `options.html`**, registered as `options_page`. `tools/lint.js` was widened from
+  "the new tab page" to "every page and stylesheet the extension ships", so the CSP, missing-file,
+  `type="module"` and CSS-token rules all apply to it — verified by breaking each on purpose.
+
+**On the key.** It is stored in `chrome.storage.local` and sent to `api.openai.com` and nowhere else,
+straight from the page. There is no Archer server to proxy it through, which is the only reason
+bring-your-own-key is worth building at all (§3.4).
 
 ### Phase 5 — Power features (~1 week) 🟢 the differentiators
 Ordered by my estimate of value per unit of work:
@@ -491,11 +518,12 @@ MV3 pages). ~~**Vitest** at Phase 0~~ (node's built-in runner instead — zero d
 | File | Owns |
 |---|---|
 | `src/classify.js` | URL vs prompt. Pure, total, 47 cases |
-| `src/router.js` | mode + modifier + verdict → one instruction. Pure, 29 cases |
+| `src/router.js` | mode + modifier + verdict → one instruction. Pure, 34 cases |
 | `src/conversations.js` | history + launch log → rows: collapse, bind, pin, filter. Pure, 39 cases |
 | `src/settings.js` | `chrome.storage.local`: mode, hint dismissal, launch log, pins, dismissals |
 | `src/history.js` | the only caller of `chrome.history` and `chrome.permissions` |
 | `src/rows.js` | paints rows from a `<template>`, `textContent` only |
+| `src/answer.js` | the only caller of `api.openai.com`; SSE framing and budget maths are pure, 20 cases |
 | `src/modemenu.js` | the `Auto ⌄` listbox |
 | `newtab.js` | DOM wiring, and nothing else |
 
@@ -508,6 +536,7 @@ Each one costs install-time trust; add only when its phase needs it.
 | `storage` | 2 | Mode, launch log, preferences |
 | ~~`tabs`~~ | — | **Not needed.** `chrome.tabs.update({url})` retargets the current tab without it; `tabs` only gates *reading* `url`/`title`/`favIconUrl`. Its install prompt says "Read your browsing history", so not asking is worth real trust |
 | `history` *(optional)* | 3 | Recent ChatGPT conversations. Requested at the click that turns them on, never at install — so it is absent from the install prompt entirely |
+| `optional_host_permissions: api.openai.com` | 4 | Inline answers. Optional, requested when a key is saved — never at install |
 | `topSites`, `sessions` | 5 | Tiles, recently-closed |
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
 
