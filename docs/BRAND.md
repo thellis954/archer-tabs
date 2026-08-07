@@ -84,7 +84,7 @@ different product rather than a knock-off, and it suits a name that evokes leath
 | `--text` | `#141416` | ink — body and titles |
 | `--muted` | `#78706A` | descriptions, placeholder |
 | `--faint` | `#D9D2C7` | the oversized page mark |
-| `--accent` | `#B45309` | brass — mark, focus, hover, send |
+| `--accent` | `#B45309` | brass — mark, focus, hover, send, attachment chips |
 | `--onAccent` | `#FBF7F0` | the glyph inside a brass fill |
 
 ### Dark
@@ -140,9 +140,11 @@ instantly, and a webfont means either a flash or a blocking load. Neither is wor
 
 Plain, short, a little dry. The product is a text box; it should not be enthusiastic about itself.
 
-- Placeholder: **"Ask or type a URL"** — deliberately not "Ask ChatGPT or type a URL". Naming the
-  provider in shipped UI implies an affiliation that doesn't exist, and the routing target is a
-  setting, not an identity.
+- Placeholder: **"Ask or type a URL"** by default — deliberately not "Ask ChatGPT or type a URL". A
+  *default* that names a provider implies an affiliation that doesn't exist.
+  **Once the user picks a destination, the placeholder says so** — "Ask Claude, or type a URL". That
+  is the opposite claim: it reports a setting the user just chose, and the box is the only thing on
+  the page that can say where the next Enter goes.
 - Description: *"A calm new tab page. Ask a question or type a URL — Archer works out which you meant."*
 - No exclamation marks. No "supercharge", "AI-powered", or "seamlessly".
 

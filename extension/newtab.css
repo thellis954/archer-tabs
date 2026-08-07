@@ -105,6 +105,7 @@ body {
 /* Hangs off the `+`, which sits inside the rounded box rather than in the bar. */
 .plusMenu {
   top: calc(100% + 10px);
+  right: auto;
   left: -6px;
   width: min(320px, calc(100vw - 60px));
 }
@@ -121,7 +122,9 @@ body {
   position: absolute;
   z-index: 10;
   top: calc(100% + 6px);
-  left: 0;
+  /* Anchored to the button's right edge: this menu hangs off a control at the
+     far right of the bar, and anchoring it left pushed 256px of it off-screen. */
+  right: 0;
   width: min(340px, calc(100vw - 36px));
 
   margin: 0;
@@ -134,7 +137,12 @@ body {
   box-shadow: var(--shadow);
 }
 
-.modeMenu [role="option"] {
+/* Both roles: this menu is a listbox in the top bar and a menu inside the
+   search box, and the items are styled the same either way. Targeting only
+   [role=option] silently unstyled the whole + menu when its items became
+   menuitems in Phase 5. */
+.modeMenu [role="option"],
+.modeMenu [role="menuitem"] {
   display: grid;
   gap: 2px;
   padding: 9px 11px;
@@ -142,7 +150,8 @@ body {
   cursor: pointer;
 }
 
-.modeMenu [role="option"]:hover { background: var(--bg); }
+.modeMenu [role="option"]:hover,
+.modeMenu [role="menuitem"]:hover { background: var(--bg); }
 
 .modeName { font-size: 14px; font-weight: 500; }
 .modeHint { font-size: 12px; color: var(--muted); }
@@ -214,11 +223,31 @@ body {
 .weatherTop,
 .weatherBottom { display: flex; align-items: baseline; gap: 7px; }
 
-.weatherTemp { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.weather { max-width: min(260px, 42vw); }
+
+.weatherBody { min-width: 0; }
+
+/* One line each, truncated — the card wrapped to four lines on a narrow window
+   and pushed the whole bar out of shape. */
+.weatherTop,
+.weatherBottom { min-width: 0; }
+
+.weatherTemp { flex: none; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+
+.weatherText,
+.weatherPlace {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .weatherText { font-size: 13px; }
 
 .weatherPlace,
 .weatherRange { color: var(--muted); font-size: 11.5px; }
+
+.weatherRange { flex: none; white-space: nowrap; }
 
 /* ---------- clock ---------- */
 
@@ -250,11 +279,15 @@ body {
 .targets {
   display: flex;
   justify-content: center;
+  /* Wraps rather than overflowing: four pills are wider than a 360px window,
+     and a page that scrolls sideways on a phone-width window is broken. */
+  flex-wrap: wrap;
   gap: 4px;
   margin: 0 auto 14px;
   padding: 4px;
   width: fit-content;
-  border-radius: 999px;
+  max-width: 100%;
+  border-radius: 22px;
   background: var(--pressed);
 }
 
@@ -300,7 +333,7 @@ body {
 
 .page {
   /* Tighter than before the clock arrived: the clock, the mark, the pills, the
-     box, the rows and the favourites all have to fit a laptop window. */
+     box, the rows and the favorites all have to fit a laptop window. */
   padding: max(4vh, 28px) 24px 56px;
 }
 
@@ -505,6 +538,61 @@ body {
 
 .row.isPinned .pin { color: var(--accent); }
 
+.attachments {
+  width: min(795px, 100%);
+  margin: 10px auto 0;
+  padding: 0 21px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  list-style: none;
+}
+
+.attachments:empty { display: none; }
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12.5px;
+}
+
+.chipIcon { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.chipName { font-weight: 500; }
+.chipSize { color: var(--muted); }
+
+.chipRemove {
+  display: grid;
+  place-items: center;
+  width: 18px; height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chipRemove svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.chipRemove:hover { background: var(--pressed); color: var(--text); }
+
+.attachStatus {
+  width: min(795px, 100%);
+  margin: 10px auto 0;
+  padding: 0 21px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* A long menu on a short window has to scroll rather than run off the bottom. */
+.modeMenu {
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+}
+
 /* ---------- inline answer ---------- */
 
 .answer {
@@ -660,21 +748,21 @@ body {
   * { transition: none !important; }
 }
 
-/* ---------- favourites ---------- */
+/* ---------- favorites ---------- */
 
-.favourites {
+.favorites {
   width: min(795px, 100%);
   margin: 34px auto 0;
 }
 
-.favouritesHead {
+.favoritesHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 4px 10px;
 }
 
-.favouritesTitle {
+.favoritesTitle {
   margin: 0;
   color: var(--muted);
   font-size: 11px;
@@ -683,7 +771,7 @@ body {
   text-transform: uppercase;
 }
 
-.addFavourite {
+.addFavorite {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -698,9 +786,9 @@ body {
   cursor: pointer;
 }
 
-.addFavourite svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
-.addFavourite:hover  { border-color: var(--accent); }
-.addFavourite:active { background: var(--pressed); }
+.addFavorite svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.addFavorite:hover  { border-color: var(--accent); }
+.addFavorite:active { background: var(--pressed); }
 
 .tiles {
   display: grid;
@@ -823,7 +911,7 @@ body {
 .addTile .tileSave:hover { filter: brightness(1.08); }
 .addTile .tileCancel:hover { background: var(--pressed); }
 
-.favouritesEmpty { padding: 0 4px; }
+.favoritesEmpty { padding: 0 4px; }
 
 .tileStatus {
   margin: 10px 0 0;

@@ -79,11 +79,24 @@ export async function readRecentlyClosed(limit = 8) {
 }
 
 /**
+ * Chrome forbids an extension from navigating to the Web Store, and trying kills
+ * the tab. It is also the *only* entry in topSites on a fresh profile, so it is
+ * the first thing a new user would click.
+ */
+const UNREACHABLE = ["chromewebstore.google.com", "chrome.google.com"];
+
+/**
  * The same rule the classifier enforces: only http(s) is ever navigable from
  * this page. `chrome://`, `file://` and friends turn up in both of these APIs.
  */
-function isWebLink(url) {
-  return /^https?:\/\//i.test(String(url ?? ""));
+export function isWebLink(url) {
+  const value = String(url ?? "");
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    return !UNREACHABLE.includes(new URL(value).host.toLowerCase());
+  } catch {
+    return false;
+  }
 }
 
 function hostOf(url) {

@@ -1,18 +1,18 @@
-// Wires the clock, the weather card and the favourites bar into the page.
+// Wires the clock, the weather card and the favorites bar into the page.
 //
 // Split out of newtab.js because that file is meant to be the router's wiring,
 // not everything the page can show. Nothing here decides anything — the
-// decisions live in clock.js, weather.js and favourites.js, which are pure.
+// decisions live in clock.js, weather.js and favorites.js, which are pure.
 //
 // Every string painted here comes from a place name the user typed, a site
 // name, or a forecast service. All of it goes in with textContent.
 
 import { describeMoment, msToNextMinute } from "./clock.js";
 import { fetchWeather, isStale, unitSymbol, WEATHER_ORIGINS } from "./weather.js";
-import { hostOf, hueFor, monogram, addFavourite, removeFavourite } from "./favourites.js";
+import { hostOf, hueFor, monogram, addFavorite, removeFavorite } from "./favorites.js";
 import {
-  readFavourites,
-  saveFavourites,
+  readFavorites,
+  saveFavorites,
   readWeatherSettings,
   readWeatherCache,
   saveWeatherCache,
@@ -113,50 +113,50 @@ export async function hasWeatherAccess() {
   }
 }
 
-// --- favourites ------------------------------------------------------------------
+// --- favorites ------------------------------------------------------------------
 
-export async function renderFavourites({ onNavigate }) {
+export async function renderFavorites({ onNavigate }) {
   const list = $("tiles");
-  const favourites = await readFavourites();
+  const favorites = await readFavorites();
 
   list.replaceChildren();
-  $("favouritesEmpty").hidden = favourites.length > 0;
+  $("favoritesEmpty").hidden = favorites.length > 0;
 
   const template = document.getElementById("tileTemplate");
 
-  for (const favourite of favourites) {
+  for (const favorite of favorites) {
     const node = template.content.firstElementChild.cloneNode(true);
 
     const link = node.querySelector(".tileLink");
-    link.href = favourite.url; // normaliseURL guaranteed http(s) before this was stored
-    link.title = favourite.url;
+    link.href = favorite.url; // normaliseURL guaranteed http(s) before this was stored
+    link.title = favorite.url;
 
     const face = node.querySelector(".tileFace");
-    face.textContent = monogram(favourite.name);
+    face.textContent = monogram(favorite.name);
     // A stable hue per host, so a tile keeps its colour between sessions.
-    face.style.setProperty("--tileHue", String(hueFor(hostOf(favourite.url) || favourite.url)));
+    face.style.setProperty("--tileHue", String(hueFor(hostOf(favorite.url) || favorite.url)));
 
-    node.querySelector(".tileName").textContent = favourite.name;
+    node.querySelector(".tileName").textContent = favorite.name;
 
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      onNavigate(favourite.url);
+      onNavigate(favorite.url);
     });
 
     const remove = node.querySelector(".tileRemove");
-    remove.setAttribute("aria-label", `Remove ${favourite.name}`);
+    remove.setAttribute("aria-label", `Remove ${favorite.name}`);
     remove.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      await saveFavourites(removeFavourite(await readFavourites(), favourite.id));
-      await renderFavourites({ onNavigate });
+      await saveFavorites(removeFavorite(await readFavorites(), favorite.id));
+      await renderFavorites({ onNavigate });
     });
 
     list.append(node);
   }
 }
 
-export function wireFavouriteForm({ onNavigate }) {
+export function wireFavoriteForm({ onNavigate }) {
   const form = $("addTileForm");
   const url = $("tileUrl");
   const status = $("tileStatus");
@@ -167,13 +167,13 @@ export function wireFavouriteForm({ onNavigate }) {
     if (open) url.focus();
   };
 
-  $("addFavourite").addEventListener("click", () => show(form.hidden));
+  $("addFavorite").addEventListener("click", () => show(form.hidden));
   $("cancelTile").addEventListener("click", () => show(false));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const result = addFavourite(await readFavourites(), {
+    const result = addFavorite(await readFavorites(), {
       url: url.value,
       name: $("tileName").value,
     });
@@ -183,10 +183,10 @@ export function wireFavouriteForm({ onNavigate }) {
       return;
     }
 
-    await saveFavourites(result.favourites);
+    await saveFavorites(result.favorites);
     url.value = "";
     $("tileName").value = "";
     show(false);
-    await renderFavourites({ onNavigate });
+    await renderFavorites({ onNavigate });
   });
 }

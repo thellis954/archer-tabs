@@ -44,9 +44,11 @@ export function renderRows(list, rows, { onOpen, onPin, onDismiss }) {
 
     if (row.kind === CONVERSATION) {
       title.textContent = row.title;
-      // An em dash only reads as a separator when there is something after it.
-      description.textContent = row.prompt ? `— ${row.prompt}` : "";
-      node.setAttribute("aria-label", row.prompt ? `${row.title} — ${row.prompt}` : row.title);
+      // With more than one assistant in the list, a row has to say which one it
+      // came from — otherwise two identical-looking rows go to different places.
+      const detail = row.prompt ? `${row.provider ?? ""} · ${row.prompt}`.replace(/^ · /, "") : row.provider ?? "";
+      description.textContent = detail ? `— ${detail}` : "";
+      node.setAttribute("aria-label", detail ? `${row.title} — ${detail}` : row.title);
     } else if (row.kind === PROMPT_ROW) {
       title.textContent = row.text;
       description.textContent = SUFFIX[PROMPT_ROW];

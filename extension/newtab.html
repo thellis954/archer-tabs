@@ -139,7 +139,11 @@
           </button>
 
           <ul class="modeMenu plusMenu" id="plusMenu" role="menu" aria-label="Add to the prompt" hidden>
-            <li role="menuitem" data-action="paste" tabindex="0">
+            <li role="menuitem" data-action="attach" tabindex="0">
+              <span class="modeName">Attach a text file</span>
+              <span class="modeHint">Reads it here and adds its contents to your prompt. Code, notes, CSV, JSON.</span>
+            </li>
+            <li role="menuitem" data-action="paste" tabindex="-1">
               <span class="modeName">Paste clipboard</span>
               <span class="modeHint">Adds whatever you last copied to the end of the box.</span>
             </li>
@@ -161,6 +165,11 @@
             </li>
           </ul>
         </div>
+
+        <!-- Never shown; the + menu clicks it. An <input type=file> is the only
+             way to read a file without a permission, and it is entirely local. -->
+        <input type="file" id="attachInput" class="visuallyHidden" tabindex="-1" aria-hidden="true"
+               accept=".txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.sh,.sql,.log,text/*">
 
         <input
           id="query"
@@ -187,6 +196,25 @@
 
       </div>
     </form>
+
+    <!-- Attachments are chips, not text pasted into the box. An <input type=text>
+         strips newlines, so inlining a file destroyed it; and a chip can be
+         removed, which inlined text cannot. -->
+    <ul class="attachments" id="attachments" aria-label="Attached files"></ul>
+    <p class="attachStatus" id="attachStatus" hidden role="status"></p>
+
+    <template id="chipTemplate">
+      <li class="chip">
+        <svg class="chipIcon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M5.5 3.5h6l3.5 3.5v9.5h-9.5z"/><path d="M11.5 3.5V7h3.5"/>
+        </svg>
+        <span class="chipName"></span>
+        <span class="chipSize"></span>
+        <button type="button" class="chipRemove">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 6l8 8M14 6l-8 8"/></svg>
+        </button>
+      </li>
+    </template>
 
     <!-- The streamed answer. Text only: everything in here comes back from the
          API, and is written with textContent. -->
@@ -300,12 +328,12 @@
       </button>
     </p>
 
-    <!-- Favourites. Tile faces are monograms drawn from the site's own name —
+    <!-- Favorites. Tile faces are monograms drawn from the site's own name —
          no favicon fetch, no permission, works offline. -->
-    <section class="favourites" id="favourites">
-      <div class="favouritesHead">
-        <h2 class="favouritesTitle">Favourites</h2>
-        <button type="button" class="addFavourite" id="addFavourite">
+    <section class="favorites" id="favorites">
+      <div class="favoritesHead">
+        <h2 class="favoritesTitle">Favorites</h2>
+        <button type="button" class="addFavorite" id="addFavorite">
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12"/></svg>
           Add
         </button>
@@ -313,7 +341,7 @@
 
       <ul class="tiles" id="tiles"></ul>
 
-      <p class="empty favouritesEmpty" id="favouritesEmpty" hidden>
+      <p class="empty favoritesEmpty" id="favoritesEmpty" hidden>
         Nothing pinned here yet. Add the handful of places you open without thinking.
       </p>
 

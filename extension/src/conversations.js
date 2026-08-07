@@ -25,16 +25,72 @@ export const LINK_KINDS = new Set([CONVERSATION, SITE, CLOSED]);
  */
 export const BIND_WINDOW_MS = 2 * 60_000;
 
-const CONVERSATION_URL = /^https:\/\/chatgpt\.com\/c\/([0-9a-f-]{36})(?:[/?#]|$)/i;
+/**
+ * The assistants whose conversations Archer can recognise in history.
+ *
+ * Host is matched by parsing the URL and comparing the host exactly — never by
+ * regex against the whole string, which is how `chatgpt.com.evil.com/c/<uuid>`
+ * would otherwise pass and become a row's link target.
+ *
+ * The path patterns are deliberately generous about prefixes: a conversation
+ * with a custom GPT lives at `/g/g-xxxx/c/<uuid>`, and matching only `/c/<uuid>`
+ * silently dropped every one of them.
+ */
+export const PROVIDERS = [
+  {
+    id: "chatgpt",
+    label: "ChatGPT",
+    // chat.openai.com is the old address. It still fills a lot of history, and
+    // the conversations are the same ones.
+    hosts: ["chatgpt.com", "chat.openai.com"],
+    path: /^\/(?:g\/[^/]+\/)?c\/([0-9a-f-]{36})(?:[/?#]|$)/i,
+    url: (id) => `https://chatgpt.com/c/${id}`,
+    // What to search history for. Chrome's history search is a loose text
+    // match, so this is the broad net; `path` is the actual filter.
+    query: "chatgpt.com",
+    extraQueries: ["chat.openai.com"],
+  },
+  {
+    id: "claude",
+    label: "Claude",
+    hosts: ["claude.ai"],
+    path: /^\/chat\/([0-9a-f-]{36})(?:[/?#]|$)/i,
+    url: (id) => `https://claude.ai/chat/${id}`,
+    query: "claude.ai",
+  },
+];
+
+/**
+ * @returns {{provider: object, id: string, url: string}|null}
+ */
+export function identify(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl ?? ""));
+  } catch {
+    return null;
+  }
+  // https only: these are link targets clicked from a privileged origin.
+  if (parsed.protocol !== "https:") return null;
+
+  const host = parsed.host.toLowerCase().replace(/^www\./, "");
+  const provider = PROVIDERS.find((p) => p.hosts.includes(host));
+  if (!provider) return null;
+
+  const found = provider.path.exec(parsed.pathname);
+  if (!found) return null;
+
+  const id = found[1].toLowerCase();
+  return { provider, id, url: provider.url(id) };
+}
 
 /** @returns {string|null} the conversation UUID, lowercased. */
 export function conversationId(url) {
-  const found = CONVERSATION_URL.exec(String(url ?? ""));
-  return found ? found[1].toLowerCase() : null;
+  return identify(url)?.id ?? null;
 }
 
 /** The canonical address of a conversation, rebuilt rather than passed through. */
-export const conversationURL = (id) => `https://chatgpt.com/c/${id}`;
+export const conversationURL = (url) => identify(url)?.url ?? null;
 
 /**
  * @param {object} input
@@ -106,24 +162,34 @@ function browsingRows(sites, closed, dropped, recall) {
   return rows;
 }
 
+/** "ChatGPT", "Claude", "Claude.ai" — a tab that was never named. */
+function isBareProductName(title) {
+  const flat = title.toLowerCase().replace(/[\s.]/g, "");
+  return ["chatgpt", "claude", "claudeai", "openai", "newchat"].includes(flat);
+}
+
 function collapseVisits(visits) {
   const byId = new Map();
 
   for (const visit of visits) {
-    const id = conversationId(visit?.url);
-    if (!id) continue;
+    const found = identify(visit?.url);
+    if (!found) continue;
+    const { provider, id, url } = found;
 
     // Chrome records the tab title as it was at visit time. Before the model
-    // names the conversation that is just "ChatGPT", which is no use as a row.
-    const title = String(visit.title ?? "").trim();
-    if (!title || title.toLowerCase() === "chatgpt") continue;
+    // names the conversation that is just the product name, which is no use as
+    // a row — and the browser's own tab title often carries a suffix.
+    const title = String(visit.title ?? "")
+      .replace(/\s*[|·—-]\s*(ChatGPT|Claude)\s*$/i, "")
+      .trim();
+    if (!title || isBareProductName(title)) continue;
 
     const last = Number(visit.lastVisitTime) || 0;
     const first = Number(visit.firstVisitTime ?? visit.lastVisitTime) || 0;
     const existing = byId.get(id);
 
     if (!existing) {
-      byId.set(id, { kind: CONVERSATION, id, url: conversationURL(id), title, at: last, firstVisit: first });
+      byId.set(id, { kind: CONVERSATION, id, url, title, at: last, firstVisit: first, provider: provider.label });
       continue;
     }
     // The newest visit wins the title — conversations get renamed.

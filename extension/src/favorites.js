@@ -1,10 +1,10 @@
-// The favourites bar.
+// The favorites bar.
 //
 // Pure: normalising what someone types into a tile, and working out what to
 // draw on it. Storage lives in settings.js, rendering in newtab.js.
 
 /**
- * Only http(s) is ever navigable from this page, so a favourite is only ever
+ * Only http(s) is ever navigable from this page, so a favorite is only ever
  * http(s) — the same rule classify.js enforces for the search box. A tile is a
  * link the user clicks, so `javascript:` here would be as dangerous as it is
  * there.
@@ -102,17 +102,17 @@ export function hueFor(seed) {
 /**
  * @param {Array} existing
  * @param {{url: string, name?: string}} input
- * @returns {{ok: true, favourites: Array} | {ok: false, reason: string}}
+ * @returns {{ok: true, favorites: Array} | {ok: false, reason: string}}
  */
-export function addFavourite(existing, input) {
+export function addFavorite(existing, input) {
   const url = normaliseURL(input?.url);
   if (!url) return { ok: false, reason: "That does not look like a web address." };
 
   const list = Array.isArray(existing) ? existing : [];
   if (list.some((f) => f.url === url)) return { ok: false, reason: "That one is already here." };
 
-  return { ok: true, favourites: [...list, { id: url, url, name: nameFor(url, input?.name) }] };
+  return { ok: true, favorites: [...list, { id: url, url, name: nameFor(url, input?.name) }] };
 }
 
-export const removeFavourite = (existing, id) =>
+export const removeFavorite = (existing, id) =>
   (Array.isArray(existing) ? existing : []).filter((f) => f.id !== id);

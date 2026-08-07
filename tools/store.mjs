@@ -82,7 +82,7 @@ const SEED = {
     low: 20,
     at: Date.now(),
   },
-  favourites: [
+  favorites: [
     ["youtube.com", "YouTube"],
     ["github.com", "GitHub"],
     ["chatgpt.com", "ChatGPT"],
