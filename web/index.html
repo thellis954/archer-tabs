@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Archer - a calm new tab for Chrome</title>
-<meta name="description" content="One box on every new tab. Type a question and it goes to your AI. Type an address and you land there. Archer works out which you meant, using the real IANA top-level domain list.">
+<title>Archer - a smarter new tab for Chrome</title>
+<meta name="description" content="Open a new tab and just start typing. Questions go to ChatGPT, Claude or Perplexity. Websites just open. Free, and nothing about you leaves your computer.">
 
-<meta property="og:title" content="Archer - a calm new tab for Chrome">
-<meta property="og:description" content="Ask a question or type a URL. Archer works out which you meant.">
+<meta property="og:title" content="Archer - a smarter new tab for Chrome">
+<meta property="og:description" content="Open a new tab and just start typing. Archer works out whether you want an answer or a website.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://archertabs.app">
 <meta property="og:image" content="https://archertabs.app/assets/og.png">
@@ -34,21 +34,19 @@
     <span class="brandName">Archer</span>
   </a>
   <nav aria-label="Sections">
-    <a href="#decision">How it decides</a>
-    <a href="#page">The page</a>
-    <a href="#modes">Modes</a>
+    <a href="#how">How it works</a>
+    <a href="#page">Your new tab</a>
     <a href="#privacy">Privacy</a>
-    <a class="navCta" href="#install">Install</a>
+    <a class="navCta" href="#install">Get it</a>
   </nav>
 </header>
 
 <main id="main">
 
   <!--
-    HERO. Asymmetric split: the argument on the left, a working copy of the
-    product on the right. The box is not a picture of the box. It runs
-    /vendor/router.js, which tools/lint.js pins byte-for-byte to the
-    extension/src/router.js that ships to Chrome.
+    HERO. The box on the right is the real extension running, not a picture of
+    it: app.js imports /vendor/router.js, which tools/lint.js pins byte-for-byte
+    to the module Chrome loads. Everything the readout says is computed live.
   -->
   <section class="hero">
     <picture class="heroArc">
@@ -58,23 +56,19 @@
     </picture>
 
     <div class="heroCopy">
-      <p class="eyebrow">Chrome extension</p>
-      <h1>Ask, or&nbsp;go.</h1>
+      <p class="eyebrow">Free for Chrome</p>
+      <h1>Just start&nbsp;typing.</h1>
       <p class="lede">
-        Type a question and it goes to your AI. Type an address and you just
-        land&nbsp;there.
+        Open a new tab and type whatever is on your mind. Questions go to your
+        AI. Websites just open. You never have to&nbsp;pick.
       </p>
       <div class="cta">
-        <a class="btn primary" href="#install">Install</a>
-        <a class="btn" href="https://github.com/thellis954/archer-tabs">Source</a>
+        <a class="btn primary" href="#install">Get Archer</a>
+        <a class="btn" href="#how">See how it works</a>
       </div>
     </div>
 
     <div class="heroDemo">
-      <!--
-        A real component preview, not a screenshot and not a div dressed up as
-        one. Everything below the box is computed by the shipped classifier.
-      -->
       <div class="demo" id="demo">
         <div class="demoChrome">
           <svg class="demoMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -83,21 +77,21 @@
           </svg>
           <span class="demoName">Archer</span>
 
-          <label class="demoModeLabel" for="demoMode">Mode</label>
+          <label class="demoModeLabel" for="demoMode">Send questions to</label>
           <select class="demoMode" id="demoMode">
-            <option value="auto" selected>Auto</option>
-            <option value="chatgpt">ChatGPT</option>
+            <option value="chatgpt" selected>ChatGPT</option>
             <option value="claude">Claude</option>
             <option value="perplexity">Perplexity</option>
-            <option value="search">Search</option>
-            <option value="answer">Answer here</option>
+            <option value="auto">My usual search</option>
+            <option value="answer">Answer right here</option>
+            <option value="search">Search only</option>
           </select>
         </div>
 
         <form class="demoForm" id="demoForm">
-          <label class="visuallyHidden" for="demoInput">Ask a question or enter a URL</label>
+          <label class="visuallyHidden" for="demoInput">Ask a question or type a website</label>
           <div class="demoBox">
-            <input id="demoInput" type="text" placeholder="Ask or type a URL"
+            <input id="demoInput" type="text" placeholder="Ask ChatGPT, or type a URL"
                    autocomplete="off" spellcheck="false"
                    aria-describedby="demoVerdict">
             <button type="submit" class="demoSend" id="demoSend" aria-label="Go" disabled>
@@ -109,196 +103,105 @@
         </form>
 
         <p class="demoVerdict" id="demoVerdict" role="status" data-state="idle">
-          <span class="demoTag" id="demoTag">Waiting</span>
-          <span class="demoWhat" id="demoWhat">Type anything. The verdict updates as you go.</span>
+          <span class="demoTag" id="demoTag" aria-hidden="true"></span>
+          <span class="demoWhat" id="demoWhat">Try typing something. This box is really working.</span>
         </p>
 
-        <ul class="demoTries" id="demoTries" aria-label="Examples to try">
-          <li><button type="button" data-q="claude.ai">claude.ai</button></li>
-          <li><button type="button" data-q="node.js">node.js</button></li>
-          <li><button type="button" data-q="localhost:3000">localhost:3000</button></li>
-          <li><button type="button" data-q="how do I rebase onto main">how do I rebase onto main</button></li>
+        <ul class="demoTries" id="demoTries" aria-label="Things to try">
+          <li><button type="button" data-q="what should I make for dinner">what should I make for dinner</button></li>
+          <li><button type="button" data-q="netflix.com">netflix.com</button></li>
+          <li><button type="button" data-q="how do I get a grass stain out">how do I get a grass stain out</button></li>
         </ul>
       </div>
+      <p class="demoFoot">Go on, type in it. It is the real thing, not a video.</p>
     </div>
   </section>
 
   <!--
-    THE DECISION. A sticky specimen panel plus a scrolling column of the six
-    rules, in the order classify.js actually applies them. IntersectionObserver
-    drives it, never a scroll listener.
+    HOW IT WORKS. The old version of this section walked through the six rules
+    in classify.js in order, with javascript: and userinfo-in-the-authority as
+    worked examples. True, and completely wrong for anyone who is not an
+    engineer. Same mechanic, same live classifier, ordinary things to type.
   -->
-  <section class="decision" id="decision">
-    <div class="decisionHead">
-      <h2>It reads what you typed before it moves.</h2>
+  <section class="how" id="how">
+    <div class="howHead">
+      <h2>It can tell a question from a website.</h2>
       <p class="sectionLede">
-        Most launchers look for a dot and hope. Archer runs a fixed sequence of
-        rules against the string, and the first one that matches wins. Here is
-        the whole sequence, in order.
+        That is the whole trick, and you never have to think about it. Scroll
+        through a few things you might type and watch where each one goes.
       </p>
     </div>
 
-    <div class="decisionGrid">
+    <div class="howGrid">
 
       <div class="specimenWrap">
-        <figure class="specimen" id="specimen" data-verdict="url">
-          <figcaption class="specimenCap">You typed</figcaption>
-          <p class="specimenText" id="specimenText">https://archertabs.app</p>
-          <div class="specimenRule">
-            <span class="specimenRuleNo" id="specimenNo">1</span>
-            <span class="specimenRuleText" id="specimenRule">Already carries http or https</span>
-          </div>
-          <p class="specimenVerdict">
-            <span class="verdictBadge" id="specimenBadge">Go</span>
-            <span class="verdictNote" id="specimenNote">Opens the address. Nothing is searched.</span>
+        <figure class="specimen" id="specimen" data-verdict="prompt">
+          <figcaption class="specimenCap">You type</figcaption>
+          <p class="specimenText" id="specimenText">what should I make for dinner</p>
+          <p class="specimenArrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v15M6.5 13.5 12 19l5.5-5.5"/></svg>
+          </p>
+          <p class="specimenOut">
+            <span class="verdictBadge" id="specimenBadge">Asks ChatGPT</span>
+            <span class="verdictNote" id="specimenNote">Your question lands in ChatGPT, ready to go.</span>
           </p>
         </figure>
       </div>
 
-      <ol class="rules" id="rules">
-        <li class="rule" data-specimen="https://archertabs.app" data-verdict="url"
-            data-rule="Already carries http or https"
-            data-note="Opens the address. Nothing is searched.">
-          <h3><span class="ruleNo">1</span> An explicit scheme settles it</h3>
+      <ol class="scenes" id="scenes">
+        <li class="scene" data-specimen="what should I make for dinner" data-verdict="prompt"
+            data-badge="Asks ChatGPT"
+            data-note="Your question lands in ChatGPT, ready to go.">
+          <h3>A question you would normally search</h3>
           <p>
-            If the string already starts with <code>http://</code> or
-            <code>https://</code>, you have told Archer it is a place. It goes,
-            and no other rule runs.
+            Anything that reads like a sentence goes to whichever AI you picked.
+            No quotes, no special key, no menu. You type it and press Enter.
           </p>
         </li>
 
-        <li class="rule" data-specimen="vue.js tutorial" data-verdict="prompt"
-            data-rule="Contains whitespace"
-            data-note="Goes to your AI. A URL never has a space in it.">
-          <h3><span class="ruleNo">2</span> Whitespace means it is a question</h3>
+        <li class="scene" data-specimen="netflix.com" data-verdict="url"
+            data-badge="Opens Netflix"
+            data-note="Straight there. Nothing gets searched, nothing gets asked.">
+          <h3>A website you already know</h3>
           <p>
-            A URL never contains a space. This single rule kills the largest
-            class of false positives on any launcher that just hunts for a dot.
-            <code>vue.js tutorial</code> and <code>3.5 vs 4 pricing</code> both
-            have dots, and both are questions.
+            Type an address and you just land on it, exactly like the address
+            bar. Archer does not get clever and turn it into a search.
           </p>
         </li>
 
-        <li class="rule" data-specimen="localhost:3000" data-verdict="url"
-            data-rule="localhost, bracketed IPv6, or a dotted IPv4"
-            data-note="Opens over plain http, because that is what these actually are.">
-          <h3><span class="ruleNo">3</span> Local addresses are addresses</h3>
+        <li class="scene" data-specimen="how do I get a grass stain out" data-verdict="prompt"
+            data-badge="Asks ChatGPT"
+            data-note="Long, short, messy, typo-ridden. It still knows this is a question.">
+          <h3>Even the ones with a dot in them</h3>
           <p>
-            <code>localhost:3000</code>, <code>[::1]:8080</code> and
-            <code>192.168.1.1</code> navigate, over plain <code>http</code>
-            rather than <code>https</code>, because that is what is listening.
-            This has to be checked before the scheme rule below, since
-            <code>localhost:3000</code> and a scheme are the same shape.
+            This is where most launchers trip. They spot a dot and assume you
+            meant a website. Archer checks properly, so
+            <span class="lede-em">node.js</span> stays a question and
+            <span class="lede-em">claude.ai</span> stays a website.
           </p>
         </li>
 
-        <li class="rule" data-specimen="javascript:alert(1)" data-verdict="prompt"
-            data-rule="Carries a scheme that is not http or https"
-            data-note="Never navigates. It is treated as text and handed to your AI.">
-          <h3><span class="ruleNo">4</span> Every other scheme is refused</h3>
+        <li class="scene" data-specimen="gmail.com" data-verdict="url"
+            data-badge="Opens Gmail"
+            data-note="One tab, one line, two completely different jobs.">
+          <h3>Back and forth, all day</h3>
           <p>
-            <code>javascript:</code>, <code>data:</code> and <code>file:</code>
-            classify as questions, never as places. The new tab page runs in a
-            privileged extension origin, so a <code>javascript:</code> URL would
-            execute <em>there</em>. A unit test asserts that no combination of
-            mode and modifier key can produce a non-http destination.
-          </p>
-        </li>
-
-        <li class="rule" data-specimen="google.com@evil.com" data-verdict="prompt"
-            data-rule="Userinfo sits in front of the host"
-            data-note="Refused. The host here is evil.com, not google.com.">
-          <h3><span class="ruleNo">5</span> Userinfo is a phishing shape</h3>
-          <p>
-            <code>google.com@evil.com</code> is a perfectly valid URL whose host
-            is <code>evil.com</code>. Anything with an <code>@</code> before the
-            host is refused. An address that genuinely needs credentials can
-            still be typed with an explicit scheme.
-          </p>
-        </li>
-
-        <li class="rule" data-specimen="node.js" data-verdict="prompt"
-            data-rule="Last label is not in the IANA registry"
-            data-note="Goes to your AI. There is no .js top-level domain.">
-          <h3><span class="ruleNo">6</span> The registry has the last word</h3>
-          <p>
-            What is left gets split on its dots, and the final label is looked up
-            in the real IANA list of top-level domains. <code>claude.ai</code> is
-            a place. <code>node.js</code> is not, because <code>.js</code> is not
-            a top-level domain and never has been.
+            The point is not any single one of these. It is that you stop
+            deciding. One box handles both, every time you open a tab.
           </p>
         </li>
       </ol>
     </div>
   </section>
 
-  <!--
-    THE LAB. Same classifier, but the reader drives. Modifier toggles map to
-    router.js's `force` argument, which is how Cmd+Enter and Shift+Enter work in
-    the extension.
-  -->
-  <section class="lab" id="lab">
-    <div class="labHead">
-      <h2>Try to break it.</h2>
-      <p class="sectionLede">
-        Every string below is a real case from the extension's test suite. The
-        verdict is computed here, in your browser, by the same code Chrome runs.
-      </p>
-    </div>
-
-    <div class="labPanel">
-      <div class="labInputRow">
-        <label class="visuallyHidden" for="labInput">Something to classify</label>
-        <input id="labInput" type="text" value="claude.ai" spellcheck="false"
-               autocomplete="off" aria-describedby="labOut">
-        <div class="labForce" role="group" aria-label="Modifier key">
-          <button type="button" data-force="" class="on">Enter</button>
-          <button type="button" data-force="prompt">Cmd + Enter</button>
-          <button type="button" data-force="url">Shift + Enter</button>
-        </div>
-      </div>
-
-      <output class="labOut" id="labOut" data-verdict="url">
-        <span class="labBadge" id="labBadge">Go</span>
-        <span class="labDest" id="labDest">https://claude.ai</span>
-        <span class="labWhy" id="labWhy">The last label is a registered top-level domain.</span>
-      </output>
-
-      <div class="labChips">
-        <p class="labChipsTitle">Places</p>
-        <ul>
-          <li><button type="button" data-q="claude.ai">claude.ai</button></li>
-          <li><button type="button" data-q="localhost:3000">localhost:3000</button></li>
-          <li><button type="button" data-q="192.168.1.1">192.168.1.1</button></li>
-          <li><button type="button" data-q="en.wikipedia.org/wiki/Toxophily">en.wikipedia.org/wiki/Toxophily</button></li>
-          <li><button type="button" data-q="[::1]:8080">[::1]:8080</button></li>
-          <li><button type="button" data-q="example.co.uk">example.co.uk</button></li>
-        </ul>
-
-        <p class="labChipsTitle">Questions</p>
-        <ul>
-          <li><button type="button" data-q="node.js">node.js</button></li>
-          <li><button type="button" data-q="vue.js tutorial">vue.js tutorial</button></li>
-          <li><button type="button" data-q="3.5 vs 4 pricing">3.5 vs 4 pricing</button></li>
-          <li><button type="button" data-q="google.com@evil.com">google.com@evil.com</button></li>
-          <li><button type="button" data-q="javascript:alert(1)">javascript:alert(1)</button></li>
-          <li><button type="button" data-q="what.the">what.the</button></li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!--
-    THE PAGE. Image-led: the screenshot is regenerated by `npm run shots` from
-    the extension itself, so it cannot describe a version that no longer ships.
-  -->
+  <!-- YOUR NEW TAB. Image-led. The screenshot is regenerated from the
+       extension by `npm run shots`, so it cannot show a version that is gone. -->
   <section class="surface" id="page">
     <div class="surfaceHead">
-      <h2>The rest of the page earns its place.</h2>
+      <h2>A new tab that is actually nice to look at.</h2>
       <p class="sectionLede">
-        A clock, the weather, the sites you actually open, and the things you
-        were working on. No feed, no widgets, no sponsored tiles, nothing that
-        moves on its own.
+        The time, the weather, the handful of sites you really use, and whatever
+        you were in the middle of. No news feed, no ads, nothing blinking at you.
       </p>
     </div>
 
@@ -306,52 +209,50 @@
       <picture>
         <source srcset="/assets/newtab-dark.png" media="(prefers-color-scheme: dark)">
         <img src="/assets/newtab-light.png" width="1280" height="700" loading="lazy"
-             alt="The Archer new tab page: a weather card at top left reading 19 degrees, partly cloudy, Lisbon; the time and date above a faint A; a row of destination pills reading Search, ChatGPT, Claude and Perplexity; a rounded search box with a question typed in it; and a favourites bar of five monogram tiles.">
+             alt="The Archer new tab: a weather card at top left reading 19 degrees and partly cloudy in Lisbon, the time and a Good evening greeting, buttons for Search, ChatGPT, Claude and Perplexity, a search box with a question typed in it, and a row of colourful shortcut tiles.">
       </picture>
     </figure>
 
     <dl class="surfaceList">
       <div>
-        <dt>Clock and date</dt>
-        <dd>With the greeting and the time zone, so a tab opened on a borrowed machine says where it thinks it is.</dd>
+        <dt>The time, and a hello</dt>
+        <dd>With the date underneath, so a tab opened on someone else's laptop still makes sense.</dd>
       </div>
       <div>
-        <dt>Weather</dt>
-        <dd>From a place name you type, never from geolocation, and from an API that needs no account and no key.</dd>
+        <dt>Today's weather</dt>
+        <dd>You type the name of your town once. It never asks your device where you are.</dd>
       </div>
       <div>
-        <dt>Favourites</dt>
-        <dd>Monogram tiles, drawn from the site's own name. No favicon fetch, so nothing phones out to build them.</dd>
+        <dt>Your shortcuts</dt>
+        <dd>The sites you actually open, as colourful little tiles you can rearrange.</dd>
       </div>
       <div>
-        <dt>Recent conversations</dt>
-        <dd>The things you asked, with the prompt that started them, ready to pick back up.</dd>
+        <dt>What you were doing</dt>
+        <dd>Your recent chats, with the question that started them, one click from picking up again.</dd>
       </div>
     </dl>
   </section>
 
-  <!--
-    MODES. Six destinations, six cells, asymmetric. The cell count matches the
-    mode count in src/router.js exactly.
-  -->
+  <!-- PICK YOUR AI. Six modes from src/router.js, six cells. -->
   <section class="modes" id="modes">
     <div class="modesHead">
-      <h2>You decide where a question lands.</h2>
+      <h2>Use whichever AI you already like.</h2>
       <p class="sectionLede">
-        An address always just opens, in every mode but one. What changes is
-        where the <em>questions</em> go.
+        Archer does not have its own chatbot and is not trying to sell you one.
+        Point it at whatever you use and it stays out of the way.
       </p>
     </div>
 
     <div class="bento">
       <article class="cell cellWide">
-        <h3>Auto</h3>
+        <h3>ChatGPT, Claude or Perplexity</h3>
         <p>
-          Questions go to whatever you already set as Chrome's default search
-          engine. Point that at ChatGPT, Claude, Perplexity or Google, and Archer
-          follows without being told. It has no endpoint of its own.
+          Pick one and every question you type opens there, already written out
+          in the box, waiting for you to hit send. Switch whenever you feel like
+          it. You will need an account with them, the same free one you would
+          use anyway.
         </p>
-        <p class="cellMeta">The default</p>
+        <p class="cellMeta">Most people start here</p>
       </article>
 
       <article class="cell cellArt">
@@ -360,138 +261,139 @@
           <img src="/assets/arc-light.webp" alt="" aria-hidden="true" loading="lazy"
                width="1200" height="900">
         </picture>
-        <h3>Answer here</h3>
+        <h3>Or right on the page</h3>
         <p>
-          The question is answered on the new tab itself, streamed from your own
-          API key. Nothing is proxied, because there is no Archer server to proxy
-          it through.
+          Answers can appear on the new tab itself, without opening anything.
+          This one is for tinkerers: it needs your own OpenAI key, and you pay
+          them directly for what you use.
         </p>
       </article>
 
       <article class="cell">
-        <h3>ChatGPT</h3>
-        <p>Opens chatgpt.com with the question already in the composer.</p>
+        <h3>Google, or whatever you use</h3>
+        <p>Questions can just go to your normal search engine instead. Nothing changes.</p>
       </article>
 
       <article class="cell">
-        <h3>Claude</h3>
-        <p>Opens a new Claude conversation, prefilled the same way.</p>
+        <h3>Change your mind anytime</h3>
+        <p>The buttons sit right above the box. One click, no settings page.</p>
       </article>
 
       <article class="cell">
-        <h3>Perplexity</h3>
-        <p>Opens a Perplexity search with the question carried over.</p>
+        <h3>Hold a key to override</h3>
+        <p>Shift and Enter forces a website. Command and Enter forces a question.</p>
       </article>
 
       <article class="cell cellQuiet">
-        <h3>Search</h3>
+        <h3>Search only</h3>
         <p>
-          Nothing navigates. Every string is a query, even one shaped exactly
-          like an address. This is the sticky form of holding Cmd while you press
-          Enter.
+          If you would rather nothing ever opened by itself, turn this on and
+          every single thing you type becomes a search.
         </p>
       </article>
     </div>
   </section>
 
-  <!--
-    PRIVACY. The permissions ledger from docs/ROADMAP.md, split by the only
-    distinction that matters to someone reading an install prompt.
-  -->
+  <!-- PRIVACY. The permission ledger lives on /privacy now. This is the part a
+       person actually wants answered before installing anything. -->
   <section class="privacy" id="privacy">
     <div class="privacyHead">
-      <h2>Two permissions at install. That is the whole prompt.</h2>
+      <h2>It is not watching you.</h2>
       <p class="sectionLede">
-        Everything else is optional and asked for at the moment you click the
-        thing that needs it, which is the only moment your answer means anything.
+        This is the part worth reading before you install anything, so here it is
+        in plain words.
       </p>
     </div>
 
-    <div class="ledger">
-      <div class="ledgerCol ledgerNow">
-        <h3>Asked at install</h3>
-        <dl>
-          <div>
-            <dt>search</dt>
-            <dd>Hands a question to your default engine, whatever you set it to.</dd>
-          </div>
-          <div>
-            <dt>storage</dt>
-            <dd>Your mode, your saved prompts, your launch log. Local only.</dd>
-          </div>
-        </dl>
-        <p class="ledgerNote">
-          Notably absent: <code>tabs</code>. Retargeting the current tab does not
-          need it, and its prompt reads &ldquo;Read your browsing history&rdquo;.
+    <div class="promises">
+      <article>
+        <h3>No account, ever</h3>
+        <p>
+          Nothing to sign up for and no password to make. Install it and it
+          works.
         </p>
-      </div>
-
-      <div class="ledgerCol ledgerLater">
-        <h3>Asked at the click</h3>
-        <dl>
-          <div>
-            <dt>history</dt>
-            <dd>Turns your recent conversations into rows. Requested when you switch them on.</dd>
-          </div>
-          <div>
-            <dt>api.openai.com</dt>
-            <dd>Requested when you save an API key, and never before.</dd>
-          </div>
-          <div>
-            <dt>open-meteo.com</dt>
-            <dd>The weather card. Requested when you save a place name, and it sends that name and nothing else.</dd>
-          </div>
-          <div>
-            <dt>topSites</dt>
-            <dd>Adds the sites you visit most to the rows.</dd>
-          </div>
-          <div>
-            <dt>sessions and tabs</dt>
-            <dd>Recently closed tabs. This pair does cost the browsing-history prompt, and the menu says so.</dd>
-          </div>
-          <div>
-            <dt>clipboardRead</dt>
-            <dd>Only for the paste item in the plus menu.</dd>
-          </div>
-        </dl>
-      </div>
+      </article>
+      <article>
+        <h3>No tracking, no ads</h3>
+        <p>
+          There is no company server behind Archer collecting anything, because
+          one was never built. Nobody is counting your clicks.
+        </p>
+      </article>
+      <article>
+        <h3>It stays on your computer</h3>
+        <p>
+          Your settings and your recent questions are saved in your own browser.
+          Uninstall it and every bit of that goes with it.
+        </p>
+      </article>
+      <article>
+        <h3>It cannot read the web pages you visit</h3>
+        <p>
+          Archer only exists on the new tab. It has no way to see the sites you
+          browse, and it never asks for permission to.
+        </p>
+      </article>
     </div>
 
     <p class="privacyClose">
-      There is no Archer server, no account, and no telemetry. What you type goes
-      to the destination you chose, the same way it would from the address bar.
+      When you send a question to ChatGPT, it goes to ChatGPT. That is the only
+      place anything goes, and only when you press Enter.
+      <a href="/privacy">Read the full privacy policy</a>.
     </p>
   </section>
 
-  <!-- INSTALL. Steps only. The screenshot moved up to the page section, so it
-       is not used twice. -->
+  <!-- INSTALL. Honest: it is not on the Web Store yet, and that means a few
+       manual steps. Say so kindly rather than burying it. -->
   <section class="install" id="install">
-    <div class="installCopy">
-      <h2>About a minute, by hand.</h2>
+    <div class="installHead">
+      <h2>Getting it, for now.</h2>
       <p class="sectionLede">
-        Archer is not on the Chrome Web Store yet. Loading it unpacked works
-        today and takes four steps.
+        Archer is not in the Chrome Web Store yet, so there is no one-click
+        button to press. Adding it by hand takes about five minutes and you only
+        do it once. If that is not for you, the honest answer is to wait.
       </p>
-      <ol class="steps">
-        <li>
-          <h3>Get the source</h3>
-          <p><code>git clone https://github.com/thellis954/archer-tabs</code></p>
-        </li>
-        <li>
-          <h3>Turn on Developer mode</h3>
-          <p>Open <code>chrome://extensions</code>, then flip the switch at the top right.</p>
-        </li>
-        <li>
-          <h3>Load unpacked</h3>
-          <p>Pick the <code>extension</code> folder, not the repository root.</p>
-        </li>
-        <li>
-          <h3>Open a new tab</h3>
-          <p>That is it. Nothing to sign in to, nothing to configure.</p>
-        </li>
-      </ol>
+    </div>
+
+    <ol class="steps">
+      <li>
+        <h3>Download it</h3>
+        <p>
+          Open <a href="https://github.com/thellis954/archer-tabs">the project page</a>,
+          click the green <strong>Code</strong> button, then
+          <strong>Download ZIP</strong>. Unzip it somewhere you will remember,
+          like your Documents folder.
+        </p>
+      </li>
+      <li>
+        <h3>Open Chrome's extensions page</h3>
+        <p>
+          Type <span class="key">chrome://extensions</span> into the address bar
+          and press Enter. Turn on <strong>Developer mode</strong> with the
+          switch in the top right corner.
+        </p>
+      </li>
+      <li>
+        <h3>Add the folder</h3>
+        <p>
+          Click <strong>Load unpacked</strong>, then find the folder you unzipped
+          and choose the one inside it called <strong>extension</strong>. Not the
+          outer folder, the one named <em>extension</em>.
+        </p>
+      </li>
+      <li>
+        <h3>Open a new tab</h3>
+        <p>That is it. Nothing to sign in to, nothing to set up.</p>
+      </li>
+    </ol>
+
+    <div class="installFoot">
+      <p>
+        Want to know when it lands in the Chrome Web Store? Star the project and
+        GitHub will tell you.
+      </p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/thellis954/archer-tabs">Source</a>
+        <a class="btn primary" href="https://github.com/thellis954/archer-tabs">Go to the project page</a>
       </div>
     </div>
   </section>
@@ -508,14 +410,13 @@
       <span class="brandName">Archer</span>
     </a>
     <p>
-      Free software under the GPL-3.0. Not affiliated with OpenAI, Google, or
+      Archer is free and open source. Not affiliated with OpenAI, Google, or
       Anthropic.
     </p>
     <p class="footLinks">
       <a href="/privacy">Privacy policy</a>
-      <a href="https://github.com/thellis954/archer-tabs">Source</a>
-      <a href="https://github.com/thellis954/archer-tabs/issues">Report a problem</a>
-      <a href="https://github.com/thellis954/archer-tabs/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/thellis954/archer-tabs">Project page</a>
+      <a href="https://github.com/thellis954/archer-tabs/issues">Something wrong?</a>
     </p>
   </div>
 </footer>

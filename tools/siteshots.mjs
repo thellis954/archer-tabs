@@ -77,7 +77,7 @@ const SHOTS = [
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.fill("#demoInput", "en.wikipedia.org/wiki/Toxophily");
+      await page.fill("#demoInput", "netflix.com");
     },
   },
   {
@@ -86,27 +86,17 @@ const SHOTS = [
     height: 900,
     async prepare(page) {
       await page.selectOption("#demoMode", "claude");
-      await page.fill("#demoInput", "how do I rebase onto main");
+      await page.fill("#demoInput", "what should I make for dinner");
     },
   },
   {
-    // Mid-scrollytell: the sticky specimen should be showing rule 4, not rule 1.
-    name: "decision",
+    // Mid-walkthrough: the sticky panel should be on scene 3, not scene 1.
+    name: "how",
     width: 1440,
     height: 900,
     async prepare(page) {
-      await page.locator(".rule").nth(3).scrollIntoViewIfNeeded();
+      await page.locator(".scene").nth(2).scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
-    },
-  },
-  {
-    name: "lab",
-    width: 1440,
-    height: 900,
-    async prepare(page) {
-      await page.locator("#lab").scrollIntoViewIfNeeded();
-      await page.click('.labChips button[data-q="google.com@evil.com"]');
-      await page.waitForTimeout(400);
     },
   },
   {

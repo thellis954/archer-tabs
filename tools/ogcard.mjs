@@ -58,8 +58,8 @@ const card = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
   .brand .legs { fill: none; stroke: #141416; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
   .brand .bow  { fill: none; stroke: #B45309; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
   .brand span { font-size: 30px; font-weight: 600; letter-spacing: -0.015em; }
-  h1 { font-size: 132px; font-weight: 600; letter-spacing: -0.05em; line-height: 0.94; }
-  p { margin-top: 32px; font-size: 34px; color: #78706A; max-width: 22ch; line-height: 1.35; }
+  h1 { font-size: 112px; font-weight: 600; letter-spacing: -0.05em; line-height: 0.94; }
+  p { margin-top: 30px; font-size: 34px; color: #78706A; max-width: 24ch; line-height: 1.35; }
   .foot {
     position: absolute; left: 104px; bottom: 76px;
     font-family: "Geist Mono", monospace; font-size: 22px;
@@ -74,8 +74,8 @@ const card = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     </svg>
     <span>Archer</span>
   </div>
-  <h1>Ask, or&nbsp;go.</h1>
-  <p>A calm new tab for Chrome.</p>
+  <h1>Just start&nbsp;typing.</h1>
+  <p>A smarter new tab for Chrome.</p>
   <div class="foot">archertabs.app</div>
 </body></html>`;
 

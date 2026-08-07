@@ -195,9 +195,8 @@ code {
 
 /* --------------------------------------------------------------- shared -- */
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 12px; font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.16em;
+  font-size: 13px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.12em;
   color: var(--muted);
   margin-bottom: 1.25rem;
 }
@@ -261,8 +260,8 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
    as a rendering fault. */
 .heroArc {
   position: absolute;
-  right: -8%; bottom: -14%;
-  width: min(64%, 760px);
+  right: -10%; bottom: -22%;
+  width: min(58%, 680px);
   z-index: 0;
   pointer-events: none;
   opacity: 0.7;
@@ -325,8 +324,8 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 
 .demoModeLabel {
   margin-left: auto;
-  font-size: 12px; color: var(--muted);
-  font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 13px;
+  color: var(--muted);
 }
 /* The native control, restyled rather than replaced: a custom listbox here
    would be a second implementation of the extension's own mode menu, with its
@@ -398,28 +397,18 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   color: var(--muted);
 }
 .demoTag {
-  font-family: var(--mono);
-  font-size: 11.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--raised);
-  color: var(--muted);
+  font-size: 15.5px; font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--accent);
   white-space: nowrap;
-  transition: background 0.24s var(--ease), color 0.24s var(--ease),
-              border-color 0.24s var(--ease);
+  transition: color 0.24s var(--ease);
 }
+.demoTag:empty { display: none; }
 .demoWhat { flex: 1; min-width: 12ch; }
-.demoWhat b { font-weight: 500; color: var(--text); font-family: var(--mono); font-size: 13.5px; }
+.demoWhat b { font-weight: 500; color: var(--text); }
 
 /* Two verdicts, one accent. "Go" fills, "Ask" outlines. */
-.demoVerdict[data-state="url"] .demoTag {
-  background: var(--accent); border-color: var(--accent); color: var(--onAccent);
-}
-.demoVerdict[data-state="prompt"] .demoTag {
-  background: transparent; border-color: var(--accent); color: var(--accent);
-}
+.demoVerdict[data-state="idle"] .demoWhat { color: var(--muted); }
 
 .demoTries {
   display: flex; flex-wrap: wrap; gap: 0.4rem;
@@ -427,9 +416,9 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-.demoTries button, .labChips button {
-  font: inherit; font-family: var(--mono);
-  font-size: 12.5px;
+.demoTries button {
+  font: inherit;
+  font-size: 13px;
   padding: 0.32rem 0.7rem;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
@@ -439,20 +428,20 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   transition: color 0.16s var(--ease), border-color 0.16s var(--ease),
               transform 0.16s var(--ease);
 }
-.demoTries button:hover, .labChips button:hover {
+.demoTries button:hover {
   color: var(--accent); border-color: var(--accent); transform: translateY(-1px);
 }
-.demoTries button:active, .labChips button:active { transform: translateY(0); }
+.demoTries button:active { transform: translateY(0); }
 
 /* ------------------------------------------------------ the decision ----- */
-.decision {
+.how {
   max-width: var(--shell);
   margin: 0 auto;
   padding: 0 var(--gutter) var(--band);
 }
-.decisionHead { max-width: 62ch; margin-bottom: clamp(3rem, 6vw, 5rem); }
+.howHead { max-width: 62ch; margin-bottom: clamp(3rem, 6vw, 5rem); }
 
-.decisionGrid {
+.howGrid {
   display: grid;
   grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
   gap: clamp(2rem, 5vw, 5rem);
@@ -477,14 +466,10 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   padding: clamp(1.25rem, 2.4vw, 1.9rem);
   box-shadow: 0 1px 2px var(--scrim), 0 30px 60px -44px var(--scrim);
 }
-.specimenCap {
-  font-family: var(--mono);
-  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em;
-  color: var(--muted);
-}
+.specimenCap { font-size: 13.5px; color: var(--muted); }
 .specimenText {
   font-family: var(--mono);
-  font-size: clamp(15px, 1.9vw, 21px);
+  font-size: clamp(15px, 1.8vw, 19px);
   font-weight: 500;
   letter-spacing: -0.02em;
   margin-top: 0.7rem;
@@ -492,42 +477,35 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   min-height: 2.4em;
 }
 
-.specimenRule {
-  display: flex; align-items: flex-start; gap: 0.7rem;
-  margin-top: 1.25rem; padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  font-size: 14.5px; color: var(--muted);
-  min-height: 4.2em;
-}
-.specimenRuleNo {
-  flex: none;
-  width: 22px; height: 22px;
-  display: grid; place-items: center;
-  border-radius: var(--r-pill);
-  background: var(--accent); color: var(--onAccent);
-  font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+/* An arrow, not a rule number. The panel used to name which branch of
+   classify.js had fired, which is exactly the wrong thing to show someone
+   deciding whether to install a browser extension. */
+.specimenArrow { margin: 1.1rem 0; }
+.specimenArrow svg { width: 26px; height: 26px; }
+.specimenArrow path {
+  fill: none; stroke: var(--accent);
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
 
-.specimenVerdict {
-  display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
-  margin-top: 1.25rem;
-  font-size: 14.5px; color: var(--muted);
+.specimenOut {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem;
+  font-size: 15px; color: var(--muted);
+  min-height: 5.5em;
 }
+/* Plain words, sentence case, in the body face. This was mono uppercase
+   reading GO and ASK, which looked like a status code. */
 .verdictBadge {
-  font-family: var(--mono);
-  font-size: 11.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 0.25rem 0.7rem;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--accent);
-  white-space: nowrap;
+  font-size: clamp(17px, 2.2vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
-.specimen[data-verdict="url"] .verdictBadge { background: var(--accent); color: var(--onAccent); }
-.specimen[data-verdict="prompt"] .verdictBadge { background: transparent; color: var(--accent); }
-.verdictNote { flex: 1; min-width: 14ch; }
+.specimen[data-verdict="url"] .verdictBadge,
+.specimen[data-verdict="prompt"] .verdictBadge { color: var(--accent); }
+.verdictNote { max-width: 34ch; }
 
-.rules { display: grid; gap: clamp(2.5rem, 6vw, 4.5rem); }
-.rule {
+.scenes { display: grid; gap: clamp(2.5rem, 6vw, 4.5rem); }
+.scene {
   padding-left: 1.5rem;
   border-left: 2px solid var(--border);
   transition: border-color 0.4s var(--ease), opacity 0.4s var(--ease);
@@ -535,111 +513,49 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
      just want to read the list straight through. */
   opacity: 0.66;
 }
-.rule.active { border-left-color: var(--accent); opacity: 1; }
-.rule h3 { display: flex; align-items: baseline; gap: 0.7rem; font-size: clamp(1.1rem, 2vw, 1.45rem); }
-.ruleNo {
+.scene.active { border-left-color: var(--accent); opacity: 1; }
+.scene h3 { display: flex; align-items: baseline; gap: 0.7rem; font-size: clamp(1.1rem, 2vw, 1.45rem); }
+.sceneNo {
   font-family: var(--mono); font-size: 12px; font-weight: 600;
   color: var(--accent);
 }
-.rule p { margin-top: 0.8rem; color: var(--muted); max-width: 52ch; }
+.scene p { margin-top: 0.8rem; color: var(--muted); max-width: 52ch; }
 
 @media (max-width: 900px) {
-  .decisionGrid { grid-template-columns: 1fr; gap: 2rem; }
+  .howGrid { grid-template-columns: 1fr; gap: 2rem; }
   .specimenWrap { top: var(--nav); z-index: 20; }
   .specimen { box-shadow: 0 12px 24px -18px var(--scrim); }
   .specimenText { min-height: 0; }
-  .specimenRule { min-height: 0; }
-  .rule { opacity: 1; }
+  .specimenOut { min-height: 0; }
+  .scene { opacity: 1; }
   /* No room to centre anything on a phone: back to a plain pinned header. */
   .specimenWrap { height: auto; display: block; padding-top: 0.75rem; background: var(--bg); }
 }
 
-/* ------------------------------------------------------------- the lab --- */
-.lab {
-  background: var(--raised);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: var(--band) var(--gutter);
-}
-.labHead { max-width: var(--shell); margin: 0 auto clamp(2.5rem, 5vw, 4rem); }
-
-.labPanel {
-  max-width: var(--shell);
-  margin: 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  padding: clamp(1.25rem, 3vw, 2.25rem);
-}
-
-.labInputRow {
-  display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
-}
-.labInputRow input {
-  flex: 1 1 22ch; min-width: 0;
-  font: inherit; font-family: var(--mono); font-size: clamp(15px, 1.7vw, 18px);
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 0.75rem 1.15rem;
-  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-.labInputRow input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.labForce { display: flex; gap: 0.3rem; background: var(--raised);
-  border: 1px solid var(--border); border-radius: var(--r-pill); padding: 0.25rem; }
-.labForce button {
-  font: inherit; font-size: 13px; font-weight: 500;
+/* A nudge under the demo. The box looks like a screenshot until someone
+   realises it is not, and most people will not try it unprompted. */
+.demoFoot {
+  margin-top: 0.85rem;
+  padding-left: 0.35rem;
+  font-size: 13.5px;
   color: var(--muted);
-  background: none; border: 0;
-  border-radius: var(--r-pill);
-  padding: 0.4rem 0.85rem;
-  cursor: pointer; white-space: nowrap;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  position: relative;
+  z-index: 1;
 }
-.labForce button:hover { color: var(--text); }
-.labForce button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--scrim); }
 
-.labOut {
-  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
-  margin-top: 1.5rem; padding: 1.15rem 1.25rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  min-height: 4.5rem;
-}
-.labBadge {
+/* Inline emphasis inside body copy: the two example strings in the walkthrough
+   are the only place the site still shows something typed. */
+.lede-em, .key {
   font-family: var(--mono);
-  font-size: 11.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 0.3rem 0.75rem;
+  font-size: 0.88em;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  border: 1px solid var(--accent);
+  padding: 0.1em 0.4em;
   white-space: nowrap;
 }
-.labOut[data-verdict="url"] .labBadge { background: var(--accent); color: var(--onAccent); }
-.labOut[data-verdict="prompt"] .labBadge { background: transparent; color: var(--accent); }
-.labDest {
-  font-family: var(--mono); font-size: clamp(14px, 1.6vw, 16px); font-weight: 500;
-  word-break: break-all;
-}
-.labWhy { flex-basis: 100%; color: var(--muted); font-size: 14.5px; }
-
-.labChips { margin-top: 2rem; }
-.labChipsTitle {
-  font-family: var(--mono);
-  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em;
-  color: var(--muted);
-  margin-bottom: 0.7rem;
-}
-.labChips ul { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem; }
-.labChips ul:last-child { margin-bottom: 0; }
-.labChips button { background: var(--raised); }
 
 /* ------------------------------------------------------- the whole page -- */
 /* Image-led, and the only section that is. The screenshot is the argument. */
@@ -695,8 +611,8 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .cellWide h3 { font-size: clamp(1.3rem, 2.6vw, 1.85rem); }
 .cellWide p { font-size: 16.5px; max-width: 48ch; }
 .cellMeta {
-  font-family: var(--mono); font-size: 11.5px !important;
-  text-transform: uppercase; letter-spacing: 0.14em;
+  font-size: 13.5px !important;
+  font-weight: 500;
   color: var(--accent) !important;
   margin-top: 1.25rem !important;
 }
@@ -765,62 +681,46 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .privacyHead { max-width: var(--shell); margin: 0 auto clamp(2.5rem, 5vw, 4rem); }
 .privacyHead h2 { max-width: 24ch; }
 
-.ledger {
+/* Four plain promises. The permission-by-permission ledger this replaced was
+   accurate and unreadable; it lives on /privacy, where someone who wants that
+   level of detail goes looking for it. */
+.promises {
   max-width: var(--shell); margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
-  /* Two entries on the left against five on the right: stretching the short
-     column to match leaves it two thirds empty. */
-  align-items: start;
 }
-.ledgerCol {
+.promises article {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  padding: clamp(1.25rem, 2.6vw, 2rem);
+  padding: clamp(1.25rem, 2.4vw, 1.75rem);
 }
-.ledgerNow { border-color: var(--accent); }
-.ledgerCol h3 {
-  font-family: var(--mono);
-  font-size: 11.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.14em;
-  color: var(--muted);
-}
-.ledgerNow h3 { color: var(--accent); }
-
-.ledgerCol dl { margin: 1.25rem 0 0; display: grid; gap: 1.1rem; }
-.ledgerCol dt {
-  font-family: var(--mono); font-size: 14.5px; font-weight: 500;
-  letter-spacing: -0.01em;
-}
-.ledgerCol dd { margin: 0.25rem 0 0; color: var(--muted); font-size: 15px; }
-
-.ledgerNote {
-  margin-top: 1.5rem; padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted); font-size: 14.5px;
-}
+.promises h3 { font-size: 1.02rem; }
+.promises p { margin-top: 0.7rem; color: var(--muted); font-size: 15px; }
 
 .privacyClose {
-  max-width: 56ch;
+  max-width: 54ch;
   margin: clamp(2.5rem, 5vw, 4rem) auto 0;
   text-align: center;
   font-size: clamp(17px, 2vw, 21px);
   letter-spacing: -0.015em;
   line-height: 1.45;
 }
+.privacyClose a { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 
-@media (max-width: 800px) { .ledger { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .promises { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .promises { grid-template-columns: 1fr; } }
 
 /* --------------------------------------------------------- the install --- */
-/* Steps only now: the screenshot that used to sit beside them moved up to
-   the page section, where it is the subject rather than a decoration. */
+/* A single narrow column, centred. These are instructions someone is going to
+   follow with their other hand on the mouse, so they get a comfortable measure
+   rather than the full page width. */
 .install {
-  max-width: var(--shell); margin: 0 auto;
+  max-width: 720px; margin: 0 auto;
   padding: var(--band) var(--gutter);
 }
-.installCopy { max-width: 62ch; }
+.installHead { max-width: 62ch; }
 .steps { margin-top: clamp(2rem, 4vw, 3rem); display: grid; gap: 1.5rem; counter-reset: s; }
 .steps li {
   counter-increment: s;
@@ -837,7 +737,18 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   align-self: start;
 }
 .steps p { grid-column: 2; margin-top: 0.35rem; color: var(--muted); font-size: 15px; }
-.install .cta { margin-top: clamp(2rem, 4vw, 3rem); }
+.steps p strong { color: var(--text); font-weight: 600; }
+.steps a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.steps li { max-width: 62ch; }
+
+.installFoot {
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  padding-top: clamp(1.75rem, 4vw, 2.5rem);
+  border-top: 1px solid var(--border);
+  max-width: 62ch;
+}
+.installFoot p { color: var(--muted); }
+.installFoot .cta { margin-top: 1.25rem; }
 
 
 
@@ -967,10 +878,9 @@ footer {
   }
 
   /* The specimen swap is a state transition, so it gets a beat of its own. */
-  .specimenText, .specimenRuleText, .verdictNote { transition: opacity 0.25s var(--ease); }
+  .specimenText, .verdictBadge, .verdictNote { transition: opacity 0.25s var(--ease); }
   .specimen.swapping .specimenText,
-  .specimen.swapping .specimenRuleText,
-  .specimen.swapping .verdictNote { opacity: 0; }
+    .specimen.swapping .verdictNote { opacity: 0; }
 
   /* Section reveals, on the browser's own scroll timeline. No observer and no
      JS: an element the page never scrolls to simply renders in its finished
@@ -978,8 +888,15 @@ footer {
      browser without scroll-driven animations shows everything immediately
      rather than showing nothing. */
   @supports (animation-timeline: view()) {
-    .decisionHead, .labHead, .labPanel, .modesHead, .cell,
-    .privacyHead, .ledgerCol, .privacyClose, .installCopy,     @keyframes reveal {
+    .howHead, .surfaceHead, .surfaceShot, .surfaceList,
+    .modesHead, .cell,
+    .privacyHead, .promises article, .privacyClose,
+    .installHead, .steps li, .installFoot {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+    @keyframes reveal {
       from { opacity: 0; transform: translateY(26px); }
       to { opacity: 1; transform: none; }
     }

@@ -1,22 +1,22 @@
 // archertabs.app
 //
-// The point of this file: the site does not describe the classifier, it runs
-// it. `route` and `classify` below are imported from /vendor/, which
-// tools/lint.js pins byte-for-byte to extension/src/ - the modules Chrome
-// actually loads. If the extension's behaviour changes and the site's does not,
-// `npm run lint` fails. There is no second implementation to drift.
+// The demo in the hero is the real extension, not a mock-up: `route` below is
+// imported from /vendor/, which tools/lint.js pins byte-for-byte to
+// extension/src/ - the modules Chrome actually loads. If the extension's
+// behaviour changes and the site's does not, `npm run lint` fails.
 //
-// No scroll listeners anywhere. IntersectionObserver drives the scrollytelling
-// and the reveals, so nothing runs per frame.
+// What the reader is told, though, is written for a person rather than a
+// programmer. No verdict names, no rule numbers, no talk of classifiers: just
+// "Opens Netflix" or "Asks ChatGPT". The machinery is real; the vocabulary is
+// deliberately not.
+//
+// No scroll listeners anywhere. IntersectionObserver drives the walkthrough.
 
 import { route, placeholderFor, NAVIGATE, SEARCH, ASK, ANSWER, NONE } from "./vendor/router.js";
-import { classify, URL_KIND, PROMPT, EMPTY } from "./vendor/classify.js";
 
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------- the demo -- */
-/* Types a string, shows what the extension would do with it, and on submit
-   actually does the part a web page is allowed to do. */
 
 const demoInput = $("demoInput");
 const demoMode = $("demoMode");
@@ -25,43 +25,68 @@ const demoVerdict = $("demoVerdict");
 const demoTag = $("demoTag");
 const demoWhat = $("demoWhat");
 
-const DESTINATION = {
-  chatgpt: "ChatGPT",
-  claude: "Claude",
-  perplexity: "Perplexity",
-};
+const AI_NAME = { chatgpt: "ChatGPT", claude: "Claude", perplexity: "Perplexity" };
 
-/** What the extension would do, in words, plus whether this page can do it. */
+/**
+ * The name a person would use for a site, from its address. "netflix.com" reads
+ * as Netflix; "en.wikipedia.org" as Wikipedia. Cosmetic only, and it falls back
+ * to the address itself whenever the guess would be worse than the truth.
+ */
+function siteName(rawUrl) {
+  let host;
+  try {
+    host = new URL(rawUrl).hostname;
+  } catch {
+    return rawUrl;
+  }
+
+  // Leave anything that is not a plain dotted domain exactly as typed. An IP
+  // address, a bracketed IPv6 literal and localhost have no friendly name to
+  // give them, and inventing one ("Opens Localhost") reads as a bug.
+  if (!/^[a-z0-9.-]+$/i.test(host) || /^\d+\./.test(host)) return rawUrl;
+
+  const labels = host.replace(/^www\./i, "").split(".");
+  if (labels.length < 2) return rawUrl;
+
+  // The name is the label in front of the public suffix, so wikipedia.org and
+  // en.wikipedia.org both read as Wikipedia. Where the suffix is itself two
+  // levels (bbc.co.uk), step back one further.
+  const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov", "edu"]);
+  const beforeSuffix = labels.length - 2;
+  const i = SECOND_LEVEL.has(labels[beforeSuffix]) ? beforeSuffix - 1 : beforeSuffix;
+  const name = labels[i];
+
+  if (!name || name.length < 2) return rawUrl;
+  return name[0].toUpperCase() + name.slice(1);
+}
+
+/** What the extension would do, said the way a person would say it. */
 function describe(raw, mode) {
-  // canAnswer mirrors "an API key is set" in the extension. It is true here on
-  // purpose: with it false, router.js correctly degrades Answer mode to Auto,
-  // so picking "Answer here" in this demo would report that the question goes
-  // to your default search engine. That is the right behaviour in a browser
-  // with no key and the wrong thing to show someone asking what the mode does.
+  // canAnswer is true so that picking "Answer right here" demonstrates the
+  // mode. With it false, router.js correctly degrades it to a plain search,
+  // which is right in a browser with no key and useless as an explanation.
   const verdict = route(raw, { mode, canAnswer: true });
 
   switch (verdict.action) {
     case NONE:
-      return { state: "idle", tag: "Waiting", what: "Type anything. The verdict updates as you go.", open: null };
+      return { state: "idle", tag: "", what: "Try typing something. This box is really working.", open: null };
 
-    // `what` is unused for this branch: paintDemo builds it as DOM so the
-    // resolved URL lands in a textContent, never in a markup string.
     case NAVIGATE:
-      return { state: "url", tag: "Go", what: "", open: verdict.url };
+      return { state: "url", tag: `Opens ${siteName(verdict.url)}`, what: "", open: verdict.url };
 
     case ASK:
       return {
         state: "prompt",
-        tag: "Ask",
-        what: `Opens ${DESTINATION[mode]} with the question already in the composer.`,
+        tag: `Asks ${AI_NAME[mode]}`,
+        what: `Opens ${AI_NAME[mode]} with your question already typed in.`,
         open: verdict.url,
       };
 
     case ANSWER:
       return {
         state: "prompt",
-        tag: "Ask",
-        what: "Answered on the new tab itself, streamed from your own API key.",
+        tag: "Answers here",
+        what: "The answer appears on the new tab itself, without opening anything.",
         open: null,
       };
 
@@ -69,8 +94,8 @@ function describe(raw, mode) {
     default:
       return {
         state: "prompt",
-        tag: "Ask",
-        what: "Handed to whatever you set as Chrome's default search engine.",
+        tag: "Searches",
+        what: "Goes to whichever search engine you normally use.",
         open: null,
       };
   }
@@ -81,8 +106,8 @@ let pendingOpen = null;
 function paintDemo() {
   const mode = demoMode.value;
 
-  // The extension rewrites its placeholder to name the destination you picked,
-  // so the box tells you where the next Enter goes. Same function, same result.
+  // The extension renames its own placeholder to match the destination, so the
+  // box always says where the next Enter goes. Same function, same result.
   demoInput.placeholder = placeholderFor(mode, true);
 
   const out = describe(demoInput.value, mode);
@@ -90,15 +115,14 @@ function paintDemo() {
   demoVerdict.dataset.state = out.state;
   demoTag.textContent = out.tag;
 
-  // The only string interpolated into markup is one this file built; the user's
-  // input goes through textContent below. Keeps the extension's rule (never
-  // turn untrusted text into an element) on the site too.
+  // Everything the reader typed reaches the page through textContent. The
+  // extension has the same rule for the same reason, and lint enforces it here.
   demoWhat.textContent = "";
-  if (out.open && out.state === "url") {
-    demoWhat.append("Opens ");
+  if (out.state === "url" && out.open) {
+    demoWhat.append("Goes straight to ");
     const b = document.createElement("b");
     b.textContent = out.open;
-    demoWhat.append(b, ". Nothing is searched.");
+    demoWhat.append(b, ".");
   } else {
     demoWhat.textContent = out.what;
   }
@@ -107,7 +131,7 @@ function paintDemo() {
   demoSend.disabled = !pendingOpen;
   demoSend.setAttribute(
     "aria-label",
-    pendingOpen ? `Open ${pendingOpen}` : "Nothing to open from this page",
+    pendingOpen ? `Open ${pendingOpen}` : "Pick a destination above to try this one",
   );
 }
 
@@ -131,38 +155,33 @@ if (demoInput) {
   paintDemo();
 }
 
-/* -------------------------------------------------------- the decision --- */
-/* Six rules, one sticky specimen. Whichever rule is nearest the middle of the
-   viewport owns the specimen. */
+/* -------------------------------------------------------- the walkthrough -- */
+/* Four ordinary things to type, one sticky panel. Whichever scene is nearest
+   the middle of the viewport owns the panel. */
 
 const specimen = $("specimen");
-const rules = [...document.querySelectorAll(".rule")];
+const scenes = [...document.querySelectorAll(".scene")];
 
-if (specimen && rules.length) {
+if (specimen && scenes.length) {
   let current = null;
 
-  const show = (rule) => {
-    if (rule === current) return;
-    current = rule;
+  const show = (scene) => {
+    if (scene === current) return;
+    current = scene;
 
-    for (const r of rules) r.classList.toggle("active", r === rule);
+    for (const s of scenes) s.classList.toggle("active", s === scene);
 
     const paint = () => {
-      $("specimenText").textContent = rule.dataset.specimen;
-      $("specimenNo").textContent = rule.querySelector(".ruleNo").textContent.trim();
-      $("specimenRule").textContent = rule.dataset.rule;
-      $("specimenNote").textContent = rule.dataset.note;
-      specimen.dataset.verdict = rule.dataset.verdict;
-      $("specimenBadge").textContent = rule.dataset.verdict === "url" ? "Go" : "Ask";
+      $("specimenText").textContent = scene.dataset.specimen;
+      $("specimenBadge").textContent = scene.dataset.badge;
+      $("specimenNote").textContent = scene.dataset.note;
+      specimen.dataset.verdict = scene.dataset.verdict;
     };
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       paint();
       return;
     }
-    // Fade the three changing strings out, swap, fade back. The badge and the
-    // rule number flip immediately so the state never reads as half-applied.
     specimen.classList.add("swapping");
     setTimeout(() => {
       paint();
@@ -170,7 +189,6 @@ if (specimen && rules.length) {
     }, 180);
   };
 
-  // A band across the middle of the viewport: the rule intersecting it wins.
   const seen = new Set();
   const io = new IntersectionObserver(
     (entries) => {
@@ -179,7 +197,6 @@ if (specimen && rules.length) {
         else seen.delete(e.target);
       }
       if (!seen.size) return;
-      // Topmost of the intersecting rules, so scrolling up and down agree.
       const top = [...seen].sort(
         (a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top,
       )[0];
@@ -188,105 +205,16 @@ if (specimen && rules.length) {
     { rootMargin: "-42% 0px -42% 0px", threshold: 0 },
   );
 
-  for (const r of rules) io.observe(r);
-  show(rules[0]);
-}
-
-/* ------------------------------------------------------------- the lab --- */
-/* Same classifier, reader-driven, with the two modifier keys router.js accepts
-   as `force`. */
-
-const labInput = $("labInput");
-
-if (labInput) {
-  const labOut = $("labOut");
-  const labBadge = $("labBadge");
-  const labDest = $("labDest");
-  const labWhy = $("labWhy");
-  const forceButtons = [...document.querySelectorAll(".labForce button")];
-
-  let force = "";
-
-  /** The rule in classify.js that decided it. Kept in the order it applies. */
-  function reason(raw, forced) {
-    const value = String(raw ?? "").trim();
-    if (!value) return "Nothing typed.";
-    if (forced === "prompt") return "Cmd held. Treated as a question whatever it looks like.";
-    if (forced === "url") return "Shift held. Treated as an address whatever it looks like.";
-
-    if (/^https?:\/\//i.test(value)) return "It already carries an explicit http or https scheme.";
-    if (/\s/.test(value)) return "It contains whitespace, and a URL never does.";
-    if (/^localhost(:\d{1,5})?([/?#]|$)/i.test(value)) return "localhost is an address, so it opens over plain http.";
-    if (/^\[[0-9a-f:.]+\](:\d{1,5})?([/?#]|$)/i.test(value)) return "A bracketed IPv6 literal is an address.";
-    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return "It carries a scheme that is not http or https, which never navigates.";
-
-    const authority = value.split(/[/?#]/, 1)[0];
-    if (authority.includes("@")) return "Userinfo sits in front of the host, which is the phishing shape.";
-
-    const host = authority.replace(/:\d{1,5}$/, "").replace(/\.$/, "");
-    const labels = host.split(".");
-    if (labels.length < 2) return "There is no dot, so there is no host to go to.";
-    if (!labels.every((l) => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(l))) {
-      return "One of the labels is not a legal hostname label.";
-    }
-
-    const tld = labels[labels.length - 1].toLowerCase();
-    return classify(value).kind === URL_KIND
-      ? `The last label, .${tld}, is in the IANA registry of top-level domains.`
-      : `The last label, .${tld}, is not a top-level domain.`;
-  }
-
-  function paintLab() {
-    const raw = labInput.value;
-    const verdict = classify(raw, force || null);
-
-    labWhy.textContent = reason(raw, force);
-
-    if (verdict.kind === EMPTY) {
-      labOut.dataset.verdict = "prompt";
-      labBadge.textContent = "Idle";
-      labDest.textContent = "";
-      return;
-    }
-    if (verdict.kind === URL_KIND) {
-      labOut.dataset.verdict = "url";
-      labBadge.textContent = "Go";
-      labDest.textContent = verdict.url;
-      return;
-    }
-    labOut.dataset.verdict = "prompt";
-    labBadge.textContent = "Ask";
-    labDest.textContent = verdict.text;
-  }
-
-  labInput.addEventListener("input", paintLab);
-
-  for (const b of forceButtons) {
-    b.addEventListener("click", () => {
-      force = b.dataset.force;
-      for (const other of forceButtons) other.classList.toggle("on", other === b);
-      paintLab();
-    });
-  }
-
-  for (const b of document.querySelectorAll(".labChips button")) {
-    b.addEventListener("click", () => {
-      labInput.value = b.dataset.q;
-      paintLab();
-    });
-  }
-
-  paintLab();
+  for (const s of scenes) io.observe(s);
+  show(scenes[0]);
 }
 
 /* ---------------------------------------------------------- furnishings -- */
 
-// Section reveals used to live here, as an IntersectionObserver that set
-// opacity to 0 and waited. That is a trap: anything the observer never reports
-// on stays invisible forever, and a full-page render caught it doing exactly
-// that to four sections. They are CSS scroll-driven animations now
-// (animation-timeline: view(), see style.css) so the browser owns the
-// scheduling and unsupported browsers simply get the finished state.
+// Section reveals are CSS scroll-driven animations (animation-timeline: view(),
+// see style.css). They used to be an observer that set opacity to 0 and waited,
+// which stranded four whole sections when it never reported. The browser owns
+// the scheduling now, and anything unsupported simply renders finished.
 
 // The nav grows a hairline once the page has moved. A sentinel plus an observer,
 // rather than reading scrollY on every frame.
