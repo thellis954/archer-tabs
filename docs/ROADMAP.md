@@ -292,14 +292,31 @@ partner approval, survives OpenAI's internal refactors, and is defensible in sto
 
 Sequenced so each phase ships something usable on its own.
 
-### Phase 0 — Correctness & compliance (~1 day) 🔴 do first
-Fixes what's actively wrong; unblocks everything downstream.
-- Replace `looksLikeURL` with `classify()` + IANA TLD list (§2.1); Vitest table tests
-- `chrome.search.query()` for the web-search fallback (§2.2)
-- ⌘/Ctrl+Enter forces prompt; Shift+Enter forces URL; Esc clears
-- `http://` for localhost and private IPs
-- `manifest.json`: add `icons`, `permissions: ["search"]`
-- Add ESLint + Prettier + a GitHub Actions run on PR
+### Phase 0 — Correctness & compliance ✅ **done**
+- ✅ `classify()` + IANA TLD list replaces `looksLikeURL` (§2.1)
+- ✅ `chrome.search.query()` for the web-search fallback (§2.2)
+- ✅ ⌘/Ctrl+Enter forces prompt; Shift+Enter forces URL; Esc clears
+- ✅ `http://` for localhost, IPv4 and IPv6 literals
+- ✅ `manifest.json`: `icons`, `permissions: ["search"]`
+- ✅ CI on PR — lint + unit tests
+
+**Two security holes found during implementation that this audit had missed:**
+- `javascript:` / `data:` / `file:` URLs reached `location.href`. The new tab page is a privileged
+  extension origin, so `javascript:alert(1)` would have executed *in that origin*. Only `http(s)` is
+  navigable now; every other scheme is treated as a prompt.
+- `google.com@evil.com` passed the "has a valid TLD" test and navigated to **evil.com** with a
+  trustworthy-looking prefix. Anything with userinfo in the authority is now refused.
+
+**Deviations from the plan, deliberately:**
+- **node's built-in test runner instead of Vitest, and a purpose-built linter instead of
+  ESLint + Prettier.** Both keep the repo at zero dependencies — no `node_modules`, no lockfile, no
+  supply chain — which matters more here than generic style rules over one small source file.
+  `tools/lint.js` checks what actually breaks this project: MV3's CSP rules, HTML injection sinks,
+  the CSS-token discipline, and manifest/filesystem agreement.
+- **The Playwright e2e harness was pulled forward from Phase 6.** It drives a real Chromium with the
+  unpacked extension loaded, so every later phase gets real verification instead of assertions about
+  mocks. Note for whoever touches it: Playwright's default headless mode is the *headless shell*,
+  which silently ignores `--load-extension`; `channel: "chromium"` is required.
 
 ### Phase 1 — Pixel-accurate clone (~2–3 days) 🔴 ship before Aug 13
 The visual payload. Target: screenshot-diffable against the reference.
@@ -377,6 +394,19 @@ Each one costs install-time trust; add only when its phase needs it.
 | ~~`host_permissions: chatgpt.com`~~ | — | Deferred with the content script (Phase 2). Avoiding this one is worth real trust — host permissions on chatgpt.com is the scariest prompt in the list |
 
 ---
+
+## 4.5 Parked ideas
+
+Raised while implementing; not scheduled. Revisit after Phase 6.
+
+| Idea | Why it might be worth it |
+|---|---|
+| **Bang prefixes** — `!g`, `!c`, `!p` to force Google / Claude / Perplexity for one query | OpenAI's own extension ships `!g`, so the gesture is already familiar. Cheaper than the Phase 5 multi-target UI and covers most of its value |
+| **Switch-don't-duplicate** | If the URL you typed is already open in another tab, focus that tab instead of loading a second copy (`chrome.tabs.query`). Small, and quietly excellent |
+| **Paste-and-go** | Pasting a URL into an empty box could offer one-keystroke navigation without Enter |
+| **"Ask again elsewhere"** | After a search, re-run the same query against a different target from the new tab, without retyping |
+| **Settings import/export** | A JSON blob of modes, pins, and prompt library. Makes a machine migration painless — and this project exists because of one |
+| **Localisation** | The UI is ~12 strings. Cheap to externalise now, expensive after Phase 5 |
 
 ## 5. Open questions
 

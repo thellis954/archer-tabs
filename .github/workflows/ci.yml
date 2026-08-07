@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No install step: the repo has no dependencies. Tests run on node's
+      # built-in runner and the linter is plain node. The browser-driven suite
+      # (npm run e2e) needs Playwright and is deliberately left to local runs.
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
