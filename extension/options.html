@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
+  <title>Archer — settings</title>
+  <link rel="stylesheet" href="newtab.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+
+<body class="optionsBody">
+
+  <main class="options">
+
+    <h1 class="optionsTitle">
+      <svg class="brandMark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+        <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+      </svg>
+      Archer
+    </h1>
+
+    <section class="card">
+      <h2>Answer on the new tab page</h2>
+
+      <p class="prose">
+        With your own OpenAI Platform key, Archer can stream an answer straight onto the new tab
+        instead of sending you somewhere. Everything else keeps working exactly as it does now.
+      </p>
+
+      <p class="prose">
+        <strong>Your key stays on this device.</strong> It is kept in this browser's extension
+        storage and sent only to <code>api.openai.com</code>, directly from the new tab page. There
+        is no Archer server, nothing is proxied, and nothing is logged anywhere else. You are billed
+        by OpenAI for what you use, on your own account.
+      </p>
+
+      <div class="field">
+        <label for="apiKey">OpenAI Platform API key</label>
+        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+        <p class="hint">
+          A Platform key from <code>platform.openai.com</code> — not your ChatGPT login. The two are
+          separate accounts, and a Platform key cannot see your ChatGPT conversations.
+        </p>
+      </div>
+
+      <div class="rowButtons">
+        <button type="button" class="primary" id="saveKey">Save key</button>
+        <button type="button" id="clearKey">Clear key</button>
+      </div>
+
+      <p class="status" id="keyStatus" role="status"></p>
+    </section>
+
+    <section class="card" id="modelCard" hidden>
+      <h2>Model</h2>
+      <p class="prose">
+        Listed from your own key, so this is what your account can actually reach rather than a list
+        baked into the extension.
+      </p>
+
+      <div class="field">
+        <label for="model">Model</label>
+        <select id="model"></select>
+      </div>
+
+      <div class="rowButtons">
+        <button type="button" id="refreshModels">Refresh list</button>
+      </div>
+      <p class="status" id="modelStatus" role="status"></p>
+    </section>
+
+    <section class="card" id="budgetCard" hidden>
+      <h2>Budget</h2>
+
+      <p class="prose">
+        Counted in tokens, which the API reports exactly. A dollar figure needs a price list, and a
+        price list hardcoded into an extension goes stale silently and in the wrong direction — so
+        Archer only shows one if you enter your own rates.
+      </p>
+
+      <div class="field">
+        <label for="tokenCap">Daily token budget</label>
+        <input id="tokenCap" type="number" min="0" step="1000">
+        <p class="hint">Answering stops once a day's total passes this. 0 means no limit.</p>
+      </div>
+
+      <div class="fieldPair">
+        <div class="field">
+          <label for="rateIn">$ per 1M input tokens</label>
+          <input id="rateIn" type="number" min="0" step="0.01" placeholder="optional">
+        </div>
+        <div class="field">
+          <label for="rateOut">$ per 1M output tokens</label>
+          <input id="rateOut" type="number" min="0" step="0.01" placeholder="optional">
+        </div>
+      </div>
+
+      <div class="rowButtons">
+        <button type="button" class="primary" id="saveBudget">Save budget</button>
+      </div>
+
+      <p class="status" id="budgetStatus" role="status"></p>
+      <p class="usage" id="usage"></p>
+    </section>
+
+  </main>
+
+  <script type="module" src="options.js"></script>
+
+</body>
+</html>

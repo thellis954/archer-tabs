@@ -26,6 +26,8 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 // exempt from the browser-facing rules below, since it never runs in a page.
 const SHIPPED_JS = [
   "extension/newtab.js",
+  "extension/options.js",
+  "extension/src/answer.js",
   "extension/src/classify.js",
   "extension/src/conversations.js",
   "extension/src/history.js",
@@ -47,13 +49,18 @@ for (const f of JS_FILES) {
 
 // --- 2. MV3 forbids inline script and inline handlers on extension pages -----
 
-const html = read("extension/newtab.html");
+// Every page the extension can load, not just the new tab.
+const HTML_PAGES = ["extension/newtab.html", "extension/options.html"];
+const pages = Object.fromEntries(HTML_PAGES.map((f) => [f, read(f)]));
+const html = pages["extension/newtab.html"];
 
-for (const m of html.matchAll(/<(\w+)[^>]*\son[a-z]+\s*=/gi)) {
-  fail("extension/newtab.html", `inline event handler on <${m[1]}> — MV3 CSP blocks it silently`);
-}
-if (/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(html)) {
-  fail("extension/newtab.html", "inline <script> body — MV3 CSP blocks it; move it to a file");
+for (const [file, source] of Object.entries(pages)) {
+  for (const m of source.matchAll(/<(\w+)[^>]*\son[a-z]+\s*=/gi)) {
+    fail(file, `inline event handler on <${m[1]}> — MV3 CSP blocks it silently`);
+  }
+  if (/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(source)) {
+    fail(file, "inline <script> body — MV3 CSP blocks it; move it to a file");
+  }
 }
 
 // --- 3. no HTML injection sinks ---------------------------------------------
@@ -74,24 +81,27 @@ for (const f of SHIPPED_JS) {
 // --- 4. colors live in :root, never in a rule -------------------------------
 // A literal hex in a rule body is invisible in one of the two themes.
 
-const css = read("extension/newtab.css");
-let depth = 0;
-let inRoot = false;
-let rootDepth = 0;
+// Applies to every stylesheet the extension ships, so a second page cannot
+// quietly reintroduce hard-coded colors.
+for (const file of ["extension/newtab.css", "extension/options.css"]) {
+  let depth = 0;
+  let inRoot = false;
+  let rootDepth = 0;
 
-css.split("\n").forEach((line, i) => {
-  const code = line.replace(/\/\*.*?\*\//g, "");
-  if (/:root\s*(,[^{]*)?\{/.test(code) && !inRoot) {
-    inRoot = true;
-    rootDepth = depth;
-  }
-  if (!inRoot && /#[0-9a-f]{3,8}\b/i.test(code)) {
-    fail("extension/newtab.css", `line ${i + 1}: literal color outside :root — add a token instead`);
-  }
-  depth += (code.match(/\{/g) || []).length;
-  depth -= (code.match(/\}/g) || []).length;
-  if (inRoot && depth <= rootDepth) inRoot = false;
-});
+  read(file).split("\n").forEach((line, i) => {
+    const code = line.replace(/\/\*.*?\*\//g, "");
+    if (/:root\s*(,[^{]*)?\{/.test(code) && !inRoot) {
+      inRoot = true;
+      rootDepth = depth;
+    }
+    if (!inRoot && /#[0-9a-f]{3,8}\b/i.test(code)) {
+      fail(file, `line ${i + 1}: literal color outside :root — add a token instead`);
+    }
+    depth += (code.match(/\{/g) || []).length;
+    depth -= (code.match(/\}/g) || []).length;
+    if (inRoot && depth <= rootDepth) inRoot = false;
+  });
+}
 
 // --- 5. the manifest and the page agree with the filesystem -----------------
 
@@ -105,6 +115,7 @@ try {
 if (manifest) {
   const refs = [
     manifest.chrome_url_overrides?.newtab,
+    manifest.options_page,
     ...Object.values(manifest.icons ?? {}),
   ].filter(Boolean);
 
@@ -119,14 +130,20 @@ if (manifest) {
   }
 }
 
-for (const m of html.matchAll(/(?:src|href)="(?!https?:|data:)([^"]+)"/g)) {
-  if (!existsSync(join(EXT, m[1]))) fail("extension/newtab.html", `references missing file: ${m[1]}`);
+for (const [file, source] of Object.entries(pages)) {
+  for (const m of source.matchAll(/(?:src|href)="(?!https?:|data:)([^"]+)"/g)) {
+    if (!existsSync(join(EXT, m[1]))) fail(file, `references missing file: ${m[1]}`);
+  }
 }
 
 // --- 6. the page's script must be a module, since newtab.js uses import ------
 
-if (/<script\b[^>]*\bsrc="newtab\.js"/.test(html) && !/<script\b[^>]*type="module"[^>]*\bsrc="newtab\.js"/.test(html)) {
-  fail("extension/newtab.html", 'newtab.js uses import — its <script> needs type="module"');
+for (const [file, source] of Object.entries(pages)) {
+  for (const m of source.matchAll(/<script\b([^>]*)\bsrc="([^"]+\.js)"/g)) {
+    if (!/type="module"/.test(m[1]) ) {
+      fail(file, `${m[2]} uses import — its <script> needs type="module"`);
+    }
+  }
 }
 
 // --- 7. the generated icons are actually drawn -------------------------------

@@ -1,5 +1,5 @@
 import { URL_KIND, PROMPT } from "./src/classify.js";
-import { route, NONE, NAVIGATE, SEARCH, ASK, AUTO } from "./src/router.js";
+import { route, NONE, NAVIGATE, SEARCH, ASK, ANSWER, AUTO } from "./src/router.js";
 import {
   loadSettings,
   saveMode,
@@ -9,7 +9,11 @@ import {
   readRowState,
   togglePinned,
   dismissRow as persistDismissal,
+  loadAnswerSettings,
+  readSpend,
+  addSpend,
 } from "./src/settings.js";
+import { streamAnswer, estimateCost, checkCap } from "./src/answer.js";
 import { createModeMenu } from "./src/modemenu.js";
 import { buildRows, filterRows, CONVERSATION } from "./src/conversations.js";
 import { hasHistoryAccess, requestHistoryAccess, readConversationVisits } from "./src/history.js";
@@ -27,6 +31,8 @@ const noMatches = document.getElementById("noMatches");
 // --- mode ---------------------------------------------------------------------
 
 let mode = AUTO;
+/** Whether an API key is set. Answer mode degrades to Auto without one. */
+let canAnswer = false;
 
 const menu = createModeMenu({
   button: document.getElementById("modeButton"),
@@ -35,6 +41,12 @@ const menu = createModeMenu({
   onSelect(next) {
     mode = next;
     saveMode(next);
+    // Picking a mode that needs setting up should take you to the setting up,
+    // not silently do something else.
+    if (next === "answer" && !canAnswer) {
+      globalThis.chrome?.runtime?.openOptionsPage?.();
+      return;
+    }
     input.focus();
   },
 });
@@ -42,10 +54,16 @@ const menu = createModeMenu({
 // The mode is read from storage asynchronously, but the user can type and hit
 // Enter before that resolves. Submits await this rather than racing it, so the
 // first query of a session is routed by the mode the user actually chose.
-const ready = loadSettings().then((settings) => {
+const ready = Promise.all([loadSettings(), loadAnswerSettings()]).then(([settings, answer]) => {
   mode = settings.mode;
   menu.setMode(settings.mode);
   nudge.hidden = settings.nudgeDismissed;
+
+  canAnswer = Boolean(answer.apiKey && answer.model);
+  if (!canAnswer) {
+    document.getElementById("answerModeHint").textContent =
+      "Answer on this page with your own OpenAI key. Choose this to set one up.";
+  }
 });
 
 // --- rows ---------------------------------------------------------------------
@@ -174,7 +192,7 @@ form.addEventListener("submit", (event) => {
 
 async function go(raw, force) {
   await ready;
-  const verdict = route(raw, { mode, force });
+  const verdict = route(raw, { mode, force, canAnswer });
 
   switch (verdict.action) {
     case NONE:
@@ -191,11 +209,103 @@ async function go(raw, force) {
       navigate(verdict.url);
       return;
 
+    case ANSWER:
+      await recordLaunch(verdict.text);
+      await answerHere(verdict.text);
+      return;
+
     case SEARCH:
       await recordLaunch(verdict.text);
       runSearch(verdict.text);
   }
 }
+
+// --- inline answers ------------------------------------------------------------
+
+const answerPanel = document.getElementById("answer");
+const answerText = document.getElementById("answerText");
+const answerStatus = document.getElementById("answerStatus");
+const answerMeta = document.getElementById("answerMeta");
+const stopButton = document.getElementById("stopAnswer");
+
+let inFlight = null;
+let lastPrompt = "";
+
+async function answerHere(prompt) {
+  const config = await loadAnswerSettings();
+  lastPrompt = prompt;
+
+  answerPanel.hidden = false;
+  answerText.textContent = "";
+  answerMeta.textContent = "";
+  answerStatus.textContent = "Answering…";
+  stopButton.hidden = false;
+
+  const spend = await readSpend();
+  const cap = checkCap(spend.tokens, config.tokenCap);
+  if (!cap.allowed) {
+    // A budget that silently stops working is worse than no budget, so say what
+    // happened and where to change it.
+    answerStatus.textContent = "Daily token budget reached.";
+    answerMeta.textContent =
+      `${cap.used.toLocaleString()} of ${cap.cap.toLocaleString()} tokens used today. ` +
+      `Raise or clear the budget in Archer's settings.`;
+    stopButton.hidden = true;
+    return;
+  }
+
+  inFlight = new AbortController();
+
+  try {
+    const { usage } = await streamAnswer({
+      key: config.apiKey,
+      model: config.model,
+      prompt,
+      signal: inFlight.signal,
+      // Appending a text node rather than reassigning textContent keeps the
+      // already-painted text on screen instead of reflowing it every frame.
+      onText: (chunk) => answerText.append(chunk),
+    });
+
+    answerStatus.textContent = "Answer complete.";
+    const total = await addSpend(usage.total);
+    answerMeta.textContent = describeUsage(usage, total, config);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      answerStatus.textContent = "Stopped.";
+    } else {
+      answerStatus.textContent = "That didn't work.";
+      answerMeta.textContent = error.message;
+    }
+  } finally {
+    stopButton.hidden = true;
+    inFlight = null;
+  }
+}
+
+function describeUsage(usage, total, config) {
+  const cost = estimateCost(usage, { inputPerM: config.rateInPerM, outputPerM: config.rateOutPerM });
+  const money = cost === null ? "" : ` — about $${cost.toFixed(4)}`;
+  const today = config.tokenCap > 0
+    ? ` ${total.tokens.toLocaleString()} of ${config.tokenCap.toLocaleString()} today.`
+    : ` ${total.tokens.toLocaleString()} today.`;
+  return `${usage.total.toLocaleString()} tokens${money}.${today}`;
+}
+
+stopButton.addEventListener("click", () => inFlight?.abort());
+
+document.getElementById("closeAnswer").addEventListener("click", () => {
+  inFlight?.abort();
+  answerPanel.hidden = true;
+  input.focus();
+});
+
+// Hand the same prompt to a full conversation, where it can be followed up.
+document.getElementById("continueInChatGPT").addEventListener("click", () => {
+  const prompt = lastPrompt || input.value;
+  if (!prompt.trim()) return;
+  navigate("https://chatgpt.com/?q=" + encodeURIComponent(prompt.trim()));
+});
 
 /**
  * `chrome.tabs.update` rather than `location.assign` so the new tab page is

@@ -258,9 +258,12 @@ check(
 
 await page.keyboard.press("ArrowUp");
 await page.keyboard.press("ArrowUp");
+// Against the last option as rendered, so adding a mode does not break this.
+const lastMode = await page.locator("#modeMenu [role=option]").last().getAttribute("data-mode");
 check(
   "ArrowUp wraps to the last option",
-  await page.evaluate(() => document.activeElement?.dataset.mode) === "search",
+  (await page.evaluate(() => document.activeElement?.dataset.mode)) === lastMode,
+  lastMode,
 );
 
 await page.keyboard.press("Escape");
@@ -661,6 +664,214 @@ check("granted but empty gets a real empty state", await convoPage.locator("#emp
 
 await histCtx.close();
 rmSync(fixture, { recursive: true, force: true });
+
+// --- inline answers ------------------------------------------------------------
+//
+// Same fixture trick, for the same reason: reaching api.openai.com needs an
+// optional host permission, and the grant dialog never resolves headless. The
+// API itself is stubbed — this checks Archer's half of the exchange (framing,
+// accounting, the budget, cancellation), not OpenAI's.
+
+const answerFixture = mkdtempSync(join(tmpdir(), "archer-answer-"));
+cpSync(EXT, answerFixture, { recursive: true });
+{
+  const path = join(answerFixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  m.host_permissions = m.optional_host_permissions;
+  delete m.optional_host_permissions;
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+
+const answerCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [
+    `--disable-extensions-except=${answerFixture}`,
+    `--load-extension=${answerFixture}`,
+    "--no-sandbox",
+  ],
+});
+const ANSWER_NEWTAB = `chrome-extension://${extensionId(answerFixture)}/newtab.html`;
+
+const sse = (parts, usage) =>
+  parts.map((p) => `data: ${JSON.stringify({ choices: [{ delta: { content: p } }] })}\n\n`).join("") +
+  `data: ${JSON.stringify({ choices: [], usage })}\n\n` +
+  "data: [DONE]\n\n";
+
+let apiCalls = 0;
+let apiBody = null;
+
+const answerPage = await answerCtx.newPage();
+await answerPage.route("https://api.openai.com/**", async (r) => {
+  apiCalls++;
+  apiBody = JSON.parse(r.request().postData() ?? "null");
+  return r.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: sse(["A nock ", "is the slot ", "at the arrow's end."], {
+      prompt_tokens: 12,
+      completion_tokens: 30,
+      total_tokens: 42,
+    }),
+  });
+});
+await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await answerPage.waitForTimeout(300);
+
+// No key yet: answer mode must not break, it must fall back.
+await answerPage.evaluate(() =>
+  chrome.storage.local.set({ mode: "answer", apiKey: "", model: "", engineNudgeDismissed: true }),
+);
+await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await answerPage.waitForTimeout(400);
+
+const answerNav = [];
+await answerPage.route(/^https?:(?!\/\/api\.openai\.com)/, (r) => {
+  if (r.request().isNavigationRequest()) answerNav.push(r.request().url());
+  return r.fulfill({ status: 204, body: "" });
+});
+
+async function ask(text) {
+  answerNav.length = 0;
+  await answerPage.fill("#query", text);
+  await answerPage.locator("#query").press("Enter");
+  await answerPage.waitForTimeout(600);
+}
+
+await ask("what is a nock");
+check(
+  "answer mode with no key falls back to a search",
+  answerNav.some((u) => /[?&]q=/.test(u)),
+  JSON.stringify(answerNav),
+);
+check("...and nothing was sent to the API", apiCalls === 0, `${apiCalls} calls`);
+check("...and no answer panel appeared", await answerPage.locator("#answer").isHidden());
+
+// Now with a key.
+await answerPage.evaluate(() =>
+  chrome.storage.local.set({ mode: "answer", apiKey: "sk-test", model: "test-model", tokenCap: 50000, spend: null }),
+);
+await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await answerPage.waitForTimeout(400);
+
+await ask("what is a nock");
+check("the answer streams onto the page", apiCalls === 1, `${apiCalls} calls`);
+check(
+  "the streamed text is assembled in order",
+  (await answerPage.locator("#answerText").innerText()) === "A nock is the slot at the arrow's end.",
+  await answerPage.locator("#answerText").innerText(),
+);
+check("the request carries the chosen model", apiBody?.model === "test-model", JSON.stringify(apiBody?.model));
+check("...and asks for usage, or the counter has nothing exact", apiBody?.stream_options?.include_usage === true);
+const statusText = () => answerPage.locator("#answerStatus").evaluate((n) => n.textContent);
+check("completion is announced", (await statusText()).includes("complete"), await statusText());
+check(
+  "the token count is reported",
+  (await answerPage.locator("#answerMeta").innerText()).includes("42 tokens"),
+  await answerPage.locator("#answerMeta").innerText(),
+);
+check(
+  "the prompt is still logged, so it shows up in recall",
+  await answerPage.evaluate(() =>
+    chrome.storage.local.get({ launches: [] }).then((r) => r.launches.some((l) => l.text === "what is a nock")),
+  ),
+);
+check(
+  "spend accumulates for the day",
+  await answerPage.evaluate(() => chrome.storage.local.get({ spend: null }).then((r) => r.spend?.tokens)) === 42,
+);
+
+// Whatever the model returns is text. If any of it were parsed, this would say so.
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: sse(["<img src=x onerror=alert(1)>", "<b>bold</b>"], { total_tokens: 5 }),
+  }),
+);
+await ask("give me some html");
+check(
+  "the answer is rendered as text, never as markup",
+  (await answerPage.locator("#answerText").innerText()).includes("<img src=x") &&
+    (await answerPage.locator("#answerText").evaluate((n) => n.querySelectorAll("img, b").length)) === 0,
+);
+
+// An API error has to say what went wrong, not fail silently.
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) =>
+  r.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: { message: "Incorrect API key provided." } }) }),
+);
+await ask("this will fail");
+check(
+  "an API error surfaces the API's own message",
+  (await answerPage.locator("#answerMeta").innerText()).includes("Incorrect API key"),
+  await answerPage.locator("#answerMeta").innerText(),
+);
+
+// The budget has to actually stop it.
+await answerPage.evaluate(() =>
+  chrome.storage.local.set({ tokenCap: 100, spend: { day: new Date().toISOString().slice(0, 10), tokens: 500 } }),
+);
+await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
+await answerPage.waitForTimeout(400);
+const callsBeforeCap = apiCalls;
+await ask("over budget");
+check("the daily budget stops the request", apiCalls === callsBeforeCap, `${apiCalls - callsBeforeCap} calls got through`);
+check(
+  "...and says so rather than failing quietly",
+  (await statusText()).includes("budget"),
+  await statusText(),
+);
+
+// --- the options page ----------------------------------------------------------
+
+const optionsPage = await answerCtx.newPage();
+await optionsPage.route("https://api.openai.com/v1/models", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ data: [{ id: "model-b" }, { id: "model-a" }] }),
+  }),
+);
+await optionsPage.goto(`chrome-extension://${extensionId(answerFixture)}/options.html`, {
+  waitUntil: "domcontentloaded",
+});
+await optionsPage.waitForTimeout(300);
+
+check("the options page loads", (await optionsPage.locator("#apiKey").count()) === 1);
+check("the key field is a password field", (await optionsPage.locator("#apiKey").getAttribute("type")) === "password");
+
+await optionsPage.fill("#apiKey", "");
+await optionsPage.locator("#saveKey").click();
+await optionsPage.waitForTimeout(200);
+check(
+  "saving an empty key is refused",
+  (await optionsPage.locator("#keyStatus").innerText()).includes("Paste a key"),
+);
+
+await optionsPage.fill("#apiKey", "sk-another");
+await optionsPage.locator("#saveKey").click();
+await optionsPage.waitForTimeout(500);
+check(
+  "a key is validated against the API before it is stored",
+  (await optionsPage.locator("#keyStatus").innerText()).includes("2 models"),
+  await optionsPage.locator("#keyStatus").innerText(),
+);
+check(
+  "the model list comes from the key, not from a hardcoded list",
+  (await optionsPage.locator("#model option").allInnerTexts()).join(",") === "model-a,model-b",
+);
+
+await optionsPage.locator("#clearKey").click();
+await optionsPage.waitForTimeout(250);
+check(
+  "clearing the key removes it from storage",
+  (await optionsPage.evaluate(() => chrome.storage.local.get({ apiKey: "x" }).then((r) => r.apiKey))) === "",
+);
+
+await answerCtx.close();
+rmSync(answerFixture, { recursive: true, force: true });
 
 // --- dark mode ---------------------------------------------------------------
 // A second context, because colorScheme is fixed when the context is created.

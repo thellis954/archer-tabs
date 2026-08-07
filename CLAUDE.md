@@ -16,7 +16,8 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 ```
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
   src/       classify.js, router.js, conversations.js, history.js, rows.js,
-             settings.js, modemenu.js + the generated TLD list
+             answer.js, settings.js, modemenu.js + the generated TLD list
+  options.*  the settings page — API key, model, budget
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
 docs/        ROADMAP.md (the plan + its constraints), BRAND.md (mark, palette, voice)
 tools/       lint.js + png.js (dependency-free); genicons.mjs, shots.mjs (need playwright)
@@ -45,7 +46,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 104 unit cases (classifier, router, conversations). No install needed. |
+| `npm test` | 124 unit cases (classifier, router, conversations, answer). No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. |
@@ -66,10 +67,11 @@ invisible in the source and obvious in a render.
 
 ## Architecture
 
-`manifest.json` declares exactly one entry point — `chrome_url_overrides.newtab` → `newtab.html`.
-Everything else is reached from that page. Adding a new page or a background service worker means
-registering it in the manifest; a file that isn't referenced from `newtab.html` or the manifest is
-dead weight.
+`manifest.json` declares two pages — `chrome_url_overrides.newtab` → `newtab.html`, and
+`options_page` → `options.html`. Everything else is reached from those. Adding a page or a
+background service worker means registering it in the manifest, **and adding it to the page lists in
+`tools/lint.js`** — the CSP, missing-file, `type="module"` and CSS-token rules are all driven off
+those lists. A file that isn't referenced from a page or the manifest is dead weight.
 
 **The decisions live in pure functions; `newtab.js` only wires the DOM.**
 
@@ -81,6 +83,8 @@ dead weight.
 - `src/settings.js` — the only thing that touches `chrome.storage`.
 - `src/history.js` — the only thing that touches `chrome.history` and `chrome.permissions`.
 - `src/rows.js` — paints the rows.
+- `src/answer.js` — the only caller of `api.openai.com`. The SSE framing and the budget maths are
+  pure functions so they can be tested without a network.
 - `src/modemenu.js` — the `Auto ⌄` listbox.
 
 **Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
@@ -114,8 +118,10 @@ is restricted to the mark, focus, and hover.
 - **MV3 content security policy forbids inline script and inline event handlers on extension pages.**
   Keep JS in `newtab.js` (or another external file) and attach listeners with `addEventListener` —
   an `onclick=` attribute will silently fail to fire.
-- **No remote code and no network fetches.** The manifest asks for `search` and `storage`, and no
-  `host_permissions` at all. Anything more (favicons, history, topSites) changes the install-time
+- **No remote code, and exactly one network destination.** The manifest asks for `search` and
+  `storage`; `history` and `https://api.openai.com/*` are *optional*, requested at the click that
+  needs them. The only fetch in the extension is `src/answer.js` → `api.openai.com`, with the user's
+  own key. There is no Archer server and nothing is proxied. Anything more (favicons, history, topSites) changes the install-time
   consent prompt, so **request a permission in the phase that needs it, never earlier** — the
   roadmap's permissions ledger is the record. `npm run e2e` asserts the current set, so an
   accidental addition fails a test rather than shipping.
