@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archer",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "A calm new tab page. Ask a question or type a URL \u2014 Archer works out which you meant.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"

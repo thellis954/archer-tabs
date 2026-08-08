@@ -403,6 +403,24 @@ await page.reload({ waitUntil: "domcontentloaded" });
 await page.waitForTimeout(400);
 
 check("the onboarding row is offered when history is not granted", await page.locator("#onboarding").isVisible());
+
+// Chrome's own wording for `history` is far broader than what Archer does with
+// it — "read and change your browsing history on all your signed-in devices" —
+// and its popup opens at the top of the window with Deny focused. A user who
+// reads that and declines then got no explanation at all, so the click looked
+// dead. Both halves are said up front now.
+check("the onboarding row says a popup is coming", await page.locator("#historyNote").isVisible());
+const historyNote = (await page.locator("#historyNote").innerText()).toLowerCase();
+check(
+  "...and says where it opens and what its default is",
+  historyNote.includes("top of the window") && historyNote.includes("deny"),
+  historyNote,
+);
+check(
+  "...and warns that Chrome's wording is broader than what Archer does",
+  historyNote.includes("read and change your browsing history"),
+  historyNote,
+);
 check(
   "prompt rows appear with no permission at all",
   (await page.locator("#rows .row.is-prompt").count()) > 0,
@@ -610,7 +628,8 @@ for (const convo of CONVOS) {
   await browsing.goto(`https://chatgpt.com/c/${convo.id}`, { waitUntil: "load" });
   await browsing.waitForTimeout(150);
 }
-// A conversation Chrome only ever saw before it was named must not become a row.
+// A conversation Chrome only ever saw before it was named. It has to become a
+// row anyway — see below.
 await browsing.goto("https://chatgpt.com/c/11111111-2222-4333-8444-555555555555", { waitUntil: "load" });
 await browsing.waitForTimeout(150);
 await browsing.close();
@@ -620,6 +639,11 @@ await convoPage.goto(FIXTURE_NEWTAB, { waitUntil: "domcontentloaded" });
 await convoPage.waitForTimeout(700);
 
 check("the onboarding row is gone once access is granted", await convoPage.locator("#onboarding").isHidden());
+check(
+  "...and so is the note that explained it",
+  await convoPage.locator("#historyNote").isHidden(),
+  await convoPage.locator("#historyNote").innerText(),
+);
 
 const convoTitles = await convoPage.locator("#rows .row.is-conversation .title").allInnerTexts();
 check(
@@ -627,9 +651,19 @@ check(
   CONVOS.every((c) => convoTitles.includes(c.title)),
   JSON.stringify(convoTitles),
 );
+// This assertion used to be the opposite, and it was the bug. Chrome stores the
+// title as it was when the address was pushed — which for a single-page app is
+// before the model has named the chat — and never revises it. Dropping those
+// rows made the whole feature look like it pulled nothing: real history, real
+// search results, zero rows. Reachable beats well-named.
 check(
-  "an untitled conversation is not offered as a row",
-  !convoTitles.some((t) => t.toLowerCase() === "chatgpt"),
+  "a conversation Chrome never named is still offered, under its provider's name",
+  convoTitles.includes("ChatGPT conversation"),
+  JSON.stringify(convoTitles),
+);
+check(
+  "...and is never left showing the bare product name",
+  !convoTitles.some((t) => t.trim().toLowerCase() === "chatgpt"),
   JSON.stringify(convoTitles),
 );
 
@@ -646,6 +680,9 @@ check(
   CONVOS.every((c) => paired[c.title] === `— ChatGPT · ${c.prompt}`),
   JSON.stringify(paired),
 );
+const namelessRow = convoPage.locator("#rows .row.is-conversation", { hasText: "ChatGPT conversation" });
+check("the nameless conversation is a real row", (await namelessRow.count()) === 1);
+
 check(
   "a bound launch does not also appear as its own ask-again row",
   (await convoPage.locator("#rows .row.is-prompt").count()) === 0,
@@ -658,10 +695,12 @@ await convoPage.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) convoNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
-await convoPage.locator("#rows .row.is-conversation").first().click();
+// The *nameless* one specifically: opening it is the entire point of keeping
+// it, and clicking whichever row happens to be first would not prove that.
+await namelessRow.click();
 await convoPage.waitForTimeout(300);
 check(
-  "clicking a conversation opens it",
+  "clicking the conversation Chrome never named opens it",
   /^https:\/\/chatgpt\.com\/c\/[0-9a-f-]{36}$/.test(convoNav[0] ?? ""),
   JSON.stringify(convoNav),
 );

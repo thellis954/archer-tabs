@@ -845,6 +845,18 @@ body {
   color: transparent;
 }
 
+/* Sits under the onboarding row, in the same column as the rows themselves. */
+.onboardNote {
+  max-width: 760px;
+  margin: 6px auto 0;
+  padding: 0 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.onboardNote.isRefused { color: var(--accent); }
+
 .tileHint {
   margin: 0.5rem 0 0;
   font-size: 12px;
