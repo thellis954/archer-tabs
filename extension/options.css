@@ -3,19 +3,118 @@
 
 .optionsBody { padding: 0 24px 64px; }
 
-.options {
-  width: min(680px, 100%);
-  margin: 0 auto;
+/* Nav beside the settings rather than above them, so the section list is
+   visible the whole way down. Below 900px it stacks and the nav becomes a
+   horizontal strip — the same links, still reachable, no second markup. */
+.shell {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 680px);
+  gap: 40px;
+  justify-content: center;
+  align-items: start;
+  padding-top: 40px;
 }
+
+.sidebar { position: sticky; top: 40px; }
+
+.options { min-width: 0; }
 
 .optionsTitle {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin: 40px 0 24px;
+  margin: 0 0 20px;
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -.015em;
+}
+
+.sectionNav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.navLink {
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.navLink:hover { background: var(--pressed); color: var(--text); }
+
+/* Set by the observer in options.js, not by :target — :target only changes when
+   a link is clicked, so scrolling past a section would leave the wrong one lit. */
+.navLink.isHere {
+  background: var(--pressed);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Anchors land below the sticky edge rather than jammed against it. */
+.card { scroll-margin-top: 24px; }
+
+/* The state of a section, readable without opening it: "Off", "Google",
+   "2 of 7 on". The page had nine cards and no way to tell which were doing
+   anything. */
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cardHead h2 { margin: 0; }
+
+.cardState {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.cardState.isOn { color: var(--accent); font-weight: 600; }
+
+/* The long justifications, folded away. Nothing is deleted — this page's
+   explanations are the product — but a wall of them is why nobody read any. */
+.why { margin: 12px 0 0; }
+
+.why > summary {
+  width: fit-content;
+  padding: 3px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.why > summary:hover { color: var(--text); }
+.why > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.why[open] > summary { margin-bottom: 4px; }
+.why .hint { margin: 0; }
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 680px);
+    gap: 16px;
+    padding-top: 24px;
+  }
+
+  .sidebar { position: static; }
+
+  /* Scrollable rather than wrapped: a nav that grows to four lines pushes the
+     first setting off the screen, which is the opposite of the point. */
+  .sectionNav {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .navLink { flex: none; white-space: nowrap; }
 }
 
 .optionsTitle .brandMark { width: 24px; height: 24px; }

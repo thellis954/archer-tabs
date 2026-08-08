@@ -10,241 +10,308 @@
 
 <body class="optionsBody">
 
-  <main class="options">
+  <!-- Two columns: a nav that stays put, and the settings themselves. The page
+       was one long undifferentiated scroll, so the Permissions panel — the thing
+       most likely to be the answer to "why isn't this working" — was the part
+       nobody ever reached. -->
+  <div class="shell">
 
-    <h1 class="optionsTitle">
-      <svg class="brandMark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
-        <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
-      </svg>
-      Archer
-    </h1>
+    <aside class="sidebar">
+      <h1 class="optionsTitle">
+        <svg class="brandMark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+          <path class="bow"  d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+        </svg>
+        Archer
+      </h1>
 
-    <section class="card">
-      <h2>Default destination</h2>
-      <p class="prose">
-        Where a prompt goes when you open a new tab. The pills above the search box change it too —
-        they are the same setting, in the place you are most likely to want it.
-      </p>
+      <nav class="sectionNav" id="sectionNav" aria-label="Settings sections">
+        <a class="navLink" href="#destination">Where prompts go</a>
+        <a class="navLink" href="#weather">Weather</a>
+        <a class="navLink" href="#prompts">Saved prompts</a>
+        <a class="navLink" href="#answers">Answers on the page</a>
+        <a class="navLink" id="navModel" href="#modelCard" hidden>Model</a>
+        <a class="navLink" id="navBudget" href="#budgetCard" hidden>Budget</a>
+        <a class="navLink" href="#permissions">Permissions</a>
+        <a class="navLink" href="#activity">What you ask</a>
+        <a class="navLink" href="#data">Your data</a>
+      </nav>
+    </aside>
 
-      <div class="field">
-        <label for="defaultMode">Send prompts to</label>
-        <select id="defaultMode">
-          <option value="google">Google</option>
-          <option value="chatgpt">ChatGPT</option>
-          <option value="claude">Claude</option>
-          <option value="perplexity">Perplexity</option>
-          <option value="auto">Auto — your default search engine</option>
-          <option value="search">Default engine only — never treat what I type as a URL</option>
-          <option value="answer">Answer here — needs an API key, below</option>
-        </select>
-        <p class="hint">
-          The first four go where they say, whatever your browser's default engine is.
-          <strong>Auto</strong> and <strong>Default engine only</strong> hand the query to whatever engine
-          Chrome is set to instead — so they follow your browser, and they route to ChatGPT for anyone
-          using OpenAI's own search extension. Archer never changes that setting.
+    <main class="options">
+
+      <section class="card" id="destination">
+        <header class="cardHead">
+          <h2>Where prompts go</h2>
+          <span class="cardState" id="stateDestination"></span>
+        </header>
+        <p class="prose">
+          Where a prompt goes when you open a new tab. The pills above the search box change it too —
+          they are the same setting, in the place you are most likely to want it.
         </p>
-      </div>
-      <p class="status" id="modeStatus" role="status"></p>
-    </section>
 
-    <section class="card">
-      <h2>Weather</h2>
-      <p class="prose">
-        From <a href="https://open-meteo.com" rel="noreferrer">Open-Meteo</a>, which needs no account
-        and no API key. Archer sends the place name you type here to look up its coordinates, and
-        then the coordinates to fetch a forecast — <strong>nothing else about you is sent</strong>,
-        and your browser is never asked for its location.
-      </p>
-
-      <div class="fieldPair">
         <div class="field">
-          <label for="place">Place</label>
-          <input id="place" type="text" placeholder="Brighton" autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="unit">Units</label>
-          <select id="unit">
-            <option value="celsius">Celsius</option>
-            <option value="fahrenheit">Fahrenheit</option>
+          <label for="defaultMode">Send prompts to</label>
+          <select id="defaultMode">
+            <option value="google">Google</option>
+            <option value="chatgpt">ChatGPT</option>
+            <option value="claude">Claude</option>
+            <option value="perplexity">Perplexity</option>
+            <option value="auto">Auto — your default search engine</option>
+            <option value="search">Default engine only — never treat what I type as a URL</option>
+            <option value="answer">Answer here — needs an API key, below</option>
           </select>
         </div>
-      </div>
 
-      <!-- Shown only until the permission is granted. Chrome's popup opens at
-           the top of the window with Deny focused, so an unannounced one gets
-           dismissed and the feature looks broken. -->
-      <p class="hint heads-up" id="weatherAccessHint" hidden>
-        Chrome will ask permission to reach Open-Meteo — its popup opens at the
-        <strong>top of the window</strong>, and Deny is the default. Choose <strong>Allow</strong>.
-      </p>
+        <details class="why">
+          <summary>What each option does</summary>
+          <p class="hint">
+            The first four go where they say, whatever your browser's default engine is.
+            <strong>Auto</strong> and <strong>Default engine only</strong> hand the query to whatever
+            engine Chrome is set to instead — so they follow your browser, and they route to ChatGPT
+            for anyone using OpenAI's own search extension. Archer never changes that setting.
+          </p>
+        </details>
 
-      <div class="rowButtons">
-        <button type="button" class="primary" id="savePlace">Save place</button>
-        <button type="button" id="clearPlace">Turn weather off</button>
-      </div>
-      <p class="status" id="placeStatus" role="status"></p>
-    </section>
+        <p class="status" id="modeStatus" role="status"></p>
+      </section>
 
-    <section class="card">
-      <h2>Saved prompts</h2>
-      <p class="prose">
-        Type <kbd>/</kbd> in an empty search box to find one. Put <code>{{blanks}}</code> anywhere in
-        the text and Archer selects the first one for you to type over — <kbd>Tab</kbd> moves to the
-        next.
-      </p>
-
-      <ul class="templates" id="templates"></ul>
-
-      <div class="fieldPair">
-        <div class="field">
-          <label for="templateName">Name</label>
-          <input id="templateName" type="text" placeholder="translate" spellcheck="false">
-        </div>
-        <div class="field">
-          <label for="templateText">Prompt</label>
-          <input id="templateText" type="text" placeholder="Translate {{text}} into {{language}}">
-        </div>
-      </div>
-
-      <div class="rowButtons">
-        <button type="button" class="primary" id="addTemplate">Save prompt</button>
-      </div>
-      <p class="status" id="templateStatus" role="status"></p>
-    </section>
-
-    <section class="card">
-      <h2>What you ask</h2>
-      <p class="prose">
-        Computed here, from the prompts already stored on this device. Nothing is sent anywhere to
-        work this out.
-      </p>
-      <div id="analytics"></div>
-
-      <div class="rowButtons">
-        <button type="button" id="exportMarkdown">Export prompts as Markdown</button>
-        <button type="button" id="clearHistory">Clear prompt history</button>
-      </div>
-      <p class="status" id="dataStatus" role="status"></p>
-    </section>
-
-    <section class="card">
-      <h2>Answer on the new tab page</h2>
-
-      <p class="prose">
-        With your own OpenAI Platform key, Archer can stream an answer straight onto the new tab
-        instead of sending you somewhere. Everything else keeps working exactly as it does now.
-      </p>
-
-      <p class="prose">
-        <strong>Your key stays on this device.</strong> It is kept in this browser's extension
-        storage and sent only to <code>api.openai.com</code>, directly from the new tab page. There
-        is no Archer server, nothing is proxied, and nothing is logged anywhere else. You are billed
-        by OpenAI for what you use, on your own account.
-      </p>
-
-      <div class="field">
-        <label for="apiKey">OpenAI Platform API key</label>
-        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
-        <p class="hint">
-          A Platform key from <code>platform.openai.com</code> — not your ChatGPT login. The two are
-          separate accounts, and a Platform key cannot see your ChatGPT conversations.
+      <section class="card" id="weather">
+        <header class="cardHead">
+          <h2>Weather</h2>
+          <span class="cardState" id="stateWeather"></span>
+        </header>
+        <p class="prose">
+          A small card in the corner of the new tab. Type a town or city — your browser is never
+          asked for its location.
         </p>
-      </div>
 
-      <div class="rowButtons">
-        <button type="button" class="primary" id="saveKey">Save key</button>
-        <button type="button" id="clearKey">Clear key</button>
-      </div>
-
-      <p class="status" id="keyStatus" role="status"></p>
-    </section>
-
-    <section class="card" id="modelCard" hidden>
-      <h2>Model</h2>
-      <p class="prose">
-        Listed from your own key, so this is what your account can actually reach rather than a list
-        baked into the extension.
-      </p>
-
-      <div class="field">
-        <label for="model">Model</label>
-        <select id="model"></select>
-      </div>
-
-      <div class="rowButtons">
-        <button type="button" id="refreshModels">Refresh list</button>
-      </div>
-      <p class="status" id="modelStatus" role="status"></p>
-    </section>
-
-    <section class="card" id="budgetCard" hidden>
-      <h2>Budget</h2>
-
-      <p class="prose">
-        Counted in tokens, which the API reports exactly. A dollar figure needs a price list, and a
-        price list hardcoded into an extension goes stale silently and in the wrong direction — so
-        Archer only shows one if you enter your own rates.
-      </p>
-
-      <div class="field">
-        <label for="tokenCap">Daily token budget</label>
-        <input id="tokenCap" type="number" min="0" step="1000">
-        <p class="hint">Answering stops once a day's total passes this. 0 means no limit.</p>
-      </div>
-
-      <div class="fieldPair">
-        <div class="field">
-          <label for="rateIn">$ per 1M input tokens</label>
-          <input id="rateIn" type="number" min="0" step="0.01" placeholder="optional">
+        <div class="fieldPair">
+          <div class="field">
+            <label for="place">Place</label>
+            <input id="place" type="text" placeholder="Brighton" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="unit">Units</label>
+            <select id="unit">
+              <option value="celsius">Celsius</option>
+              <option value="fahrenheit">Fahrenheit</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
-          <label for="rateOut">$ per 1M output tokens</label>
-          <input id="rateOut" type="number" min="0" step="0.01" placeholder="optional">
+
+        <!-- Shown only until the permission is granted, and deliberately not
+             inside a disclosure: Chrome's popup opens at the top of the window
+             with Deny focused, so an unannounced one gets dismissed and the
+             feature looks broken. -->
+        <p class="hint heads-up" id="weatherAccessHint" hidden>
+          Chrome will ask permission to reach Open-Meteo — its popup opens at the
+          <strong>top of the window</strong>, and Deny is the default. Choose <strong>Allow</strong>.
+        </p>
+
+        <div class="rowButtons">
+          <button type="button" class="primary" id="savePlace">Save place</button>
+          <button type="button" id="clearPlace">Turn weather off</button>
         </div>
-      </div>
+        <p class="status" id="placeStatus" role="status"></p>
 
-      <div class="rowButtons">
-        <button type="button" class="primary" id="saveBudget">Save budget</button>
-      </div>
+        <details class="why">
+          <summary>What gets sent</summary>
+          <p class="hint">
+            <a href="https://open-meteo.com" rel="noreferrer">Open-Meteo</a> needs no account and no
+            API key. Archer sends the place name you type here to look up its coordinates, and then
+            the coordinates to fetch a forecast — <strong>nothing else about you is sent</strong>.
+          </p>
+        </details>
+      </section>
 
-      <p class="status" id="budgetStatus" role="status"></p>
-      <p class="usage" id="usage"></p>
-    </section>
+      <section class="card" id="prompts">
+        <header class="cardHead">
+          <h2>Saved prompts</h2>
+          <span class="cardState" id="statePrompts"></span>
+        </header>
+        <p class="prose">
+          Type <kbd>/</kbd> in an empty search box to find one. Put <code>{{blanks}}</code> anywhere in
+          the text and Archer selects the first one for you to type over — <kbd>Tab</kbd> moves to the
+          next.
+        </p>
 
-    <section class="card">
-      <h2>Permissions</h2>
-      <p class="prose">
-        Archer asks for two things when you install it: permission to use your default search engine,
-        and somewhere to keep your settings. <strong>Everything else on this list is off until you
-        turn it on</strong>, and can be turned back off here.
-      </p>
-      <p class="hint heads-up">
-        Turning one on is Chrome's decision, not Archer's: it opens a popup at the
-        <strong>top of the window</strong> — some way from these buttons — with <strong>Deny</strong>
-        focused by default. If a switch stays Off, that popup is where the answer went.
-      </p>
+        <ul class="templates" id="templates"></ul>
 
-      <ul class="grants" id="grants"></ul>
-    </section>
+        <div class="fieldPair">
+          <div class="field">
+            <label for="templateName">Name</label>
+            <input id="templateName" type="text" placeholder="translate" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="templateText">Prompt</label>
+            <input id="templateText" type="text" placeholder="Translate {{text}} into {{language}}">
+          </div>
+        </div>
 
-    <section class="card">
-      <h2>Where your data lives</h2>
-      <p class="prose">
-        On this device. Archer has no server, no account and no analytics — there is nowhere for your
-        data to be sent, because nothing was built to receive it. Your prompts, pins, saved prompts,
-        favorites and API key are in this browser's extension storage and nowhere else.
-      </p>
-      <p class="prose">
-        Three features reach the network, and only the ones you switch on:
-        <code>api.openai.com</code> for inline answers, with your own key;
-        <code>open-meteo.com</code> for the weather; and your own default search engine, through
-        Chrome, when you search. Uninstalling deletes everything.
-        <a href="https://github.com/thellis954/archer-tabs/blob/main/docs/PRIVACY.md" rel="noreferrer">The full policy</a>.
-      </p>
-    </section>
+        <div class="rowButtons">
+          <button type="button" class="primary" id="addTemplate">Save prompt</button>
+        </div>
+        <p class="status" id="templateStatus" role="status"></p>
+      </section>
 
-  </main>
+      <section class="card" id="answers">
+        <header class="cardHead">
+          <h2>Answers on the page</h2>
+          <span class="cardState" id="stateAnswers"></span>
+        </header>
+
+        <p class="prose">
+          With your own OpenAI Platform key, Archer can stream an answer straight onto the new tab
+          instead of sending you somewhere. Everything else keeps working exactly as it does now.
+        </p>
+
+        <div class="field">
+          <label for="apiKey">OpenAI Platform API key</label>
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+          <p class="hint">
+            A Platform key from <code>platform.openai.com</code> — not your ChatGPT login. The two are
+            separate accounts, and a Platform key cannot see your ChatGPT conversations.
+          </p>
+        </div>
+
+        <div class="rowButtons">
+          <button type="button" class="primary" id="saveKey">Save key</button>
+          <button type="button" id="clearKey">Clear key</button>
+        </div>
+
+        <p class="status" id="keyStatus" role="status"></p>
+
+        <details class="why">
+          <summary>Where your key goes</summary>
+          <p class="hint">
+            <strong>It stays on this device.</strong> It is kept in this browser's extension storage
+            and sent only to <code>api.openai.com</code>, directly from the new tab page. There is no
+            Archer server, nothing is proxied, and nothing is logged anywhere else. You are billed by
+            OpenAI for what you use, on your own account.
+          </p>
+        </details>
+      </section>
+
+      <section class="card" id="modelCard" hidden>
+        <header class="cardHead">
+          <h2>Model</h2>
+          <span class="cardState" id="stateModel"></span>
+        </header>
+        <p class="prose">
+          Listed from your own key, so this is what your account can actually reach rather than a list
+          baked into the extension.
+        </p>
+
+        <div class="field">
+          <label for="model">Model</label>
+          <select id="model"></select>
+        </div>
+
+        <div class="rowButtons">
+          <button type="button" id="refreshModels">Refresh list</button>
+        </div>
+        <p class="status" id="modelStatus" role="status"></p>
+      </section>
+
+      <section class="card" id="budgetCard" hidden>
+        <header class="cardHead">
+          <h2>Budget</h2>
+          <span class="cardState" id="stateBudget"></span>
+        </header>
+
+        <div class="field">
+          <label for="tokenCap">Daily token budget</label>
+          <input id="tokenCap" type="number" min="0" step="1000">
+          <p class="hint">Answering stops once a day's total passes this. 0 means no limit.</p>
+        </div>
+
+        <div class="fieldPair">
+          <div class="field">
+            <label for="rateIn">$ per 1M input tokens</label>
+            <input id="rateIn" type="number" min="0" step="0.01" placeholder="optional">
+          </div>
+          <div class="field">
+            <label for="rateOut">$ per 1M output tokens</label>
+            <input id="rateOut" type="number" min="0" step="0.01" placeholder="optional">
+          </div>
+        </div>
+
+        <div class="rowButtons">
+          <button type="button" class="primary" id="saveBudget">Save budget</button>
+        </div>
+
+        <p class="status" id="budgetStatus" role="status"></p>
+        <p class="usage" id="usage"></p>
+
+        <details class="why">
+          <summary>Why tokens rather than dollars</summary>
+          <p class="hint">
+            Tokens are what the API reports exactly. A dollar figure needs a price list, and a price
+            list hardcoded into an extension goes stale silently and in the wrong direction — so
+            Archer only shows one if you enter your own rates.
+          </p>
+        </details>
+      </section>
+
+      <section class="card" id="permissions">
+        <header class="cardHead">
+          <h2>Permissions</h2>
+          <span class="cardState" id="statePermissions"></span>
+        </header>
+        <p class="prose">
+          Archer asks for two things when you install it: permission to use your default search engine,
+          and somewhere to keep your settings. <strong>Everything else on this list is off until you
+          turn it on</strong>, and can be turned back off here.
+        </p>
+        <p class="hint heads-up">
+          Turning one on is Chrome's decision, not Archer's: it opens a popup at the
+          <strong>top of the window</strong> — some way from these buttons — with <strong>Deny</strong>
+          focused by default. If a switch stays Off, that popup is where the answer went.
+        </p>
+
+        <ul class="grants" id="grants"></ul>
+      </section>
+
+      <section class="card" id="activity">
+        <header class="cardHead">
+          <h2>What you ask</h2>
+        </header>
+        <p class="prose">
+          Computed here, from the prompts already stored on this device. Nothing is sent anywhere to
+          work this out.
+        </p>
+        <div id="analytics"></div>
+
+        <div class="rowButtons">
+          <button type="button" id="exportMarkdown">Export prompts as Markdown</button>
+          <button type="button" id="clearHistory">Clear prompt history</button>
+        </div>
+        <p class="status" id="dataStatus" role="status"></p>
+      </section>
+
+      <section class="card" id="data">
+        <header class="cardHead">
+          <h2>Your data</h2>
+        </header>
+        <p class="prose">
+          On this device. Archer has no server, no account and no analytics — there is nowhere for your
+          data to be sent, because nothing was built to receive it. Your prompts, pins, saved prompts,
+          favorites and API key are in this browser's extension storage and nowhere else.
+        </p>
+        <details class="why">
+          <summary>What touches the network</summary>
+          <p class="hint">
+            Three features, and only the ones you switch on: <code>api.openai.com</code> for inline
+            answers, with your own key; <code>open-meteo.com</code> for the weather; and your own
+            default search engine, through Chrome, when you search. Uninstalling deletes everything.
+            <a href="https://github.com/thellis954/archer-tabs/blob/main/docs/PRIVACY.md" rel="noreferrer">The full policy</a>.
+          </p>
+        </details>
+      </section>
+
+    </main>
+  </div>
 
   <script type="module" src="options.js"></script>
 

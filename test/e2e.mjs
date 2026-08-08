@@ -1952,6 +1952,105 @@ check(
   headsUp,
 );
 
+// --- the settings page is navigable --------------------------------------------
+//
+// It was nine cards in one undifferentiated scroll, which is why the Permissions
+// panel — the answer to most "why isn't this working" — was the part nobody
+// reached.
+
+const navTargets = await shipOptions.locator(".navLink").evaluateAll((els) =>
+  els.map((e) => e.getAttribute("href")),
+);
+check("every section has a nav link", navTargets.length >= 7, JSON.stringify(navTargets));
+check(
+  "every nav link points at a section that exists",
+  await shipOptions.evaluate(
+    (hrefs) => hrefs.every((h) => document.querySelector(h) !== null),
+    navTargets,
+  ),
+  JSON.stringify(navTargets),
+);
+
+// A link to a card that is hidden until a key is set scrolls to nothing.
+check(
+  "the Model and Budget links are hidden while their cards are",
+  (await shipOptions.locator("#navModel").isHidden()) &&
+    (await shipOptions.locator("#modelCard").isHidden()) &&
+    (await shipOptions.locator("#navBudget").isHidden()) &&
+    (await shipOptions.locator("#budgetCard").isHidden()),
+  `model ${await shipOptions.locator("#modelCard").isHidden()}/${await shipOptions.locator("#navModel").isHidden()}, ` +
+    `budget ${await shipOptions.locator("#budgetCard").isHidden()}/${await shipOptions.locator("#navBudget").isHidden()}`,
+);
+
+// Each card says its own state, so "is the weather on?" is answerable without
+// scrolling to the weather form and reading it.
+check(
+  "a section's state is readable from its header",
+  (await shipOptions.locator("#stateDestination").innerText()).trim().length > 0 &&
+    (await shipOptions.locator("#stateWeather").innerText()).trim() === "Off" &&
+    (await shipOptions.locator("#stateAnswers").innerText()).trim() === "No key set",
+  [
+    await shipOptions.locator("#stateDestination").innerText(),
+    await shipOptions.locator("#stateWeather").innerText(),
+    await shipOptions.locator("#stateAnswers").innerText(),
+  ].join(" | "),
+);
+check(
+  "...including how many permissions are on",
+  (await shipOptions.locator("#statePermissions").innerText()).trim() === "0 of 7 on",
+  await shipOptions.locator("#statePermissions").innerText(),
+);
+
+// The long justifications are folded away, not deleted — this page's
+// explanations are half the product.
+const whys = await shipOptions.locator(".why").count();
+check("the dense explanations are behind disclosures", whys >= 4, String(whys));
+check(
+  "...and every one of them opens",
+  await shipOptions.evaluate(() =>
+    [...document.querySelectorAll(".why")].every((d) => d.querySelector("summary") && d.textContent.trim()),
+  ),
+);
+
+// Clicking one is what a reader does first, so it must actually reveal text.
+const firstWhy = shipOptions.locator(".why").first();
+check("a disclosure starts closed", !(await firstWhy.evaluate((d) => d.open)));
+await firstWhy.locator("summary").click();
+await shipOptions.waitForTimeout(150);
+check("...and opens on click", await firstWhy.evaluate((d) => d.open));
+check("...revealing its explanation", await firstWhy.locator(".hint").isVisible());
+
+// The highlight follows the page. It is an IntersectionObserver rather than a
+// scroll listener, and it may only ever *add* highlighting — if it never
+// reports, every link stays plain and every link still works.
+await shipOptions.setViewportSize({ width: 1240, height: 900 });
+await shipOptions.locator("#permissions").scrollIntoViewIfNeeded();
+await shipOptions.waitForTimeout(500);
+check(
+  "the nav follows which section you are looking at",
+  await shipOptions.evaluate(
+    () => document.querySelector(".navLink.isHere")?.getAttribute("href") === "#permissions",
+  ),
+  await shipOptions.evaluate(() => document.querySelector(".navLink.isHere")?.getAttribute("href") ?? "none"),
+);
+
+await shipOptions.locator("#destination").scrollIntoViewIfNeeded();
+await shipOptions.waitForTimeout(500);
+check(
+  "...and moves back",
+  await shipOptions.evaluate(
+    () => document.querySelector(".navLink.isHere")?.getAttribute("href") === "#destination",
+  ),
+  await shipOptions.evaluate(() => document.querySelector(".navLink.isHere")?.getAttribute("href") ?? "none"),
+);
+
+// At most one, or the highlight is telling you two places at once.
+check(
+  "exactly one link is lit at a time",
+  (await shipOptions.locator(".navLink.isHere").count()) === 1,
+  String(await shipOptions.locator(".navLink.isHere").count()),
+);
+
 check(
   "the weather card says a popup is coming before you press the button",
   await shipOptions.locator("#weatherAccessHint").isVisible(),

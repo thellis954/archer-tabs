@@ -47,11 +47,35 @@ function render() {
   const hasKey = Boolean(settings.apiKey);
   modelCard.hidden = !hasKey;
   budgetCard.hidden = !hasKey;
+  // A nav link to a hidden section scrolls to nothing.
+  $("navModel").hidden = !hasKey;
+  $("navBudget").hidden = !hasKey;
+  setState("stateAnswers", hasKey ? "On" : "No key set", hasKey);
+  setState("stateModel", settings.model || "None chosen", Boolean(settings.model));
+  setState(
+    "stateBudget",
+    settings.tokenCap > 0 ? `${settings.tokenCap.toLocaleString()} tokens a day` : "No limit",
+    settings.tokenCap > 0,
+  );
 
   if (hasKey) {
     setModelOptions(settings.model ? [settings.model] : [], settings.model);
     showUsage();
   }
+}
+
+/**
+ * The one line of state a section shows in its header.
+ *
+ * Nine cards with no summary meant the only way to learn whether weather was on
+ * was to scroll to it and read the form. `on` drives the accent, so "off" and
+ * "not set up" never look like an alarm.
+ */
+function setState(id, text, on = false) {
+  const node = $(id);
+  if (!node) return;
+  node.textContent = text;
+  node.classList.toggle("isOn", Boolean(on));
 }
 
 function say(node, message, isError = false) {
@@ -63,9 +87,17 @@ function say(node, message, isError = false) {
 
 const defaultMode = $("defaultMode");
 defaultMode.value = (await loadSettings()).mode;
+paintModeState();
+
+/** Just the destination's name — the option text carries an explanation too. */
+function paintModeState() {
+  const label = (defaultMode.selectedOptions[0]?.textContent ?? "").split(" — ")[0];
+  setState("stateDestination", label, true);
+}
 
 defaultMode.addEventListener("change", async () => {
   await saveMode(defaultMode.value);
+  paintModeState();
   const label = defaultMode.selectedOptions[0]?.textContent ?? defaultMode.value;
   say($("modeStatus"), `New tabs will use ${label.split(" — ")[0]}.`);
 });
@@ -75,6 +107,11 @@ defaultMode.addEventListener("change", async () => {
 const weather = await readWeatherSettings();
 $("place").value = weather.place?.name ?? "";
 $("unit").value = weather.unit;
+paintWeatherState(weather.place?.name);
+
+function paintWeatherState(place) {
+  setState("stateWeather", place || "Off", Boolean(place));
+}
 
 $("savePlace").addEventListener("click", async () => {
   const query = $("place").value.trim();
@@ -111,6 +148,7 @@ $("savePlace").addEventListener("click", async () => {
     await saveWeatherSettings({ place, unit });
     await saveWeatherCache(reading);
     $("place").value = place.name;
+    paintWeatherState(place.name);
     say($("placeStatus"), `Showing weather for ${place.name}.`);
     await paintWeatherAccess();
   } catch (error) {
@@ -144,6 +182,7 @@ $("clearPlace").addEventListener("click", async () => {
   await saveWeatherSettings({ place: null });
   await saveWeatherCache(null);
   $("place").value = "";
+  paintWeatherState(null);
   say($("placeStatus"), "Weather turned off. The card disappears from the new tab.");
 });
 
@@ -166,6 +205,7 @@ await renderTemplates();
 async function renderTemplates() {
   const templates = await readLibrary();
   templateList.replaceChildren();
+  setState("statePrompts", templates.length ? `${templates.length} saved` : "None yet", templates.length > 0);
 
   if (!templates.length) {
     const empty = document.createElement("li");
@@ -454,9 +494,11 @@ await renderGrants();
 async function renderGrants() {
   const list = $("grants");
   list.replaceChildren();
+  let on = 0;
 
   for (const entry of GRANTS) {
     const granted = await isGranted(entry);
+    if (granted) on += 1;
 
     const item = document.createElement("li");
     item.className = "grant";
@@ -519,5 +561,51 @@ async function renderGrants() {
     }
 
     list.append(item);
+  }
+
+  setState("statePermissions", `${on} of ${GRANTS.length} on`, on > 0);
+}
+
+// --- which section you are looking at ------------------------------------------------
+
+/**
+ * Lights the nav link for the section currently on screen.
+ *
+ * An IntersectionObserver rather than a scroll listener, for the reason
+ * `docs/BRAND.md` gives about the site: a scroll handler runs on every frame to
+ * compute something that changes rarely.
+ *
+ * **It only ever adds highlighting.** If the observer never reports — no support,
+ * a hidden page, a browser that behaves differently — every link stays plain and
+ * every link still works, because they are ordinary anchors. Nothing here may
+ * hide or disable anything.
+ */
+{
+  const links = [...document.querySelectorAll(".navLink")];
+  const byId = new Map(links.map((link) => [link.getAttribute("href").slice(1), link]));
+  const sections = [...byId.keys()].map((id) => $(id)).filter(Boolean);
+
+  if (globalThis.IntersectionObserver && sections.length) {
+    const onScreen = new Set();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) onScreen.add(entry.target.id);
+          else onScreen.delete(entry.target.id);
+        }
+
+        // The topmost visible section wins, so scrolling down moves the
+        // highlight one step at a time rather than jumping to whichever
+        // boundary happened to be crossed last.
+        const here = sections.find((section) => onScreen.has(section.id));
+        for (const [id, link] of byId) link.classList.toggle("isHere", Boolean(here) && id === here.id);
+      },
+      // A band across the upper half: a section counts as "here" once its top
+      // reaches the middle of the window, which is where the eye is.
+      { rootMargin: "-10% 0px -55% 0px" },
+    );
+
+    for (const section of sections) observer.observe(section);
   }
 }

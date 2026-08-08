@@ -56,7 +56,7 @@ There is nothing to build or install. To run it:
 | `npm test` | 237 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
-| `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
+| `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state, plus the settings page at both its layouts. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
 | `npm run siteshots` | Renders the marketing site to `shots/site/` — both themes, three widths, and the demo/scrollytell/lab mid-interaction. |
 | `npm run og` | Regenerates `web/assets/og.png`, the social card. |
 | `npm run icons` | Regenerates `extension/assets/icon-*.png` from the mark. |
@@ -156,6 +156,14 @@ under the box — must only appear in those two modes.
 
 **Adding a mode means adding its `<option>` to `options.html`.** The settings dropdown renders blank
 when the stored value matches no option; an e2e check asserts it covers every mode the menu offers.
+
+**The settings page is a nav column plus cards, and a new card needs three things**: an `id`, a
+`.navLink` pointing at it, and a `.cardState` in its `<header class="cardHead">` if it has any state
+worth reading at a glance. `npm run lint` fails an in-page `href` whose target no id matches, so a
+renamed section cannot silently become a dead link. A card that is `hidden` must hide its nav link
+too — `render()` in `options.js` does that for Model and Budget. The long justifications live in
+`<details class="why">`; **nothing that explains a browser popup may go in one**, because a folded
+warning is the same as no warning.
 
 **Only `http(s)` is ever navigable.** `javascript:`, `data:` and `file:` classify as prompts, because
 this page runs in a privileged extension origin — a `javascript:` URL would execute *here*. A unit
