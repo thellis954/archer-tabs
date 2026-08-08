@@ -193,12 +193,14 @@ export function wireFavoriteForm({ onNavigate }) {
   }
 
   /** Only while the icons are not already on, so it stops being said once true. */
-  (async () => {
+  async function paintIconHint() {
     const hint = $("iconHint");
     if (!hint) return;
     hint.hidden = !globalThis.chrome?.permissions?.contains
       || (await chrome.permissions.contains({ permissions: ["favicon"] }).catch(() => true));
-  })();
+  }
+
+  paintIconHint();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -224,7 +226,11 @@ export function wireFavoriteForm({ onNavigate }) {
     // mean an unanswered dialog could stop a favourite being added at all, and
     // the icon is a decoration on a tile that already works.
     askForIcons().then((granted) => {
-      if (granted) renderFavorites({ onNavigate });
+      if (!granted) return;
+      // The hint is read once at load, so without this it keeps offering
+      // something that has already happened until the page is reloaded.
+      paintIconHint();
+      renderFavorites({ onNavigate });
     });
   });
 }
