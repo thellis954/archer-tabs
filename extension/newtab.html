@@ -276,7 +276,12 @@
     <template id="tileTemplate">
       <li class="tile">
         <a class="tileLink">
-          <span class="tileFace" aria-hidden="true"></span>
+          <span class="tileFace" aria-hidden="true">
+            <!-- Hidden until Chrome turns out to have a real icon for this
+                 site. The initials underneath are the resting state, so a tile
+                 is never blank while the icon is being checked. -->
+            <img class="tileIcon" alt="" hidden>
+          </span>
           <span class="tileName"></span>
         </a>
         <button type="button" class="tileRemove">
@@ -364,6 +369,14 @@
         <button type="submit" class="tileSave">Add</button>
         <button type="button" class="tileCancel" id="cancelTile">Cancel</button>
       </form>
+
+      <!-- Hidden once site icons are on. Chrome's popup opens at the top of the
+           window with Deny focused; an unexpected one gets dismissed, and then
+           the icons look broken rather than declined. -->
+      <p class="tileHint" id="iconHint" hidden>
+        Adding one asks Chrome for its site icons — the popup opens at the top of the window.
+        Decline and tiles keep their initials.
+      </p>
 
       <p class="status tileStatus" id="tileStatus" role="status"></p>
     </section>

@@ -9,7 +9,7 @@
 
 import { describeMoment, msToNextMinute } from "./clock.js";
 import { fetchWeather, isStale, unitSymbol, WEATHER_ORIGINS } from "./weather.js";
-import { hostOf, hueFor, monogram, addFavorite, removeFavorite } from "./favorites.js";
+import { hostOf, hueFor, monogram, faviconURL, NO_SUCH_SITE, addFavorite, removeFavorite } from "./favorites.js";
 import {
   readFavorites,
   saveFavorites,
@@ -132,7 +132,11 @@ export async function renderFavorites({ onNavigate }) {
     link.title = favorite.url;
 
     const face = node.querySelector(".tileFace");
-    face.textContent = monogram(favorite.name);
+    const icon = face.querySelector(".tileIcon");
+    // The monogram is written as a text node beside the <img>, not with
+    // textContent, which would delete the image element.
+    face.prepend(document.createTextNode(monogram(favorite.name)));
+    paintIcon(icon, favorite.url);
     // A stable hue per host, so a tile keeps its colour between sessions.
     face.style.setProperty("--tileHue", String(hueFor(hostOf(favorite.url) || favorite.url)));
 
@@ -170,6 +174,32 @@ export function wireFavoriteForm({ onNavigate }) {
   $("addFavorite").addEventListener("click", () => show(form.hidden));
   $("cancelTile").addEventListener("click", () => show(false));
 
+  /**
+   * Chrome's icon store, asked for once.
+   *
+   * `contains` first so a second favourite does not re-open the popup, and the
+   * result is never checked: a no just means initials, which is not a failure
+   * worth a message.
+   */
+  async function askForIcons() {
+    if (!globalThis.chrome?.permissions?.request) return false;
+    try {
+      if (await chrome.permissions.contains({ permissions: ["favicon"] })) return false;
+      return await chrome.permissions.request({ permissions: ["favicon"] });
+    } catch {
+      /* declined, or unavailable. The monogram stands. */
+      return false;
+    }
+  }
+
+  /** Only while the icons are not already on, so it stops being said once true. */
+  (async () => {
+    const hint = $("iconHint");
+    if (!hint) return;
+    hint.hidden = !globalThis.chrome?.permissions?.contains
+      || (await chrome.permissions.contains({ permissions: ["favicon"] }).catch(() => true));
+  })();
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -188,5 +218,75 @@ export function wireFavoriteForm({ onNavigate }) {
     $("tileName").value = "";
     show(false);
     await renderFavorites({ onNavigate });
+
+    // After the favourite is saved and painted, and deliberately not awaited.
+    // Chrome's consent popup blocks until it is answered — asking first would
+    // mean an unanswered dialog could stop a favourite being added at all, and
+    // the icon is a decoration on a tile that already works.
+    askForIcons().then((granted) => {
+      if (granted) renderFavorites({ onNavigate });
+    });
   });
+}
+
+// --- favourite icons ------------------------------------------------------------------
+
+/**
+ * Chrome's "no icon for this site" placeholder, as bytes, fetched once.
+ *
+ * `_favicon` never fails: ask it about a site the browser has never seen and it
+ * answers 200 with a generic globe — byte-identical every time, measured. So
+ * there is no error to catch and no size to test; the only way to know an icon
+ * is real is to know what the placeholder looks like and compare against it.
+ * Asking about an address that cannot resolve is how we get a copy.
+ *
+ * `null` once we know we cannot tell, in which case every tile keeps its
+ * monogram — the safe way to be wrong.
+ */
+let placeholderBytes;
+
+async function iconBytes(pageUrl) {
+  const base = globalThis.chrome?.runtime?.getURL?.("/");
+  if (!base) return null;
+  try {
+    const response = await fetch(faviconURL(pageUrl, { base }));
+    if (!response.ok) return null;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    // Without the `favicon` permission the request is blocked outright, which
+    // is not an error worth reporting — it is the un-upgraded resting state.
+    return null;
+  }
+}
+
+const sameBytes = (a, b) => a && b && a.length === b.length && a.every((byte, at) => byte === b[at]);
+
+/**
+ * Shows the site's own icon, or leaves the monogram alone.
+ *
+ * Fails toward the monogram in every direction: no permission, no cached icon,
+ * a placeholder, a fetch that throws. A wall of identical grey globes would be
+ * worse than the letters it replaced.
+ */
+async function paintIcon(img, pageUrl) {
+  const bytes = await iconBytes(pageUrl);
+  if (!bytes) return;
+
+  if (placeholderBytes === undefined) placeholderBytes = await iconBytes(NO_SUCH_SITE);
+  if (placeholderBytes && sameBytes(bytes, placeholderBytes)) return;
+
+  // Painted from the bytes already in hand rather than fetched a second time,
+  // so what was checked is exactly what is shown.
+  const url = URL.createObjectURL(new Blob([bytes]));
+  img.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+  img.addEventListener(
+    "error",
+    () => {
+      URL.revokeObjectURL(url);
+      img.hidden = true;
+    },
+    { once: true },
+  );
+  img.src = url;
+  img.hidden = false;
 }

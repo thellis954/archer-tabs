@@ -664,6 +664,8 @@ click every control, at every width, and watch what the page actually does.
 | The settings "Send prompts to" dropdown rendered blank | Adding a mode without adding its `<option>` left the stored value matching nothing. An e2e check now asserts the dropdown covers every mode the menu offers |
 | The default-engine hint contradicted the pills | "Prompts go to your default search engine" is true of Auto and Default-engine mode and false of the four named destinations. It now only shows in the two modes it describes |
 | A PDF, a Word file or a photo could not be attached at all | The file picker carried an `accept` list of text extensions, so the file someone came to attach was greyed out with no explanation |
+| **"None of these toggles work"** | They all worked. Verified with a real click in a headed browser: press Allow and the switch goes On. Chrome opens its consent popup at the *top of the window* — some way from a panel at the bottom of a long page — with **Deny** focused by default. Miss it, or press Enter, and `renderGrants()` redrew the row byte-identical: still Off, still "Turn on", not a word about why. **Silence was the entire bug.** Each row now says what happened, and the panel says where Chrome's popup opens before you press anything |
+| Weather "wouldn't save my location" | The same cause. Saving works perfectly once the origin is granted — driven end to end against a stubbed Open-Meteo — so the only failure was the grant, and its message was a dead end: no mention that Chrome had asked, no retry, no pointer to the Permissions panel that can also turn it on. It now keeps the typed place and says all three |
 
 **Two improvements that came out of the same pass:**
 - **The placeholder names the destination.** "Ask Claude, or type a URL" — the box is the only thing
@@ -675,6 +677,18 @@ click every control, at every width, and watch what the page actually does.
   line. A chip also means the file can be removed, and it survives while you type the question.
   Hand-offs travel in a URL, so their attachment is trimmed to a budget and the page says so;
   Answer mode posts a body and sends the whole file.
+- **Favourites show the site's own icon.** `src/favorites.js` builds a `_favicon` URL — Chrome's
+  **local** icon store, built from your own history, so no request reaches the site. Fetching
+  `https://site/favicon.ico` per tile needs no permission at all and was rejected for exactly that
+  reason: it would announce every favourite to its operator on every new tab, which contradicts the
+  one thing this extension promises. The `favicon` permission is optional and asked for at the click
+  that adds a favourite — *after* the favourite is saved, because Chrome's popup blocks until it is
+  answered and a decoration must never hold up the thing it decorates.
+  **The fallback is the interesting part**: `_favicon` never fails. For a site the browser has never
+  seen it answers 200 with a generic globe, byte-identical every time — so `onerror` can never fire,
+  and a naive `<img>` would replace every monogram with the same grey planet. Asking it about an
+  address that cannot resolve yields a copy of that placeholder, and anything matching it byte for
+  byte keeps its initials.
 - **Attachments read real documents.** `src/extract.js` unzips `.docx`/`.xlsx`/`.pptx` and pulls the
   text out of their XML, and inflates and reads PDF content streams — all with `DecompressionStream`,
   so it stays a dependency-free pure module that runs under `npm test`. Images become data URLs and

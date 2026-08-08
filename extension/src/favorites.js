@@ -66,12 +66,42 @@ export function nameFor(url, given = "") {
 }
 
 /**
+ * Chrome's own cached favicon for a page, as a URL the page can paint.
+ *
+ * `_favicon` reads the favicon database the browser already built from your
+ * history — **no request leaves the device**, which is the only reason this is
+ * here at all. Fetching `https://site/favicon.ico` per tile would work without
+ * any permission, and would also announce your favourites to their operators
+ * every time you open a tab. That is not a trade this page makes.
+ *
+ * Pure: the extension-origin base is passed in rather than read from chrome.*.
+ *
+ * @param {string} pageUrl  the site, not the icon
+ * @param {{base: string, size?: number}} options  base is chrome.runtime.getURL("/")
+ */
+export function faviconURL(pageUrl, { base, size = 32 } = {}) {
+  if (!pageUrl || !base) return "";
+  return `${base.replace(/\/$/, "")}/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=${size}`;
+}
+
+/**
+ * The address whose icon is Chrome's "I have no icon for this" globe.
+ *
+ * `_favicon` never fails: for a site the browser has never seen it answers 200
+ * with a generic globe, byte-identical every time — measured. So an `onerror`
+ * fallback can never fire, and a bare `<img>` would quietly replace every
+ * monogram with the same grey planet. Asking for an address that cannot exist
+ * yields that placeholder on demand, and anything matching it byte for byte is
+ * a site Chrome has no icon for.
+ */
+export const NO_SUCH_SITE = "https://no-icon.invalid/";
+
+/**
  * Two letters for the tile face.
  *
- * A monogram rather than a favicon: a real favicon needs either the `favicon`
- * permission or a network fetch per tile, and a letter drawn from the site's
- * own name works offline, in both themes, and at any size. Turning on real
- * icons is a settings toggle (docs/ROADMAP.md Phase 6).
+ * The fallback whenever Chrome has no cached icon — which is every site you
+ * have not visited yet, and every site whose icon is the placeholder. A letter
+ * drawn from the site's own name works offline, in both themes, at any size.
  */
 export function monogram(name) {
   const words = String(name ?? "").trim().split(/[\s._\-/]+/).filter(Boolean);

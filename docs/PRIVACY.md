@@ -86,6 +86,7 @@ the feature, and Archer's settings page lists all of them with an on/off switch:
 | `topSites` | "Show top sites" in the + menu | The sites you visit most, as rows |
 | `sessions` + `tabs` | "Show recently closed tabs" in the + menu | Reopening a tab you closed. Chrome will not reveal a closed tab's title without `tabs`, which is why this one asks for more |
 | `clipboardRead` | "Paste" in the + menu | Reading the clipboard at the moment you choose Paste, and at no other time |
+| `favicon` | Adding a favourite | Reading the icon Chrome already cached for that site, so a favourite shows its own icon rather than its initials. This reads a local store — **no request is made to the site** |
 | `api.openai.com` | Saving an API key | Streaming an answer onto the page |
 | `api.open-meteo.com`, `geocoding-api.open-meteo.com` | Saving a weather place | The weather card |
 

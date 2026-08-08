@@ -46,6 +46,12 @@ export const GRANTS = [
     why: "Reads the clipboard when — and only when — you choose Paste in the + menu.",
   },
   {
+    id: "favicons",
+    title: "Site icons on favourites",
+    permissions: ["favicon"],
+    why: "Shows each favourite's real icon instead of its initials, read from the icon store Chrome already built from your own history. Nothing is fetched from the site — no request leaves your device — so a site Chrome has never seen keeps its initials.",
+  },
+  {
     id: "openai",
     title: "Inline answers",
     origins: ["https://api.openai.com/*"],

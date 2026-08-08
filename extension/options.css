@@ -134,6 +134,22 @@ code {
 
 .status.isError { color: var(--accent); }
 
+/* Says a browser popup is coming, or where the last one went. Bordered rather
+   than coloured: it is not an error, and it has to stay legible in both themes. */
+.heads-up {
+  border-left: 2px solid var(--accent);
+  padding-left: 0.7rem;
+  margin-block: 0.75rem;
+}
+
+.grantNote {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
 /* ---------- saved prompts ---------- */
 
 .templates {
