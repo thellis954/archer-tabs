@@ -451,3 +451,22 @@ test("a product-name suffix is stripped from the title", () => {
   });
   assert.equal(rows[0].title, "Fletching an arrow");
 });
+
+test("a blank or non-string launch never becomes a row or a title", () => {
+  // The launch log is user text from storage, and it is now a row *title* — so
+  // a whitespace-only entry would render as a blank row, and unboundPrompts
+  // lowercases whatever it finds.
+  const rows = buildRows({
+    visits: [],
+    launches: [{ text: "   ", at: T }, { text: null, at: T }, { at: T }, { text: 42, at: T }],
+  });
+  assert.equal(rows.length, 0, JSON.stringify(rows));
+});
+
+test("a launch is trimmed before it names a conversation", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://chatgpt.com/c/${UUID}`, title: "ChatGPT", lastVisitTime: T, firstVisitTime: T }],
+    launches: [{ text: "  how do I fletch an arrow  ", at: T - 1000 }],
+  });
+  assert.equal(rows[0].title, "how do I fletch an arrow");
+});

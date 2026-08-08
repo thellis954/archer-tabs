@@ -639,6 +639,11 @@ await convoPage.goto(FIXTURE_NEWTAB, { waitUntil: "domcontentloaded" });
 await convoPage.waitForTimeout(700);
 
 check("the onboarding row is gone once access is granted", await convoPage.locator("#onboarding").isHidden());
+check(
+  "...and so is the note that explained it",
+  await convoPage.locator("#historyNote").isHidden(),
+  await convoPage.locator("#historyNote").innerText(),
+);
 
 const convoTitles = await convoPage.locator("#rows .row.is-conversation .title").allInnerTexts();
 check(
@@ -675,9 +680,8 @@ check(
   CONVOS.every((c) => paired[c.title] === `— ChatGPT · ${c.prompt}`),
   JSON.stringify(paired),
 );
-// Opening it is the entire point of keeping it.
 const namelessRow = convoPage.locator("#rows .row.is-conversation", { hasText: "ChatGPT conversation" });
-check("the nameless conversation is a real, clickable row", (await namelessRow.count()) === 1);
+check("the nameless conversation is a real row", (await namelessRow.count()) === 1);
 
 check(
   "a bound launch does not also appear as its own ask-again row",
@@ -691,10 +695,12 @@ await convoPage.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) convoNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
-await convoPage.locator("#rows .row.is-conversation").first().click();
+// The *nameless* one specifically: opening it is the entire point of keeping
+// it, and clicking whichever row happens to be first would not prove that.
+await namelessRow.click();
 await convoPage.waitForTimeout(300);
 check(
-  "clicking a conversation opens it",
+  "clicking the conversation Chrome never named opens it",
   /^https:\/\/chatgpt\.com\/c\/[0-9a-f-]{36}$/.test(convoNav[0] ?? ""),
   JSON.stringify(convoNav),
 );

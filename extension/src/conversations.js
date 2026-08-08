@@ -115,7 +115,13 @@ export function buildRows({
 
   // Oldest first, so "the latest launch that precedes this conversation" is a
   // forward scan and each launch can be spent at most once.
-  const log = [...launches].filter((l) => l && l.text).sort((a, b) => a.at - b.at);
+  // Normalised, not just truth-tested: a launch's text becomes a row title now,
+  // so a whitespace-only one would render as a blank row, and unboundPrompts
+  // calls .toLowerCase() on it — which a non-string in storage would throw on.
+  const log = launches
+    .map((l) => (l && typeof l.text === "string" ? { text: l.text.trim(), at: Number(l.at) || 0 } : null))
+    .filter((l) => l && l.text)
+    .sort((a, b) => a.at - b.at);
   const spent = bindLaunches(conversations, log);
 
   // Named *after* binding, because the best name for a conversation Chrome

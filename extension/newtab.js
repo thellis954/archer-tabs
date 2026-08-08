@@ -50,6 +50,7 @@ const nudge = document.getElementById("engineNudge");
 const list = document.getElementById("rows");
 const onboarding = document.getElementById("onboarding");
 const emptyState = document.getElementById("emptyState");
+const historyNote = document.getElementById("historyNote");
 const noMatches = document.getElementById("noMatches");
 
 // --- mode ---------------------------------------------------------------------
@@ -176,6 +177,9 @@ async function refreshRows() {
     hasClosedTabsAccess(),
   ]);
   onboarding.hidden = granted;
+  // The note explains the row; it has to come and go with it. Sitting outside
+  // #onboarding meant granting hid the row and left the warning behind.
+  historyNote.hidden = granted;
 
   const [launches, { pinned, dismissed }, library] = await Promise.all([
     readLaunches(),
@@ -545,7 +549,6 @@ document.getElementById("enableHistory").addEventListener("click", async () => {
   // Must stay inside the click: Chrome refuses a permission request that is not
   // driven by a user gesture, and refuses it silently.
   const granted = await requestHistoryAccess();
-  const note = document.getElementById("historyNote");
 
   if (granted) {
     await refreshRows();
@@ -553,10 +556,10 @@ document.getElementById("enableHistory").addEventListener("click", async () => {
     // Without this the row redraws identical and the click reads as dead — the
     // same bug the Permissions panel had. The popup is easy to miss precisely
     // because it opens nowhere near the row that was pressed.
-    note.textContent =
+    historyNote.textContent =
       "Still off — Chrome's popup was declined or dismissed. It opens at the top of the window, " +
       "and Deny is its default. Press the row again to try once more.";
-    note.classList.add("isRefused");
+    historyNote.classList.add("isRefused");
   }
 
   input.focus();
