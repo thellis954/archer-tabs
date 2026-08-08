@@ -655,10 +655,15 @@ click every control, at every width, and watch what the page actually does.
 | The top-bar menu ran 256px off the right edge | Anchored `left: 0` under a control that had moved to the far right of the bar |
 | Recent ChatGPT chats never appeared | The matcher only accepted `chatgpt.com/c/<uuid>` — it dropped every custom-GPT conversation (`/g/g-xxx/c/<uuid>`) and everything at the old `chat.openai.com`. The history query also used `"chatgpt.com/c/"`, and Chrome's history search tokenises on punctuation |
 | Favorites "didn't save" | They did. Chrome pre-renders the new tab page, so a tab built before the change showed the state as it was then. Nothing watched `chrome.storage.onChanged` |
-| The settings gear did nothing | `chrome.runtime.openOptionsPage()` is a silent no-op when the manifest has no options page registered — which is what a stale unpacked build looks like |
+| The settings gear did nothing | Two separate causes, a phase apart. First: `chrome.runtime.openOptionsPage()` is a silent no-op when the manifest has no options page registered. Then, with the page registered, it *still* looked dead — see the row below |
 | **A hand-off could navigate the wrong tab** | `chrome.tabs.update({url})` with no tab id navigates whatever tab is *active*, not the one running the page. Measured: the page's own tab id and the active tab id differ. It now resolves its own id with `chrome.tabs.getCurrent()` |
 | Clicking the "Web Store" top site killed the tab | Chrome forbids extensions from navigating there — and it is the *only* entry in `topSites` on a fresh profile, so it was the first thing a new user would click |
 | The page scrolled sideways at 360px | Four destination pills are wider than a phone-width window and the row would not wrap |
+| **The gear and the `+` menu's Settings both still did nothing** | `chrome.runtime.openOptionsPage()` takes a special path when the caller *is* the new tab page: it replaces that tab instead of opening one. Measured with a real click in a headed browser — two tabs before, two after, and the new tab had become `options.html`. Indistinguishable from a dead button, and it destroys the page you were on. Now `chrome.tabs.create`, which needs no permission and always visibly does something |
+| **The pill labelled "Search" went to ChatGPT** | It was `data-mode="auto"`, and Auto hands prompts to `chrome.search` — the user's *default engine*. For anyone who had taken the page's own advice and installed OpenAI's search extension, a button reading "Search" reached ChatGPT. A pill that names a place now goes to that place: `google` is a destination like the other three |
+| The settings "Send prompts to" dropdown rendered blank | Adding a mode without adding its `<option>` left the stored value matching nothing. An e2e check now asserts the dropdown covers every mode the menu offers |
+| The default-engine hint contradicted the pills | "Prompts go to your default search engine" is true of Auto and Default-engine mode and false of the four named destinations. It now only shows in the two modes it describes |
+| A PDF, a Word file or a photo could not be attached at all | The file picker carried an `accept` list of text extensions, so the file someone came to attach was greyed out with no explanation |
 
 **Two improvements that came out of the same pass:**
 - **The placeholder names the destination.** "Ask Claude, or type a URL" — the box is the only thing
@@ -670,6 +675,13 @@ click every control, at every width, and watch what the page actually does.
   line. A chip also means the file can be removed, and it survives while you type the question.
   Hand-offs travel in a URL, so their attachment is trimmed to a budget and the page says so;
   Answer mode posts a body and sends the whole file.
+- **Attachments read real documents.** `src/extract.js` unzips `.docx`/`.xlsx`/`.pptx` and pulls the
+  text out of their XML, and inflates and reads PDF content streams — all with `DecompressionStream`,
+  so it stays a dependency-free pure module that runs under `npm test`. Images become data URLs and
+  ride the Answer-here path, which posts a body; a URL hand-off cannot carry a picture and the page
+  says so rather than dropping it. **What it will not do is pretend**: a scanned PDF has no text
+  layer, so the chip reads "no text layer — it looks like a scan" instead of attaching nothing while
+  claiming a PDF went.
 
 ## 4.5 Parked ideas
 

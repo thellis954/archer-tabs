@@ -18,12 +18,13 @@ export const ASK = "ask";
 export const ANSWER = "answer";
 
 export const AUTO = "auto";
+export const GOOGLE = "google";
 export const CHATGPT = "chatgpt";
 export const CLAUDE = "claude";
 export const PERPLEXITY = "perplexity";
 export const SEARCH_MODE = "search";
 export const ANSWER_MODE = "answer";
-export const MODES = [AUTO, CHATGPT, CLAUDE, PERPLEXITY, SEARCH_MODE, ANSWER_MODE];
+export const MODES = [AUTO, GOOGLE, CHATGPT, CLAUDE, PERPLEXITY, SEARCH_MODE, ANSWER_MODE];
 
 /**
  * Where a prompt goes in each hand-off mode. Every one is a plain `?q=`
@@ -34,6 +35,7 @@ export const MODES = [AUTO, CHATGPT, CLAUDE, PERPLEXITY, SEARCH_MODE, ANSWER_MOD
  * browser's settings name search engines. No mark or styling of theirs is used.
  */
 const TARGETS = {
+  [GOOGLE]: "https://www.google.com/search?q=",
   [CHATGPT]: "https://chatgpt.com/?q=",
   [CLAUDE]: "https://claude.ai/new?q=",
   [PERPLEXITY]: "https://www.perplexity.ai/search?q=",
@@ -51,10 +53,11 @@ export const isHandoff = (mode) => Object.hasOwn(TARGETS, mode);
  */
 const PLACEHOLDERS = {
   [AUTO]: "Ask or type a URL",
+  [GOOGLE]: "Search Google, or type a URL",
   [CHATGPT]: "Ask ChatGPT, or type a URL",
   [CLAUDE]: "Ask Claude, or type a URL",
   [PERPLEXITY]: "Ask Perplexity, or type a URL",
-  [SEARCH_MODE]: "Search the web",
+  [SEARCH_MODE]: "Search with your default engine",
   [ANSWER_MODE]: "Ask, and the answer appears here",
 };
 

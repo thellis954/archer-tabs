@@ -7,6 +7,7 @@
 //   mkdir -p node_modules && ln -s "$(npm root -g)/playwright" node_modules/playwright
 
 import { createHash } from "node:crypto";
+import { deflateRawSync } from "node:zlib";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -245,25 +246,36 @@ check("the mode button declares its popup", (await modeButton.getAttribute("aria
 await modeButton.click();
 check("clicking the mode button opens the menu", await modeMenu.isVisible());
 check("open is announced", (await modeButton.getAttribute("aria-expanded")) === "true");
+// Everything below is expressed against the menu as rendered rather than against
+// mode names, so adding a destination changes no assertion here.
+const modeOrder = await page.locator("#modeMenu [role=option]").evaluateAll((els) =>
+  els.map((e) => e.dataset.mode),
+);
+const selectedAt = await page
+  .locator("#modeMenu [role=option]")
+  .evaluateAll((els) => els.findIndex((e) => e.getAttribute("aria-selected") === "true"));
+
 check(
   "the selected option is focused on open",
-  await page.evaluate(() => document.activeElement?.dataset.mode) === "auto",
+  (await page.evaluate(() => document.activeElement?.dataset.mode)) === modeOrder[selectedAt],
+  await page.evaluate(() => document.activeElement?.dataset.mode),
 );
 
 await page.keyboard.press("ArrowDown");
 check(
   "ArrowDown walks the options",
-  await page.evaluate(() => document.activeElement?.dataset.mode) === "chatgpt",
+  (await page.evaluate(() => document.activeElement?.dataset.mode)) ===
+    modeOrder[(selectedAt + 1) % modeOrder.length],
+  await page.evaluate(() => document.activeElement?.dataset.mode),
 );
 
-await page.keyboard.press("ArrowUp");
-await page.keyboard.press("ArrowUp");
-// Against the last option as rendered, so adding a mode does not break this.
-const lastMode = await page.locator("#modeMenu [role=option]").last().getAttribute("data-mode");
+// Back to the selected option, then one past the top — which has to wrap rather
+// than stick.
+for (let i = 0; i <= selectedAt + 1; i++) await page.keyboard.press("ArrowUp");
 check(
   "ArrowUp wraps to the last option",
-  (await page.evaluate(() => document.activeElement?.dataset.mode)) === lastMode,
-  lastMode,
+  (await page.evaluate(() => document.activeElement?.dataset.mode)) === modeOrder.at(-1),
+  await page.evaluate(() => document.activeElement?.dataset.mode),
 );
 
 await page.keyboard.press("Escape");
@@ -977,13 +989,16 @@ check("a URL still opens in a hand-off mode", out[0]?.startsWith("https://exampl
 
 // Alt+arrow cycles the target without going near the menu.
 await pickMode("auto");
+// The label after Auto in the menu, rather than a name: the point of the check
+// is that Alt+arrow moves one step, not which destination happens to be next.
+const nextLabel = await power.locator("#modeMenu [role=option]").nth(1).getAttribute("data-label");
 await power.fill("#query", "x");
 await power.locator("#query").press("Alt+ArrowDown");
 await power.waitForTimeout(150);
 check(
   "Alt+ArrowDown cycles to the next target",
-  (await power.locator("#modeLabel").innerText()).trim() === "ChatGPT",
-  await power.locator("#modeLabel").innerText(),
+  (await power.locator("#modeLabel").innerText()).trim() === nextLabel,
+  `${await power.locator("#modeLabel").innerText()} (wanted ${nextLabel})`,
 );
 
 await power.locator("#query").press("Alt+ArrowUp");
@@ -1350,7 +1365,7 @@ check("turning weather off removes the card", await dash.locator("#weather").isH
 
 // --- target pills ------------------------------------------------------------------
 
-await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: true, favorites: [] }));
+await dash.evaluate(() => chrome.storage.local.set({ mode: "google", engineNudgeDismissed: true, favorites: [] }));
 await dash.reload({ waitUntil: "domcontentloaded" });
 await dash.waitForTimeout(400);
 
@@ -1358,7 +1373,7 @@ const pressed = () =>
   dash.locator('.target[aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.dataset.mode));
 
 check("exactly one pill is pressed at a time", (await pressed()).length === 1, JSON.stringify(await pressed()));
-check("...and it matches the stored mode", (await pressed())[0] === "auto");
+check("...and it matches the stored mode", (await pressed())[0] === "google");
 
 await dash.locator('.target[data-mode="claude"]').click();
 await dash.waitForTimeout(200);
@@ -1387,16 +1402,49 @@ check(
 
 // Choosing in the menu has to move the pill back the other way.
 await dash.locator("#modeButton").click();
-await dash.locator('#modeMenu [role=option][data-mode="auto"]').click();
+await dash.locator('#modeMenu [role=option][data-mode="chatgpt"]').click();
 await dash.waitForTimeout(200);
-check("choosing in the menu moves the pill", (await pressed())[0] === "auto", JSON.stringify(await pressed()));
+check("choosing in the menu moves the pill", (await pressed())[0] === "chatgpt", JSON.stringify(await pressed()));
 
 check(
   "all four destinations have a pill",
   (await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))).join() ===
-    "auto,chatgpt,claude,perplexity",
+    "google,chatgpt,claude,perplexity",
   JSON.stringify(await dash.locator(".target").evaluateAll((els) => els.map((e) => e.dataset.mode))),
 );
+
+// The pill labelled Google used to be data-mode="auto", which hands prompts to
+// chrome.search — the user's *default* engine. Anyone who had made ChatGPT their
+// default got ChatGPT from a button that said Google. A pill naming a place has
+// to reach that place.
+check(
+  "the pill labelled Google says Google",
+  (await dash.locator('.target[data-mode="google"]').innerText()).trim() === "Google",
+  await dash.locator('.target[data-mode="google"]').innerText(),
+);
+
+await dash.locator('.target[data-mode="google"]').click();
+await dash.waitForTimeout(200);
+dashNav.length = 0;
+await dash.fill("#query", "submit an extension to the chrome store");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(400);
+check(
+  "the Google pill reaches Google, not the default engine",
+  (dashNav[0] ?? "").startsWith("https://www.google.com/search?q=submit"),
+  JSON.stringify(dashNav),
+);
+
+dashNav.length = 0;
+await dash.fill("#query", "example.com");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(400);
+check(
+  "...and a URL still just opens in Google mode",
+  (dashNav[0] ?? "").startsWith("https://example.com"),
+  JSON.stringify(dashNav),
+);
+await dash.fill("#query", "");
 
 // A mode with no pill leaves them all unpressed rather than lying about one.
 await dash.locator("#modeButton").click();
@@ -1571,6 +1619,211 @@ await dash.waitForTimeout(250);
 check("a chip can be removed", (await dash.locator(".chip").count()) === 0);
 check("...which disarms send again", await dash.locator("#send").isDisabled());
 rmSync(ATTACH, { force: true });
+
+// --- the default-engine hint only appears where it is true ------------------------
+//
+// It reads "Prompts go to your default search engine", which is a statement
+// about Auto and Default-engine mode and a flat contradiction of the Google,
+// ChatGPT, Claude and Perplexity pills.
+
+await dash.evaluate(() => chrome.storage.local.set({ mode: "auto", engineNudgeDismissed: false }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+check("the default-engine hint shows in Auto", await dash.locator("#engineNudge").isVisible());
+
+await dash.locator('.target[data-mode="google"]').click();
+await dash.waitForTimeout(250);
+check("...and goes away once a named destination is chosen", await dash.locator("#engineNudge").isHidden());
+
+await dash.locator("#modeButton").click();
+await dash.locator('#modeMenu [role=option][data-mode="search"]').click();
+await dash.waitForTimeout(250);
+check("...and comes back for Default engine, which does use one", await dash.locator("#engineNudge").isVisible());
+await dash.evaluate(() => chrome.storage.local.set({ mode: "chatgpt", engineNudgeDismissed: true }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
+
+/**
+ * A real .docx, built here rather than checked in: a zip whose word/document.xml
+ * holds the paragraphs. Small enough to read, real enough that the extension's
+ * own unzip has to work for the check to pass.
+ */
+function makeDocx(text) {
+  const body =
+    "<w:document><w:body>" +
+    text
+      .split("\n")
+      .map((line) => `<w:p><w:r><w:t>${line}</w:t></w:r></w:p>`)
+      .join("") +
+    "</w:body></w:document>";
+
+  const name = Buffer.from("word/document.xml");
+  const raw = Buffer.from(body);
+  const packed = deflateRawSync(raw);
+
+  const local = Buffer.alloc(30 + name.length + packed.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(8, 8);
+  local.writeUInt32LE(packed.length, 18);
+  local.writeUInt32LE(raw.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  name.copy(local, 30);
+  packed.copy(local, 30 + name.length);
+
+  const dir = Buffer.alloc(46 + name.length);
+  dir.writeUInt32LE(0x02014b50, 0);
+  dir.writeUInt16LE(8, 10);
+  dir.writeUInt32LE(packed.length, 20);
+  dir.writeUInt32LE(raw.length, 24);
+  dir.writeUInt16LE(name.length, 28);
+  dir.writeUInt32LE(0, 42);
+  name.copy(dir, 46);
+
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(dir.length, 12);
+  eocd.writeUInt32LE(local.length, 16);
+
+  return Buffer.concat([local, dir, eocd]);
+}
+
+// --- attachments that are not text ------------------------------------------------
+//
+// The picker used to carry an `accept` list of text extensions, so the PDF or
+// the spreadsheet someone came to attach was greyed out with no explanation.
+// It now accepts anything and src/extract.js says what it could and could not
+// read — which only means something if a chip actually reports the difference.
+
+check(
+  "the file picker does not grey out the file you came to attach",
+  (await dash.locator("#attachInput").getAttribute("accept")) === null,
+  await dash.locator("#attachInput").getAttribute("accept"),
+);
+
+const DOCX = join(tmpdir(), "archer-brief.docx");
+writeFileSync(DOCX, Buffer.from(makeDocx("Quarterly review\nRevenue rose four percent.")));
+await dash.setInputFiles("#attachInput", DOCX);
+await dash.waitForTimeout(600);
+check("a .docx attaches", (await dash.locator(".chip").count()) === 1);
+check(
+  "...and the chip says it is a Word file, not a byte count",
+  (await dash.locator(".chipSize").innerText()).startsWith("Word"),
+  await dash.locator(".chipSize").innerText(),
+);
+
+dashNav.length = 0;
+await dash.fill("#query", "summarise this");
+await dash.locator("#query").press("Enter");
+await dash.waitForTimeout(500);
+const docxSent = decodeURIComponent((dashNav[0] ?? "").replace(/^[^?]*\?q=/, ""));
+check(
+  "the words inside the .docx actually reach the destination",
+  docxSent.includes("Quarterly review") && docxSent.includes("Revenue rose four percent"),
+  JSON.stringify(docxSent.slice(0, 160)),
+);
+rmSync(DOCX, { force: true });
+
+// A scan has no text layer, and saying so beats attaching nothing while the
+// chip claims a PDF went.
+const SCAN = join(tmpdir(), "archer-scan.pdf");
+writeFileSync(SCAN, "%PDF-1.4\n1 0 obj\n<< /Filter /DCTDecode >>\nstream\nxx\nendstream\n%%EOF");
+await dash.fill("#query", "");
+await dash.setInputFiles("#attachInput", SCAN);
+await dash.waitForTimeout(600);
+check(
+  "a PDF with no text layer is attached and labelled, not silently empty",
+  (await dash.locator(".chipSize").innerText()).toLowerCase().includes("scan"),
+  await dash.locator(".chipSize").innerText(),
+);
+await dash.locator(".chipRemove").click();
+await dash.waitForTimeout(200);
+rmSync(SCAN, { force: true });
+
+// An image can only go on the Answer-here path, which posts a body. A hand-off
+// puts the prompt in a URL, and a URL cannot carry a picture — so the page has
+// to say that rather than dropping it between two screens.
+const SHOT = join(tmpdir(), "archer-shot.png");
+writeFileSync(SHOT, Buffer.from("89504e470d0a1a0a", "hex"));
+await dash.setInputFiles("#attachInput", SHOT);
+await dash.waitForTimeout(600);
+check("an image attaches", (await dash.locator(".chip").count()) === 1);
+check(
+  "...and the page says an image needs Answer here",
+  (await dash.locator("#attachStatus").innerText()).toLowerCase().includes("image"),
+  await dash.locator("#attachStatus").innerText(),
+);
+await dash.locator(".chipRemove").click();
+await dash.waitForTimeout(200);
+rmSync(SHOT, { force: true });
+
+// The destination select went blank the moment a mode existed that it had no
+// <option> for — the stored value matched nothing, so it rendered empty and the
+// page looked broken.
+check(
+  "every mode the menu offers is also in the settings dropdown",
+  await dash.evaluate(async () => {
+    const page = await fetch(chrome.runtime.getURL("options.html")).then((r) => r.text());
+    const inOptions = new Set([...page.matchAll(/<option value="([^"]+)"/g)].map((m) => m[1]));
+    return [...document.querySelectorAll("#modeMenu [role=option]")].every((li) =>
+      inOptions.has(li.dataset.mode),
+    );
+  }),
+);
+
+// A rejection has to survive the repaint. paintAttachments() owns the status line
+// and clears it when nothing is attached, so a message written while reading the
+// files was wiped a moment later — and if every file was rejected, all the user
+// saw was a picker that closed and did nothing.
+const HUGE = join(tmpdir(), "archer-huge.bin");
+writeFileSync(HUGE, Buffer.alloc(11 * 1024 * 1024));
+await dash.setInputFiles("#attachInput", HUGE);
+await dash.waitForTimeout(700);
+check("nothing attaches when the only file is too big", (await dash.locator(".chip").count()) === 0);
+check(
+  "...and the page says why, rather than closing the picker onto silence",
+  (await dash.locator("#attachStatus").innerText()).includes("10 MB"),
+  await dash.locator("#attachStatus").innerText(),
+);
+rmSync(HUGE, { force: true });
+
+// --- settings opens somewhere you can see -----------------------------------------
+//
+// chrome.runtime.openOptionsPage() takes a special path when the caller is the
+// new tab page: it *replaces* that tab instead of opening one. Measured with a
+// real click in a headed browser — two tabs before, two after, and the new tab
+// had become options.html. Indistinguishable from the button doing nothing.
+
+const beforeGear = dashCtx.pages().length;
+await dash.locator("#openSettings").click();
+await dash.waitForTimeout(900);
+const openedByGear = dashCtx.pages().filter((p) => p.url().endsWith("/options.html"));
+check(
+  "the gear opens settings in a new tab",
+  dashCtx.pages().length === beforeGear + 1,
+  `${beforeGear} -> ${dashCtx.pages().length}`,
+);
+check("...and the new tab page survives it", dash.url().includes("newtab.html"), dash.url());
+for (const p of openedByGear) await p.close();
+await dash.bringToFront();
+await dash.waitForTimeout(200);
+
+const beforeMenu = dashCtx.pages().length;
+await dash.locator("#plusButton").click();
+await dash.waitForTimeout(200);
+await dash.locator('#plusMenu [role=menuitem][data-action="settings"]').click();
+await dash.waitForTimeout(900);
+check(
+  "the + menu's Settings item opens settings too",
+  dashCtx.pages().length === beforeMenu + 1,
+  `${beforeMenu} -> ${dashCtx.pages().length}`,
+);
+for (const p of dashCtx.pages().filter((p) => p.url().endsWith("/options.html"))) await p.close();
+await dash.bringToFront();
+await dash.waitForTimeout(200);
 
 // --- navigation targets this tab, not whichever one is active --------------------
 //

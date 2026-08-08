@@ -1,7 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { URL_KIND, PROMPT } from "../extension/src/classify.js";
-import { route, NONE, NAVIGATE, SEARCH, ASK, AUTO, CHATGPT, SEARCH_MODE } from "../extension/src/router.js";
+import {
+  route,
+  NONE,
+  NAVIGATE,
+  SEARCH,
+  ASK,
+  AUTO,
+  GOOGLE,
+  CHATGPT,
+  SEARCH_MODE,
+  placeholderFor,
+} from "../extension/src/router.js";
 
 // [input, mode, force, expected action, expected url or text]
 const CASES = [
@@ -82,6 +93,49 @@ test("no verdict can ever produce a non-http(s) url", () => {
         const verdict = route(raw, { mode, force });
         if (verdict.url) assert.match(verdict.url, /^https?:\/\//i, `${raw} @ ${mode} force:${force}`);
       }
+    }
+  }
+});
+
+// --- Google is a destination, not the default engine -------------------------------
+//
+// These exist because of a bug worth not repeating: the pill labelled "Search"
+// was `data-mode="auto"`, and Auto hands prompts to chrome.search — the user's
+// *default* engine. For anyone who had made ChatGPT their default (which the
+// page's own hint suggests), pressing "Search" sent them to ChatGPT. A pill
+// naming a place has to go to that place.
+
+test("Google mode sends a prompt to Google, whatever the default engine is", () => {
+  const verdict = route("submit an extension to the chrome store", { mode: GOOGLE });
+  assert.equal(verdict.action, ASK);
+  assert.equal(
+    verdict.url,
+    "https://www.google.com/search?q=submit%20an%20extension%20to%20the%20chrome%20store",
+  );
+});
+
+test("Google mode still navigates a URL, like every other destination", () => {
+  assert.deepEqual(route("example.com", { mode: GOOGLE }), {
+    action: NAVIGATE,
+    url: "https://example.com",
+  });
+});
+
+test("Auto and Search still defer to the default engine", () => {
+  assert.equal(route("a question", { mode: AUTO }).action, SEARCH);
+  assert.equal(route("a question", { mode: SEARCH_MODE }).action, SEARCH);
+});
+
+test("the placeholder names Google when Google is the destination", () => {
+  assert.equal(placeholderFor(GOOGLE), "Search Google, or type a URL");
+  assert.notEqual(placeholderFor(GOOGLE), placeholderFor(AUTO));
+});
+
+test("Google mode cannot be talked into a non-http(s) url either", () => {
+  for (const raw of ["javascript:alert(1)", "data:text/html,x", "file:///etc/passwd"]) {
+    for (const force of [null, PROMPT, URL_KIND]) {
+      const verdict = route(raw, { mode: GOOGLE, force });
+      if (verdict.url) assert.match(verdict.url, /^https?:\/\//i, `${raw} force:${force}`);
     }
   }
 });

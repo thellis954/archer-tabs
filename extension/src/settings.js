@@ -9,7 +9,7 @@
 //
 // Nothing here ever leaves the device.
 
-import { AUTO, MODES } from "./router.js";
+import { GOOGLE, MODES } from "./router.js";
 
 const KEY_MODE = "mode";
 const KEY_NUDGE = "engineNudgeDismissed";
@@ -41,11 +41,14 @@ const store = () => globalThis.chrome?.storage?.local ?? fallback;
 
 /** @returns {Promise<{mode: string, nudgeDismissed: boolean}>} */
 export async function loadSettings() {
-  const raw = await store().get({ [KEY_MODE]: AUTO, [KEY_NUDGE]: false });
+  // Google rather than Auto as the fresh-install default: every pill is a named
+  // destination, Auto is not one of them, and a page that opens with no pill
+  // pressed gives you nothing to read the next Enter off.
+  const raw = await store().get({ [KEY_MODE]: GOOGLE, [KEY_NUDGE]: false });
   return {
     // A mode written by a newer version, or a corrupted one, falls back rather
     // than putting the page in a state with no routing rule.
-    mode: MODES.includes(raw[KEY_MODE]) ? raw[KEY_MODE] : AUTO,
+    mode: MODES.includes(raw[KEY_MODE]) ? raw[KEY_MODE] : GOOGLE,
     nudgeDismissed: raw[KEY_NUDGE] === true,
   };
 }
