@@ -677,6 +677,14 @@ click every control, at every width, and watch what the page actually does.
   line. A chip also means the file can be removed, and it survives while you type the question.
   Hand-offs travel in a URL, so their attachment is trimmed to a budget and the page says so;
   Answer mode posts a body and sends the whole file.
+- **The settings page has a nav.** It was nine cards in one undifferentiated scroll, so the
+  Permissions panel — the answer to most "why isn't this working" — was the part nobody reached.
+  Now: a sticky section list beside the cards (a scrolling strip below 900px), each card's state in
+  its header so "is the weather on?" is answerable without scrolling to the weather form, and the
+  dense justifications folded into `<details>`. **Nothing was deleted** — the explanations are half
+  of what this page is for — and nothing that warns about a browser popup was folded, because a
+  hidden warning is no warning. The highlight is an IntersectionObserver that may only ever *add*
+  highlighting: if it never reports, every link is still an ordinary anchor that still works.
 - **Favourites show the site's own icon.** `src/favorites.js` builds a `_favicon` URL — Chrome's
   **local** icon store, built from your own history, so no request reaches the site. Fetching
   `https://site/favicon.ico` per tile needs no permission at all and was rejected for exactly that

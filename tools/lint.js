@@ -139,8 +139,19 @@ if (manifest) {
 }
 
 for (const [file, source] of Object.entries(pages)) {
+  // An in-page anchor is not a file. It is still checkable, and worth checking:
+  // a nav link pointing at a section that has since been renamed is silent in
+  // the browser — the click simply does nothing — so resolve it against the
+  // ids the page actually declares.
+  const ids = new Set([...source.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+
   for (const m of source.matchAll(/(?:src|href)="(?!https?:|data:)([^"]+)"/g)) {
-    if (!existsSync(join(EXT, m[1]))) fail(file, `references missing file: ${m[1]}`);
+    const ref = m[1];
+    if (ref.startsWith("#")) {
+      if (!ids.has(ref.slice(1))) fail(file, `link to #${ref.slice(1)}, which no element on the page has`);
+      continue;
+    }
+    if (!existsSync(join(EXT, ref))) fail(file, `references missing file: ${ref}`);
   }
 }
 

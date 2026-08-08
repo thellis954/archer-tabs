@@ -130,14 +130,20 @@ for (const scheme of ["light", "dark"]) {
   console.log(sitePath);
   await site.close();
 
-  const options = await ctx.newPage();
-  await options.setViewportSize({ width: 900, height: 800 });
-  await options.goto(`chrome-extension://${extensionId(EXT)}/options.html`, { waitUntil: "domcontentloaded" });
-  await options.waitForTimeout(200);
-  const optionsPath = join(OUT, `options-${scheme}.png`);
-  await options.screenshot({ path: optionsPath, fullPage: true });
-  console.log(optionsPath);
-  await options.close();
+  // Two widths, because the settings page now has two layouts: a nav column
+  // beside the cards, and below 900px the same links as a scrolling strip. The
+  // wide one is the one nobody would look at otherwise — 900px is exactly the
+  // breakpoint, so a single shot at that size only ever showed the narrow form.
+  for (const [name, width] of [["", 1240], ["-narrow", 560]]) {
+    const options = await ctx.newPage();
+    await options.setViewportSize({ width, height: 900 });
+    await options.goto(`chrome-extension://${extensionId(EXT)}/options.html`, { waitUntil: "domcontentloaded" });
+    await options.waitForTimeout(250);
+    const optionsPath = join(OUT, `options-${scheme}${name}.png`);
+    await options.screenshot({ path: optionsPath, fullPage: true });
+    console.log(optionsPath);
+    await options.close();
+  }
 
   await ctx.close();
 }
