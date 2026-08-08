@@ -53,7 +53,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 231 unit cases across the pure modules. No install needed. |
+| `npm test` | 237 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
@@ -116,7 +116,7 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
 - `src/rows.js` — paints the rows.
 - `src/answer.js` — the only caller of `api.openai.com`. The SSE framing and the budget maths are
   pure functions so they can be tested without a network.
-- `src/clock.js`, `src/weather.js`, `src/favourites.js` — the dashboard's decisions. All pure;
+- `src/clock.js`, `src/weather.js`, `src/favorites.js` — the dashboard's decisions. All pure;
   `src/dashboard.js` is the only part that touches the DOM or the network.
 - `src/modemenu.js` — the mode listbox in the top bar, and the `+` menu.
 - `src/extract.js` — an attached file → text a model can read. Unzips `.docx`/`.xlsx`/`.pptx` and
@@ -126,6 +126,21 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
 - `src/permissions.js` — every optional permission, with the plain-language reason the settings
   page shows beside it. **Adding a capability that needs a permission means adding it here too** —
   an e2e case asserts this list accounts for every optional permission the manifest declares.
+
+**Favourite icons come from Chrome's local store, never from the site.** `faviconURL()` builds a
+`/_favicon/` URL, which reads the icon database the browser already built from your history — no
+request leaves the device. Fetching `https://site/favicon.ico` per tile would need no permission and
+is exactly what not to do: it announces every favourite to its operator on every new tab. And
+`_favicon` **never fails** — an unknown site gets a generic globe, byte-identical every time — so the
+fallback to initials cannot be an `onerror` handler. `dashboard.js` fetches the placeholder once, by
+asking about an address that cannot resolve, and compares.
+
+**Chrome's permission popup opens at the top of the window, with Deny focused.** That is far from
+whatever button was pressed, and it is why "none of the toggles work" was reported about switches
+that all worked. Anything that calls `chrome.permissions.request()` must say what happened when the
+answer is no — a control that redraws unchanged is indistinguishable from a dead one. Never `await`
+a permission request before doing the work the user asked for, either: the popup blocks until it is
+answered.
 
 **The destination pills and the top-bar menu are one setting.** Both write `mode`; both are kept in
 sync by `syncTargets()`. The pills carry four of the seven modes — a mode with no pill presses none

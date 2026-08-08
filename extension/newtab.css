@@ -831,6 +831,27 @@ body {
   letter-spacing: .01em;
 }
 
+/* Covers the coloured monogram square entirely when there is a real icon, so
+   the two never show at once. */
+.tileIcon {
+  width: 100%; height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.tileFace:has(.tileIcon:not([hidden])) {
+  background: var(--surface);
+  color: transparent;
+}
+
+.tileHint {
+  margin: 0.5rem 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .tileName {
   max-width: 100%;
   overflow: hidden;

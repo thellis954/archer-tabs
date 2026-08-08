@@ -1239,6 +1239,10 @@ cpSync(EXT, dashFixture, { recursive: true });
   const m = JSON.parse(readFileSync(path, "utf8"));
   m.host_permissions = m.optional_host_permissions.filter((o) => o.includes("open-meteo"));
   m.optional_host_permissions = m.optional_host_permissions.filter((o) => !o.includes("open-meteo"));
+  // Same reason for `favicon`: its dialog never resolves headless either, and
+  // what is under test is the fallback, not Chrome's consent UI.
+  m.permissions = [...m.permissions, "favicon"];
+  m.optional_permissions = m.optional_permissions.filter((x) => x !== "favicon");
   writeFileSync(path, JSON.stringify(m, null, 2));
 }
 
@@ -1551,7 +1555,10 @@ await dash.waitForTimeout(500);
 check(
   "a tile name is text, never markup",
   (await dash.locator(".tileName").innerText()).includes("<img src=x") &&
-    (await dash.locator(".tile").evaluate((n) => n.querySelectorAll("img").length)) === 0,
+    // The name renders as text nodes only. The tile does now carry one <img> of
+    // its own — the favicon — so counting images across the whole tile would
+    // stop testing what this is about.
+    (await dash.locator(".tileName").evaluate((n) => n.children.length)) === 0,
 );
 
 // --- the + menu, attachments, and the placeholder --------------------------------
@@ -1619,6 +1626,58 @@ await dash.waitForTimeout(250);
 check("a chip can be removed", (await dash.locator(".chip").count()) === 0);
 check("...which disarms send again", await dash.locator("#send").isDisabled());
 rmSync(ATTACH, { force: true });
+
+// --- favourite tiles show the site's own icon -------------------------------------
+//
+// `_favicon` reads Chrome's *local* icon store — no request reaches the site,
+// which is the only reason this feature is allowed to exist here at all.
+//
+// It also never fails: for a site the browser has never seen it answers 200
+// with a generic globe, byte-identical every time. So an onerror fallback can
+// never fire, and a naive <img> would replace every monogram with the same grey
+// planet. A fresh profile has visited nothing, so every tile below must still
+// be showing its initials.
+
+await dash.evaluate(() =>
+  chrome.storage.local.set({
+    favorites: [{ id: "https://github.com", url: "https://github.com", name: "GitHub" }],
+  }),
+);
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(700);
+
+check(
+  "the favicon permission is what a tile reads, and it is granted here",
+  await dash.evaluate(() => chrome.permissions.contains({ permissions: ["favicon"] })),
+);
+check(
+  "a site Chrome has no icon for keeps its initials, not a generic globe",
+  (await dash.locator(".tile .tileIcon").isHidden()) &&
+    (await dash.locator(".tile .tileFace").innerText()).trim() === "GH",
+  `hidden=${await dash.locator(".tile .tileIcon").isHidden()} face=${await dash.locator(".tile .tileFace").innerText()}`,
+);
+
+// The placeholder is byte-identical for every unknown site — the fact the whole
+// fallback rests on. If Chrome ever stops doing this, the check above starts
+// passing for the wrong reason, so assert it directly.
+const placeholders = await dash.evaluate(async () => {
+  const grab = async (u) => {
+    const r = await fetch(chrome.runtime.getURL("/_favicon/?pageUrl=" + encodeURIComponent(u) + "&size=32"));
+    return [...new Uint8Array(await r.arrayBuffer())].join(",");
+  };
+  return [await grab("https://never-seen-one.invalid/"), await grab("https://never-seen-two.invalid/")];
+});
+check(
+  "_favicon answers with one identical placeholder for every unknown site",
+  placeholders[0] === placeholders[1] && placeholders[0].length > 0,
+  `${placeholders[0].length} vs ${placeholders[1].length}`,
+);
+
+await dash.evaluate(() => chrome.storage.local.set({ favorites: [] }));
+await dash.reload({ waitUntil: "domcontentloaded" });
+await dash.bringToFront();
+await dash.waitForTimeout(400);
 
 // --- the default-engine hint only appears where it is true ------------------------
 //
@@ -1877,10 +1936,36 @@ check(
 );
 check("no host permission is required at install", !shipManifest.host_permissions?.length);
 
+// Every one of these switches worked all along — verified with a real click in
+// a headed browser. What did not work was Chrome's answer coming back: its
+// popup opens at the *top* of the window, some way from a panel at the bottom
+// of a long page, with Deny focused by default. Miss it and the row re-rendered
+// byte-identical. Saying so up front is the fix.
+check(
+  "the permissions panel warns that Chrome asks in a popup elsewhere on screen",
+  await shipOptions.locator(".heads-up").first().isVisible(),
+);
+const headsUp = (await shipOptions.locator(".heads-up").first().innerText()).toLowerCase();
+check(
+  "...and says where it opens and what its default is",
+  headsUp.includes("top of the window") && headsUp.includes("deny"),
+  headsUp,
+);
+
+check(
+  "the weather card says a popup is coming before you press the button",
+  await shipOptions.locator("#weatherAccessHint").isVisible(),
+);
+check(
+  "...and the button names what it is about to do",
+  (await shipOptions.locator("#savePlace").innerText()).trim() === "Allow & save place",
+  await shipOptions.locator("#savePlace").innerText(),
+);
+
 const listed = await shipOptions.locator(".grant").evaluateAll((els) => els.map((e) => e.dataset.grant));
 check(
   "every optional permission is listed in the panel",
-  listed.length === 6,
+  listed.length === 7,
   JSON.stringify(listed),
 );
 

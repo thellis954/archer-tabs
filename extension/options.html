@@ -71,6 +71,14 @@
         </div>
       </div>
 
+      <!-- Shown only until the permission is granted. Chrome's popup opens at
+           the top of the window with Deny focused, so an unannounced one gets
+           dismissed and the feature looks broken. -->
+      <p class="hint heads-up" id="weatherAccessHint" hidden>
+        Chrome will ask permission to reach Open-Meteo — its popup opens at the
+        <strong>top of the window</strong>, and Deny is the default. Choose <strong>Allow</strong>.
+      </p>
+
       <div class="rowButtons">
         <button type="button" class="primary" id="savePlace">Save place</button>
         <button type="button" id="clearPlace">Turn weather off</button>
@@ -210,6 +218,11 @@
         Archer asks for two things when you install it: permission to use your default search engine,
         and somewhere to keep your settings. <strong>Everything else on this list is off until you
         turn it on</strong>, and can be turned back off here.
+      </p>
+      <p class="hint heads-up">
+        Turning one on is Chrome's decision, not Archer's: it opens a popup at the
+        <strong>top of the window</strong> — some way from these buttons — with <strong>Deny</strong>
+        focused by default. If a switch stays Off, that popup is where the answer went.
       </p>
 
       <ul class="grants" id="grants"></ul>

@@ -10,6 +10,8 @@ import {
   hueFor,
   addFavorite,
   removeFavorite,
+  faviconURL,
+  NO_SUCH_SITE,
 } from "../extension/src/favorites.js";
 
 // --- the clock ---------------------------------------------------------------
@@ -221,4 +223,50 @@ test("the Web Store is excluded — an extension cannot navigate there", () => {
   // the renderer.
   assert.equal(isWebLink("https://chrome.google.com/webstore?hl=en"), false);
   assert.equal(isWebLink("https://chromewebstore.google.com/detail/x"), false);
+});
+
+// --- favicons ---------------------------------------------------------------------
+//
+// The URL is built here rather than in dashboard.js so it can be checked without
+// a browser. `_favicon` is Chrome's *local* icon store: reading it makes no
+// request to the site, which is the only reason favourites show real icons at
+// all — fetching https://site/favicon.ico per tile would announce every
+// favourite to its operator on every new tab.
+
+test("faviconURL points at Chrome's own icon store, not the site", () => {
+  const url = faviconURL("https://github.com/", { base: "chrome-extension://abc/" });
+  assert.ok(url.startsWith("chrome-extension://abc/_favicon/"), url);
+  assert.ok(!url.includes("github.com/favicon"), url);
+});
+
+test("faviconURL encodes the page address as a parameter", () => {
+  const url = faviconURL("https://example.com/a?b=c&d=e", { base: "chrome-extension://abc" });
+  assert.ok(url.includes("pageUrl=https%3A%2F%2Fexample.com%2Fa%3Fb%3Dc%26d%3De"), url);
+  // The site's own query must not leak into the favicon request's parameters.
+  assert.equal(url.split("&").length, 2, url);
+});
+
+test("faviconURL takes a size, and defaults to one", () => {
+  assert.ok(faviconURL("https://a.test/", { base: "chrome-extension://abc" }).endsWith("size=32"));
+  assert.ok(faviconURL("https://a.test/", { base: "chrome-extension://abc", size: 64 }).endsWith("size=64"));
+});
+
+test("faviconURL tolerates a base with or without its trailing slash", () => {
+  const withSlash = faviconURL("https://a.test/", { base: "chrome-extension://abc/" });
+  const without = faviconURL("https://a.test/", { base: "chrome-extension://abc" });
+  assert.equal(withSlash, without);
+  assert.ok(!withSlash.includes("//_favicon"), withSlash);
+});
+
+test("faviconURL is empty rather than wrong without a base or a page", () => {
+  assert.equal(faviconURL("https://a.test/", {}), "");
+  assert.equal(faviconURL("", { base: "chrome-extension://abc" }), "");
+});
+
+test("the placeholder probe asks about an address that cannot resolve", () => {
+  // _favicon answers 200 with a generic globe for anything it has never seen,
+  // so the only way to recognise that globe is to ask for a copy of it. The
+  // address has to be one no real favourite could ever be.
+  assert.match(NO_SUCH_SITE, /^https:\/\//);
+  assert.ok(NO_SUCH_SITE.endsWith(".invalid/"), NO_SUCH_SITE);
 });

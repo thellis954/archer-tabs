@@ -86,7 +86,17 @@ $("savePlace").addEventListener("click", async () => {
   // Inside the click: Chrome refuses a permission request without a gesture.
   const granted = await requestWeatherAccess();
   if (!granted) {
-    say($("placeStatus"), "Archer needs permission to reach Open-Meteo before it can show weather.", true);
+    // Not a dead end. Chrome's popup opens at the top of the window with Deny
+    // focused, so the common way to land here is never to have seen it — and
+    // the typed place is kept so saying yes is one click, not a retype.
+    say(
+      $("placeStatus"),
+      "Not saved yet — Chrome asks permission to reach Open-Meteo in a popup at the top of the window, " +
+        "and Deny is its default. Your place is still typed in: press Save place again and choose Allow. " +
+        "You can also turn Weather on under Permissions at the bottom of this page.",
+      true,
+    );
+    await paintWeatherAccess();
     return;
   }
 
@@ -102,10 +112,33 @@ $("savePlace").addEventListener("click", async () => {
     await saveWeatherCache(reading);
     $("place").value = place.name;
     say($("placeStatus"), `Showing weather for ${place.name}.`);
+    await paintWeatherAccess();
   } catch (error) {
     say($("placeStatus"), error.message, true);
   }
 });
+
+/**
+ * Says up front that a popup is coming, so it is expected rather than a
+ * surprise to be dismissed — and names the button once it is not needed.
+ */
+async function paintWeatherAccess() {
+  const has = await hasWeatherAccess();
+  $("savePlace").textContent = has ? "Save place" : "Allow & save place";
+  const hint = $("weatherAccessHint");
+  hint.hidden = has;
+}
+
+async function hasWeatherAccess() {
+  if (!globalThis.chrome?.permissions?.contains) return true;
+  try {
+    return await chrome.permissions.contains({ origins: WEATHER_ORIGINS });
+  } catch {
+    return false;
+  }
+}
+
+await paintWeatherAccess();
 
 $("clearPlace").addEventListener("click", async () => {
   await saveWeatherSettings({ place: null });
@@ -397,6 +430,25 @@ async function showUsage() {
 
 // --- permissions -------------------------------------------------------------------
 
+/**
+ * What just happened to each row, by grant id.
+ *
+ * Kept outside renderGrants() because the render is how a toggle reports back,
+ * and a re-render would otherwise wipe the one thing worth saying.
+ *
+ * This exists because of the bug it fixes: Chrome asks for an optional
+ * permission in a popup at the *top* of the window, with **Deny** focused by
+ * default — and the Permissions panel is at the bottom of a long page. Miss
+ * that popup, or press Enter, and the row re-rendered byte-identical: still
+ * Off, still "Turn on", not a word about why. Verified in a headed browser —
+ * the toggle works perfectly when Allow is clicked. Silence was the whole bug.
+ */
+const grantNotes = new Map();
+
+const DENIED_NOTE =
+  "Still off. Chrome asks for this in a popup at the top of the window, and Deny is its default — " +
+  "if you missed it or pressed Enter, choose Turn on again and look up there.";
+
 await renderGrants();
 
 async function renderGrants() {
@@ -430,8 +482,13 @@ async function renderGrants() {
     button.addEventListener("click", async () => {
       // Both inside the click: Chrome refuses a permission request without a
       // user gesture, and refuses it silently.
-      if (granted) await revoke(entry);
-      else await grant(entry);
+      if (granted) {
+        const removed = await revoke(entry);
+        grantNotes.set(entry.id, removed ? "" : "Chrome would not turn that off. Try again.");
+      } else {
+        const allowed = await grant(entry);
+        grantNotes.set(entry.id, allowed ? "" : DENIED_NOTE);
+      }
       await renderGrants();
     });
 
@@ -442,6 +499,17 @@ async function renderGrants() {
     why.textContent = entry.why;
 
     item.append(head, why);
+
+    const note = grantNotes.get(entry.id);
+    if (note) {
+      const said = document.createElement("p");
+      said.className = "grantNote";
+      said.textContent = note;
+      // Announced, not just painted: someone who cannot see the popup appear
+      // is exactly who most needs to be told it did.
+      said.setAttribute("role", "status");
+      item.append(said);
+    }
 
     if (entry.cost) {
       const cost = document.createElement("p");
