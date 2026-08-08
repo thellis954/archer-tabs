@@ -55,11 +55,36 @@ test("a titled conversation becomes a row", () => {
   assert.equal(rows[0].url, `https://chatgpt.com/c/${UUID}`);
 });
 
-test("an untitled or pre-rename visit is dropped", () => {
-  assert.equal(buildRows({ visits: [visit(UUID, "ChatGPT", T)] }).length, 0);
-  assert.equal(buildRows({ visits: [visit(UUID, "chatgpt", T)] }).length, 0);
-  assert.equal(buildRows({ visits: [visit(UUID, "   ", T)] }).length, 0);
-  assert.equal(buildRows({ visits: [visit(UUID, undefined, T)] }).length, 0);
+// These used to assert the opposite, and that assertion was the bug: dropping
+// them made most real conversations invisible. The address becomes /c/<id> the
+// moment you send the first message — before the model has named the chat — so
+// what Chrome stores is very often the bare product name, and it never revises
+// it. The row is what makes the conversation reachable; a mediocre name on a
+// reachable row beats a perfect name on one that was never rendered.
+test("an untitled or pre-rename visit is kept, and named for its provider", () => {
+  for (const title of ["ChatGPT", "chatgpt", "   ", undefined, "New chat"]) {
+    const rows = buildRows({ visits: [visit(UUID, title, T)] });
+    assert.equal(rows.length, 1, JSON.stringify(title));
+    assert.equal(rows[0].title, "ChatGPT conversation", JSON.stringify(title));
+    assert.equal(rows[0].url, `https://chatgpt.com/c/${UUID}`);
+  }
+});
+
+test("...and the prompt that started it is a better name than that", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://chatgpt.com/c/${UUID}`, title: "ChatGPT", lastVisitTime: T, firstVisitTime: T }],
+    launches: [{ text: "how do I fletch an arrow", at: T - 1000 }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].title, "how do I fletch an arrow");
+});
+
+test("a real title still wins over the prompt", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://chatgpt.com/c/${UUID}`, title: "Fletching", lastVisitTime: T, firstVisitTime: T }],
+    launches: [{ text: "how do I fletch an arrow", at: T - 1000 }],
+  });
+  assert.equal(rows[0].title, "Fletching");
 });
 
 test("repeat visits collapse to one row, keeping the newest title", () => {
@@ -68,6 +93,16 @@ test("repeat visits collapse to one row, keeping the newest title", () => {
   });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].title, "Renamed later");
+});
+
+test("a real title beats a bare one whichever visit carried it", () => {
+  // The visit that carries the real name is usually the *older* one — the name
+  // arrives after the address does — so "newest wins" alone loses it.
+  const rows = buildRows({
+    visits: [visit(UUID, "Fletching an arrow", T), visit(UUID, "ChatGPT", T + 5000)],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].title, "Fletching an arrow");
 });
 
 test("the row link is rebuilt from the id, not passed through", () => {
@@ -397,14 +432,16 @@ test("look-alike hosts are still refused", () => {
   }
 });
 
-test("a tab that was never named is dropped, whichever assistant it was", () => {
-  for (const [url, title] of [
-    [`https://chatgpt.com/c/${UUID}`, "ChatGPT"],
-    [`https://claude.ai/chat/${UUID}`, "Claude"],
-    [`https://claude.ai/chat/${UUID}`, "Claude.ai"],
-    [`https://chatgpt.com/c/${UUID}`, "New chat"],
+test("a tab that was never named is still a row, named for its assistant", () => {
+  for (const [url, title, expected] of [
+    [`https://chatgpt.com/c/${UUID}`, "ChatGPT", "ChatGPT conversation"],
+    [`https://claude.ai/chat/${UUID}`, "Claude", "Claude conversation"],
+    [`https://claude.ai/chat/${UUID}`, "Claude.ai", "Claude conversation"],
+    [`https://chatgpt.com/c/${UUID}`, "New chat", "ChatGPT conversation"],
   ]) {
-    assert.equal(buildRows({ visits: [{ url, title, lastVisitTime: T }] }).length, 0, `${title}`);
+    const rows = buildRows({ visits: [{ url, title, lastVisitTime: T }] });
+    assert.equal(rows.length, 1, `${title}`);
+    assert.equal(rows[0].title, expected, `${title}`);
   }
 });
 
@@ -413,4 +450,23 @@ test("a product-name suffix is stripped from the title", () => {
     visits: [{ url: `https://claude.ai/chat/${UUID}`, title: "Fletching an arrow - Claude", lastVisitTime: T }],
   });
   assert.equal(rows[0].title, "Fletching an arrow");
+});
+
+test("a blank or non-string launch never becomes a row or a title", () => {
+  // The launch log is user text from storage, and it is now a row *title* — so
+  // a whitespace-only entry would render as a blank row, and unboundPrompts
+  // lowercases whatever it finds.
+  const rows = buildRows({
+    visits: [],
+    launches: [{ text: "   ", at: T }, { text: null, at: T }, { at: T }, { text: 42, at: T }],
+  });
+  assert.equal(rows.length, 0, JSON.stringify(rows));
+});
+
+test("a launch is trimmed before it names a conversation", () => {
+  const rows = buildRows({
+    visits: [{ url: `https://chatgpt.com/c/${UUID}`, title: "ChatGPT", lastVisitTime: T, firstVisitTime: T }],
+    launches: [{ text: "  how do I fletch an arrow  ", at: T - 1000 }],
+  });
+  assert.equal(rows[0].title, "how do I fletch an arrow");
 });

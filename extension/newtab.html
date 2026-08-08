@@ -258,6 +258,17 @@
       </button></li>
     </ul>
 
+    <!-- Chrome's own wording for the history permission is far broader than what
+         Archer does with it, and its popup opens at the top of the window with
+         Deny focused. Saying both before the click is the difference between a
+         considered no and a dismissed surprise. -->
+    <p class="onboardNote" id="historyNote">
+      Chrome will ask first, in a popup at the <strong>top of the window</strong> where
+      <strong>Deny</strong> is the default. Its warning says "read and change your browsing history"
+      — that is the only history permission Chrome offers. Archer reads conversation addresses and
+      drops everything else before looking at it.
+    </p>
+
     <!-- Granted, but there is nothing to show yet. -->
     <p class="empty" id="emptyState" hidden>
       Nothing yet. Anything you ask from here shows up as a row you can pick back up.
