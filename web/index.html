@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Archer - a smarter new tab for Chrome</title>
-<meta name="description" content="Open a new tab and just start typing. Questions go to ChatGPT, Claude or Perplexity. Websites just open. Free, and nothing about you leaves your computer.">
+<title>Archer - AI on every new tab</title>
+<meta name="description" content="Turn every new tab into ChatGPT, Claude or Perplexity. Save the prompts you reuse, pull them up with a slash, and make the page look how you want. Free for Chrome.">
 
-<meta property="og:title" content="Archer - a smarter new tab for Chrome">
-<meta property="og:description" content="Open a new tab and just start typing. Archer works out whether you want an answer or a website.">
+<meta property="og:title" content="Archer - AI on every new tab">
+<meta property="og:description" content="Turn every new tab into ChatGPT, Claude or Perplexity. Save your prompts, customise the page, and get more out of your browser.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://archertabs.app">
 <meta property="og:image" content="https://archertabs.app/assets/og.png">
@@ -34,9 +34,9 @@
     <span class="brandName">Archer</span>
   </a>
   <nav aria-label="Sections">
-    <a href="#how">How it works</a>
-    <a href="#page">Your new tab</a>
-    <a href="#privacy">Privacy</a>
+    <a href="#tricks">What it does</a>
+    <a href="#yours">Make it yours</a>
+    <a href="#ai">Your AI</a>
     <a class="navCta" href="#install">Get it</a>
   </nav>
 </header>
@@ -57,14 +57,14 @@
 
     <div class="heroCopy">
       <p class="eyebrow">Free for Chrome</p>
-      <h1>Just start&nbsp;typing.</h1>
+      <h1>AI on every new&nbsp;tab.</h1>
       <p class="lede">
-        Open a new tab and type whatever is on your mind. Questions go to your
-        AI. Websites just open. You never have to&nbsp;pick.
+        Ask ChatGPT anything, jump straight to any site, and build a new tab that
+        actually works how you&nbsp;think.
       </p>
       <div class="cta">
         <a class="btn primary" href="#install">Get Archer</a>
-        <a class="btn" href="#how">See how it works</a>
+        <a class="btn" href="#tricks">What it does</a>
       </div>
     </div>
 
@@ -104,31 +104,30 @@
 
         <p class="demoVerdict" id="demoVerdict" role="status" data-state="idle">
           <span class="demoTag" id="demoTag" aria-hidden="true"></span>
-          <span class="demoWhat" id="demoWhat">Try typing something. This box is really working.</span>
+          <span class="demoWhat" id="demoWhat">Go ahead, type in it. This one is live.</span>
         </p>
 
         <ul class="demoTries" id="demoTries" aria-label="Things to try">
-          <li><button type="button" data-q="what should I make for dinner">what should I make for dinner</button></li>
-          <li><button type="button" data-q="netflix.com">netflix.com</button></li>
-          <li><button type="button" data-q="how do I get a grass stain out">how do I get a grass stain out</button></li>
+          <li><button type="button" data-q="explain the offside rule like I am five">explain the offside rule like I am five</button></li>
+          <li><button type="button" data-q="youtube.com">youtube.com</button></li>
+          <li><button type="button" data-q="ideas for a 10 minute presentation">ideas for a 10 minute presentation</button></li>
         </ul>
       </div>
-      <p class="demoFoot">Go on, type in it. It is the real thing, not a video.</p>
+      <p class="demoFoot">Switch the destination and watch the box change with it.</p>
     </div>
   </section>
 
   <!--
-    HOW IT WORKS. The old version of this section walked through the six rules
-    in classify.js in order, with javascript: and userinfo-in-the-authority as
-    worked examples. True, and completely wrong for anyone who is not an
-    engineer. Same mechanic, same live classifier, ordinary things to type.
+    WHAT IT DOES. This slot used to walk through the six rules of classify.js in
+    the order they fire. The mechanic is worth keeping, the subject was not:
+    it now shows off what the thing can actually do.
   -->
-  <section class="how" id="how">
+  <section class="how" id="tricks">
     <div class="howHead">
-      <h2>It can tell a question from a website.</h2>
+      <h2>One box, and it keeps up with you.</h2>
       <p class="sectionLede">
-        That is the whole trick, and you never have to think about it. Scroll
-        through a few things you might type and watch where each one goes.
+        Everything below happens in the same place you already type. Scroll
+        through and watch the box change.
       </p>
     </div>
 
@@ -137,71 +136,69 @@
       <div class="specimenWrap">
         <figure class="specimen" id="specimen" data-verdict="prompt">
           <figcaption class="specimenCap">You type</figcaption>
-          <p class="specimenText" id="specimenText">what should I make for dinner</p>
+          <p class="specimenText" id="specimenText">explain the offside rule like I am five</p>
           <p class="specimenArrow" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v15M6.5 13.5 12 19l5.5-5.5"/></svg>
           </p>
           <p class="specimenOut">
             <span class="verdictBadge" id="specimenBadge">Asks ChatGPT</span>
-            <span class="verdictNote" id="specimenNote">Your question lands in ChatGPT, ready to go.</span>
+            <span class="verdictNote" id="specimenNote">Straight into ChatGPT, question already written.</span>
           </p>
         </figure>
       </div>
 
       <ol class="scenes" id="scenes">
-        <li class="scene" data-specimen="what should I make for dinner" data-verdict="prompt"
+        <li class="scene" data-specimen="explain the offside rule like I am five" data-verdict="prompt"
             data-badge="Asks ChatGPT"
-            data-note="Your question lands in ChatGPT, ready to go.">
-          <h3>A question you would normally search</h3>
+            data-note="Straight into ChatGPT, question already written.">
+          <h3>Ask anything, from the tab you already opened</h3>
           <p>
-            Anything that reads like a sentence goes to whichever AI you picked.
-            No quotes, no special key, no menu. You type it and press Enter.
+            No going to a site first, no clicking into a chat box. Type the
+            question where you were already typing and hit Enter.
           </p>
         </li>
 
-        <li class="scene" data-specimen="netflix.com" data-verdict="url"
-            data-badge="Opens Netflix"
-            data-note="Straight there. Nothing gets searched, nothing gets asked.">
-          <h3>A website you already know</h3>
+        <li class="scene" data-specimen="youtube.com" data-verdict="url"
+            data-badge="Opens YouTube"
+            data-note="No search results page in the way. You are just there.">
+          <h3>Or skip the AI entirely</h3>
           <p>
-            Type an address and you just land on it, exactly like the address
-            bar. Archer does not get clever and turn it into a search.
+            Type a site and you land on it. Archer works out which one you meant
+            without you flagging it, so the same box does both jobs all day.
           </p>
         </li>
 
-        <li class="scene" data-specimen="how do I get a grass stain out" data-verdict="prompt"
-            data-badge="Asks ChatGPT"
-            data-note="Long, short, messy, typo-ridden. It still knows this is a question.">
-          <h3>Even the ones with a dot in them</h3>
+        <li class="scene" data-specimen="/essay" data-verdict="prompt"
+            data-badge="Pulls up a saved prompt"
+            data-note="Fill in the blanks with Tab. Your best prompts, one keystroke away.">
+          <h3>Save the prompts you keep retyping</h3>
           <p>
-            This is where most launchers trip. They spot a dot and assume you
-            meant a website. Archer checks properly, so
-            <span class="lede-em">node.js</span> stays a question and
-            <span class="lede-em">claude.ai</span> stays a website.
+            Write a good one once, give it a name, and a slash brings it back.
+            Leave blanks in it and Tab jumps between them, so the same prompt
+            works for a different topic every time.
           </p>
         </li>
 
-        <li class="scene" data-specimen="gmail.com" data-verdict="url"
-            data-badge="Opens Gmail"
-            data-note="One tab, one line, two completely different jobs.">
-          <h3>Back and forth, all day</h3>
+        <li class="scene" data-specimen="what is a nock" data-verdict="answer"
+            data-badge="Answers on the page"
+            data-note="The reply streams onto the new tab. Nothing else opens.">
+          <h3>Or get the answer without leaving</h3>
           <p>
-            The point is not any single one of these. It is that you stop
-            deciding. One box handles both, every time you open a tab.
+            For the quick ones, the answer can appear right on the new tab and
+            you carry on. Nothing opens, nothing to close.
           </p>
         </li>
       </ol>
     </div>
   </section>
 
-  <!-- YOUR NEW TAB. Image-led. The screenshot is regenerated from the
-       extension by `npm run shots`, so it cannot show a version that is gone. -->
-  <section class="surface" id="page">
+  <!-- MAKE IT YOURS. The customisation story, led by the real screenshot. -->
+  <section class="surface" id="yours">
     <div class="surfaceHead">
-      <h2>A new tab that is actually nice to look at.</h2>
+      <h2>Then make the page yours.</h2>
       <p class="sectionLede">
-        The time, the weather, the handful of sites you really use, and whatever
-        you were in the middle of. No news feed, no ads, nothing blinking at you.
+        Your shortcuts, your weather, your AI, your saved prompts. Set it up once
+        and every tab you open starts there.
       </p>
     </div>
 
@@ -209,37 +206,45 @@
       <picture>
         <source srcset="/assets/newtab-dark.png" media="(prefers-color-scheme: dark)">
         <img src="/assets/newtab-light.png" width="1280" height="700" loading="lazy"
-             alt="The Archer new tab: a weather card at top left reading 19 degrees and partly cloudy in Lisbon, the time and a Good evening greeting, buttons for Search, ChatGPT, Claude and Perplexity, a search box with a question typed in it, and a row of colourful shortcut tiles.">
+             alt="The Archer new tab: a weather card reading 19 degrees and partly cloudy in Lisbon, the time and a Good evening greeting, buttons for Search, ChatGPT, Claude and Perplexity, a search box with a question typed in it, and a row of colourful shortcut tiles.">
       </picture>
     </figure>
 
     <dl class="surfaceList">
       <div>
-        <dt>The time, and a hello</dt>
-        <dd>With the date underneath, so a tab opened on someone else's laptop still makes sense.</dd>
+        <dt>Your shortcuts, in colour</dt>
+        <dd>The sites you actually open, as tiles that pick their own colour from the name.</dd>
       </div>
       <div>
-        <dt>Today's weather</dt>
-        <dd>You type the name of your town once. It never asks your device where you are.</dd>
+        <dt>Your prompt library</dt>
+        <dd>Every prompt worth keeping, named, with blanks you Tab through. Type a slash to find one.</dd>
       </div>
       <div>
-        <dt>Your shortcuts</dt>
-        <dd>The sites you actually open, as colourful little tiles you can rearrange.</dd>
+        <dt>Weather and the time</dt>
+        <dd>Type your town once. A clock, the date and today's forecast, without a widget store.</dd>
       </div>
       <div>
-        <dt>What you were doing</dt>
-        <dd>Your recent chats, with the question that started them, one click from picking up again.</dd>
+        <dt>What you ask about</dt>
+        <dd>Archer keeps a private tally of your own prompts and shows you the patterns.</dd>
+      </div>
+      <div>
+        <dt>Pick up where you left off</dt>
+        <dd>Recent chats sit under the box with the question that started them. Pin the good ones.</dd>
+      </div>
+      <div>
+        <dt>Take it with you</dt>
+        <dd>Export everything you have asked as Markdown and drop it straight into your notes.</dd>
       </div>
     </dl>
   </section>
 
-  <!-- PICK YOUR AI. Six modes from src/router.js, six cells. -->
-  <section class="modes" id="modes">
+  <!-- YOUR AI. Six modes from src/router.js, six cells. -->
+  <section class="modes" id="ai">
     <div class="modesHead">
-      <h2>Use whichever AI you already like.</h2>
+      <h2>Bring your own AI.</h2>
       <p class="sectionLede">
-        Archer does not have its own chatbot and is not trying to sell you one.
-        Point it at whatever you use and it stays out of the way.
+        Archer has no chatbot of its own and is not trying to sell you one. Point
+        it at whatever you already use.
       </p>
     </div>
 
@@ -247,10 +252,10 @@
       <article class="cell cellWide">
         <h3>ChatGPT, Claude or Perplexity</h3>
         <p>
-          Pick one and every question you type opens there, already written out
-          in the box, waiting for you to hit send. Switch whenever you feel like
-          it. You will need an account with them, the same free one you would
-          use anyway.
+          Pick one and every question opens there, already typed out and waiting
+          for you to send. The buttons sit right above the box, so switching mid
+          thought takes one click. Hold Shift or Command as you press Enter to
+          override it for a single line.
         </p>
         <p class="cellMeta">Most people start here</p>
       </article>
@@ -261,97 +266,47 @@
           <img src="/assets/arc-light.webp" alt="" aria-hidden="true" loading="lazy"
                width="1200" height="900">
         </picture>
-        <h3>Or right on the page</h3>
+        <h3>Answers on the page</h3>
         <p>
-          Answers can appear on the new tab itself, without opening anything.
-          This one is for tinkerers: it needs your own OpenAI key, and you pay
-          them directly for what you use.
+          Plug in your own OpenAI key and replies stream onto the new tab itself.
+          Pick the model, set a daily budget, and hand off to a full conversation
+          whenever one gets interesting.
         </p>
       </article>
 
       <article class="cell">
-        <h3>Google, or whatever you use</h3>
-        <p>Questions can just go to your normal search engine instead. Nothing changes.</p>
+        <h3>Google still works</h3>
+        <p>Send questions to your normal search engine instead. Nothing else changes.</p>
       </article>
 
       <article class="cell">
-        <h3>Change your mind anytime</h3>
-        <p>The buttons sit right above the box. One click, no settings page.</p>
+        <h3>Nothing to sign up for</h3>
+        <p>No Archer account, no key required. Install it and it works.</p>
       </article>
 
       <article class="cell">
-        <h3>Hold a key to override</h3>
-        <p>Shift and Enter forces a website. Command and Enter forces a question.</p>
+        <h3>Built for the keyboard</h3>
+        <p>Arrow keys walk the rows, slash opens your prompts, Tab fills the blanks.</p>
       </article>
 
       <article class="cell cellQuiet">
-        <h3>Search only</h3>
+        <h3>It stays yours</h3>
         <p>
-          If you would rather nothing ever opened by itself, turn this on and
-          every single thing you type becomes a search.
+          No ads, no tracking, no telemetry. Your prompts and settings live in
+          your browser and nowhere else.
+          <a href="/privacy">The details</a>.
         </p>
       </article>
     </div>
   </section>
 
-  <!-- PRIVACY. The permission ledger lives on /privacy now. This is the part a
-       person actually wants answered before installing anything. -->
-  <section class="privacy" id="privacy">
-    <div class="privacyHead">
-      <h2>It is not watching you.</h2>
-      <p class="sectionLede">
-        This is the part worth reading before you install anything, so here it is
-        in plain words.
-      </p>
-    </div>
-
-    <div class="promises">
-      <article>
-        <h3>No account, ever</h3>
-        <p>
-          Nothing to sign up for and no password to make. Install it and it
-          works.
-        </p>
-      </article>
-      <article>
-        <h3>No tracking, no ads</h3>
-        <p>
-          There is no company server behind Archer collecting anything, because
-          one was never built. Nobody is counting your clicks.
-        </p>
-      </article>
-      <article>
-        <h3>It stays on your computer</h3>
-        <p>
-          Your settings and your recent questions are saved in your own browser.
-          Uninstall it and every bit of that goes with it.
-        </p>
-      </article>
-      <article>
-        <h3>It cannot read the web pages you visit</h3>
-        <p>
-          Archer only exists on the new tab. It has no way to see the sites you
-          browse, and it never asks for permission to.
-        </p>
-      </article>
-    </div>
-
-    <p class="privacyClose">
-      When you send a question to ChatGPT, it goes to ChatGPT. That is the only
-      place anything goes, and only when you press Enter.
-      <a href="/privacy">Read the full privacy policy</a>.
-    </p>
-  </section>
-
-  <!-- INSTALL. Honest: it is not on the Web Store yet, and that means a few
-       manual steps. Say so kindly rather than burying it. -->
+  <!-- INSTALL. Not on the Web Store yet, so say so once and move on. -->
   <section class="install" id="install">
     <div class="installHead">
-      <h2>Getting it, for now.</h2>
+      <h2>Five minutes, once.</h2>
       <p class="sectionLede">
-        Archer is not in the Chrome Web Store yet, so there is no one-click
-        button to press. Adding it by hand takes about five minutes and you only
-        do it once. If that is not for you, the honest answer is to wait.
+        Archer is not in the Chrome Web Store yet, so you add it yourself. Four
+        steps, and you never do it again.
       </p>
     </div>
 
@@ -389,8 +344,8 @@
 
     <div class="installFoot">
       <p>
-        Want to know when it lands in the Chrome Web Store? Star the project and
-        GitHub will tell you.
+        Star the project and GitHub will tell you when it hits the Chrome Web
+        Store.
       </p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/thellis954/archer-tabs">Go to the project page</a>

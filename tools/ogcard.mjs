@@ -74,8 +74,8 @@ const card = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     </svg>
     <span>Archer</span>
   </div>
-  <h1>Just start&nbsp;typing.</h1>
-  <p>A smarter new tab for Chrome.</p>
+  <h1>AI on every<br>new&nbsp;tab.</h1>
+  <p>Ask, jump, customise. Free for Chrome.</p>
   <div class="foot">archertabs.app</div>
 </body></html>`;
 

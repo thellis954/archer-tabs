@@ -57,7 +57,19 @@ function siteName(rawUrl) {
   const name = labels[i];
 
   if (!name || name.length < 2) return rawUrl;
-  return name[0].toUpperCase() + name.slice(1);
+
+  // Capitalising the first letter gets "Netflix" right and "Youtube" wrong, and
+  // a brand set in the wrong case is the kind of small thing that makes a page
+  // look careless. Only the handful anyone is likely to type here; everything
+  // else falls back to the plain capital, which is fine for one-word names.
+  const CASED = {
+    youtube: "YouTube", github: "GitHub", linkedin: "LinkedIn", tiktok: "TikTok",
+    chatgpt: "ChatGPT", openai: "OpenAI", whatsapp: "WhatsApp", paypal: "PayPal",
+    ebay: "eBay", imdb: "IMDb", bbc: "BBC", nytimes: "NYTimes", icloud: "iCloud",
+    duckduckgo: "DuckDuckGo", stackoverflow: "Stack Overflow", ycombinator: "Hacker News",
+  };
+  const key = name.toLowerCase();
+  return CASED[key] ?? name[0].toUpperCase() + name.slice(1);
 }
 
 /** What the extension would do, said the way a person would say it. */
@@ -69,7 +81,7 @@ function describe(raw, mode) {
 
   switch (verdict.action) {
     case NONE:
-      return { state: "idle", tag: "", what: "Try typing something. This box is really working.", open: null };
+      return { state: "idle", tag: "", what: "Go ahead, type in it. This one is live.", open: null };
 
     case NAVIGATE:
       return { state: "url", tag: `Opens ${siteName(verdict.url)}`, what: "", open: verdict.url };

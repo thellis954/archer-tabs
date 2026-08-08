@@ -500,8 +500,7 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   letter-spacing: -0.02em;
   color: var(--text);
 }
-.specimen[data-verdict="url"] .verdictBadge,
-.specimen[data-verdict="prompt"] .verdictBadge { color: var(--accent); }
+.specimen .verdictBadge { color: var(--accent); }
 .verdictNote { max-width: 34ch; }
 
 .scenes { display: grid; gap: clamp(2.5rem, 6vw, 4.5rem); }
@@ -574,8 +573,8 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .surfaceList {
   margin: clamp(2rem, 4vw, 3rem) 0 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: clamp(1.25rem, 3vw, 2.5rem);
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
 }
 .surfaceList dt {
   font-size: 15.5px; font-weight: 600; letter-spacing: -0.015em;
@@ -584,7 +583,7 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 }
 .surfaceList dd { margin: 0.5rem 0 0; color: var(--muted); font-size: 14.5px; }
 
-@media (max-width: 900px) { .surfaceList { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 860px) { .surfaceList { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 520px) { .surfaceList { grid-template-columns: 1fr; } }
 
 /* ----------------------------------------------------------- the modes --- */
@@ -659,6 +658,7 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 .cellArt h3, .cellArt p { position: relative; z-index: 1; }
 
 .cellQuiet { background: var(--raised); }
+.cell a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 860px) {
   .bento { grid-template-columns: repeat(2, 1fr); }
@@ -670,47 +670,6 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
   .bento { grid-template-columns: 1fr; }
   .cellWide, .cellArt { grid-column: span 1; }
 }
-
-/* --------------------------------------------------------- the privacy --- */
-.privacy {
-  background: var(--raised);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: var(--band) var(--gutter);
-}
-.privacyHead { max-width: var(--shell); margin: 0 auto clamp(2.5rem, 5vw, 4rem); }
-.privacyHead h2 { max-width: 24ch; }
-
-/* Four plain promises. The permission-by-permission ledger this replaced was
-   accurate and unreadable; it lives on /privacy, where someone who wants that
-   level of detail goes looking for it. */
-.promises {
-  max-width: var(--shell); margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-.promises article {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  padding: clamp(1.25rem, 2.4vw, 1.75rem);
-}
-.promises h3 { font-size: 1.02rem; }
-.promises p { margin-top: 0.7rem; color: var(--muted); font-size: 15px; }
-
-.privacyClose {
-  max-width: 54ch;
-  margin: clamp(2.5rem, 5vw, 4rem) auto 0;
-  text-align: center;
-  font-size: clamp(17px, 2vw, 21px);
-  letter-spacing: -0.015em;
-  line-height: 1.45;
-}
-.privacyClose a { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
-
-@media (max-width: 900px) { .promises { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .promises { grid-template-columns: 1fr; } }
 
 /* --------------------------------------------------------- the install --- */
 /* A single narrow column, centred. These are instructions someone is going to
@@ -890,7 +849,6 @@ footer {
   @supports (animation-timeline: view()) {
     .howHead, .surfaceHead, .surfaceShot, .surfaceList,
     .modesHead, .cell,
-    .privacyHead, .promises article, .privacyClose,
     .installHead, .steps li, .installFoot {
       animation: reveal linear both;
       animation-timeline: view();
