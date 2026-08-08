@@ -1975,7 +1975,11 @@ check(
 check(
   "the Model and Budget links are hidden while their cards are",
   (await shipOptions.locator("#navModel").isHidden()) &&
-    (await shipOptions.locator("#modelCard").isHidden()),
+    (await shipOptions.locator("#modelCard").isHidden()) &&
+    (await shipOptions.locator("#navBudget").isHidden()) &&
+    (await shipOptions.locator("#budgetCard").isHidden()),
+  `model ${await shipOptions.locator("#modelCard").isHidden()}/${await shipOptions.locator("#navModel").isHidden()}, ` +
+    `budget ${await shipOptions.locator("#budgetCard").isHidden()}/${await shipOptions.locator("#navBudget").isHidden()}`,
 );
 
 // Each card says its own state, so "is the weather on?" is answerable without
