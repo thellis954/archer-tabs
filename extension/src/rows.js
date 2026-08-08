@@ -46,7 +46,10 @@ export function renderRows(list, rows, { onOpen, onPin, onDismiss }) {
       title.textContent = row.title;
       // With more than one assistant in the list, a row has to say which one it
       // came from — otherwise two identical-looking rows go to different places.
-      const detail = row.prompt ? `${row.provider ?? ""} · ${row.prompt}`.replace(/^ · /, "") : row.provider ?? "";
+      // A conversation Chrome never titled takes its prompt as the title, so
+      // repeating it here would print the same sentence twice on one row.
+      const extra = row.prompt && row.prompt !== row.title ? row.prompt : "";
+      const detail = extra ? `${row.provider ?? ""} · ${extra}`.replace(/^ · /, "") : row.provider ?? "";
       description.textContent = detail ? `— ${detail}` : "";
       node.setAttribute("aria-label", detail ? `${row.title} — ${detail}` : row.title);
     } else if (row.kind === PROMPT_ROW) {

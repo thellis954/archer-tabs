@@ -118,6 +118,14 @@ export function buildRows({
   const log = [...launches].filter((l) => l && l.text).sort((a, b) => a.at - b.at);
   const spent = bindLaunches(conversations, log);
 
+  // Named *after* binding, because the best name for a conversation Chrome
+  // never titled is the prompt that started it — which is only known once a
+  // launch has been bound to it.
+  for (const conversation of conversations) {
+    if (conversation.title) continue;
+    conversation.title = conversation.prompt || `${conversation.provider} conversation`;
+  }
+
   const recall = [...conversations, ...unboundPrompts(log, spent, dropped)];
   const browsing = browsingRows(sites, closed, dropped, recall);
 
@@ -176,26 +184,46 @@ function collapseVisits(visits) {
     if (!found) continue;
     const { provider, id, url } = found;
 
-    // Chrome records the tab title as it was at visit time. Before the model
-    // names the conversation that is just the product name, which is no use as
-    // a row — and the browser's own tab title often carries a suffix.
+    // Chrome records the tab title as it was at visit time, and the browser's
+    // own tab title often carries a suffix.
+    //
+    // **A conversation with no usable title is kept, not dropped.** These sites
+    // are single-page apps: the address becomes /c/<id> the moment you send the
+    // first message, which is *before* the model has named the chat, so what
+    // Chrome stores is very often the bare product name and it never revises
+    // it. Dropping those made most real conversations invisible — the whole
+    // feature looked like it pulled nothing. A row that reads "ChatGPT
+    // conversation" is worth far more than no row at all, and buildRows gives
+    // it a better name below if a prompt of yours can be bound to it.
     const title = String(visit.title ?? "")
       .replace(/\s*[|·—-]\s*(ChatGPT|Claude)\s*$/i, "")
       .trim();
-    if (!title || isBareProductName(title)) continue;
+    const usable = title && !isBareProductName(title) ? title : "";
 
     const last = Number(visit.lastVisitTime) || 0;
     const first = Number(visit.firstVisitTime ?? visit.lastVisitTime) || 0;
     const existing = byId.get(id);
 
     if (!existing) {
-      byId.set(id, { kind: CONVERSATION, id, url, title, at: last, firstVisit: first, provider: provider.label });
+      byId.set(id, {
+        kind: CONVERSATION,
+        id,
+        url,
+        title: usable,
+        at: last,
+        firstVisit: first,
+        provider: provider.label,
+      });
       continue;
     }
-    // The newest visit wins the title — conversations get renamed.
+    // The newest visit wins the title — conversations get renamed. But any real
+    // title beats none, whenever it was recorded: the visit that carries the
+    // name is usually an older one, for the same reason as above.
     if (last > existing.at) {
       existing.at = last;
-      existing.title = title;
+      if (usable) existing.title = usable;
+    } else if (usable && !existing.title) {
+      existing.title = usable;
     }
     if (first && (!existing.firstVisit || first < existing.firstVisit)) existing.firstVisit = first;
   }

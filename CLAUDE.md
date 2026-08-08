@@ -53,7 +53,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 237 unit cases across the pure modules. No install needed. |
+| `npm test` | 240 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state, plus the settings page at both its layouts. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
@@ -111,6 +111,11 @@ those lists. A file that isn't referenced from a page or the manifest is dead we
   `none` / `navigate` / `search` / `ask`. Also pure, 29 unit cases.
 - `src/conversations.js` — `chrome.history` visits + the launch log → the suggestion rows.
   Collapsing, prompt binding, pinning and fuzzy filtering all happen here. Pure, 39 unit cases.
+  **A conversation with no usable title is kept, never dropped.** These sites are single-page apps:
+  the address becomes `/c/<id>` when the first message is sent, *before* the model names the chat,
+  so what Chrome stores is very often just "ChatGPT" and it never revises it. Dropping those made
+  most real conversations invisible. `buildRows` names them after binding — the prompt that started
+  it, or the provider — because a reachable row beats a well-named one that was never rendered.
 - `src/settings.js` — the only thing that touches `chrome.storage`.
 - `src/history.js` — the only thing that touches `chrome.history` and `chrome.permissions`.
 - `src/rows.js` — paints the rows.
