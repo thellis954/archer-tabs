@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+For agent-oriented workflow (including the committed code graph), see **`AGENTS.md`**.
+
 ## What this is
 
 **Archer** — a Chrome Manifest V3 extension that replaces the browser's New Tab page with a calm
