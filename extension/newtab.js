@@ -55,7 +55,7 @@ const noMatches = document.getElementById("noMatches");
 
 // --- mode ---------------------------------------------------------------------
 
-let mode = GOOGLE;
+let mode = AUTO;
 /** Whether an API key is set. Answer mode degrades to Auto without one. */
 let canAnswer = false;
 

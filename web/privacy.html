@@ -52,6 +52,11 @@
   <header class="docHead">
     <h1>Privacy</h1>
     <p class="docDate">Last updated 2026-10-28. Applies to the Archer Chrome extension, every version.</p>
+    <p>
+      This page is published at <a href="https://archertabs.app/privacy">archertabs.app/privacy</a>
+      (<code>web/privacy.html</code>), which is the policy URL on the Chrome Web Store listing.
+      The canonical text lives in <code>docs/PRIVACY.md</code>; change the two together.
+    </p>
   </header>
 
   <section class="docLead">
@@ -82,7 +87,7 @@
         </thead>
         <tbody>
           <tr>
-            <td>Your chosen destination (Search, ChatGPT, Claude, Perplexity)</td>
+            <td>Your chosen destination (Auto, Default engine, Google, ChatGPT, Claude, Perplexity or Answer here)</td>
             <td>So a new tab opens the way you left it</td>
             <td>You change it</td>
           </tr>
@@ -139,7 +144,7 @@
       <div>
         <dt>Your search terms, to your own default search engine</dt>
         <dd>
-          When a prompt is routed to Search, Archer calls Chrome's own
+          In Auto and Default engine modes, Archer calls Chrome's own
           <code>chrome.search</code> API. Chrome sends the query to whatever
           engine <em>you</em> have set as default. Archer does not choose the
           engine, does not see the response, and has no search provider of its
@@ -149,9 +154,18 @@
       <div>
         <dt>Your prompt, to the site you picked</dt>
         <dd>
-          Choosing ChatGPT, Claude or Perplexity navigates the tab to that site
+          Choosing Google, ChatGPT, Claude or Perplexity navigates the tab to that site
           with your prompt in the address, exactly as if you had typed it there.
           Their privacy policies apply from that point, as they would anyway.
+        </dd>
+      </div>
+      <div>
+        <dt>Files you attach, with your prompt</dt>
+        <dd>
+          If you attach a file, the text Archer extracts from it goes with that one
+          prompt: trimmed to fit the address for a hand-off to a site, or in full to
+          OpenAI for "Answer here". Images are sent only with "Answer here".
+          Attachments are held in memory for the next send and are never stored.
         </dd>
       </div>
       <div>
@@ -178,6 +192,10 @@
     </dl>
 
     <p class="callout">That is the complete list.</p>
+    <p>
+      Archer's use of information received from Chrome APIs adheres to the Chrome
+      Web Store User Data Policy, including the Limited Use requirements.
+    </p>
   </section>
 
   <section>
@@ -215,7 +233,7 @@
           <tr>
             <td><code>history</code></td>
             <td>"Show your recent conversations"</td>
-            <td>Finding <code>chatgpt.com</code> conversation addresses so they can be rows. Every other history entry is discarded before it is read</td>
+            <td>Finding ChatGPT (<code>chatgpt.com</code>, <code>chat.openai.com</code>) and Claude (<code>claude.ai</code>) conversation addresses from the last 30 days so they can be rows. Every other history entry is discarded before it is read</td>
           </tr>
           <tr>
             <td><code>topSites</code></td>

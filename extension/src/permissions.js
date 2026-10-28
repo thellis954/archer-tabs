@@ -24,7 +24,7 @@ export const GRANTS = [
     id: "history",
     title: "Recent conversations",
     permissions: ["history"],
-    why: "Reads your browsing history so conversations you have already had can appear as rows. Archer only looks at chatgpt.com conversation addresses; every other entry is discarded before it is read.",
+    why: "Reads your browsing history so conversations you have already had can appear as rows. Archer only looks at ChatGPT and Claude conversation addresses; every other entry is discarded before it is read.",
   },
   {
     id: "topSites",

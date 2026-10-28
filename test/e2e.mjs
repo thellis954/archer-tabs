@@ -45,28 +45,32 @@ const ctx = await chromium.launchPersistentContext("", {
 
 const NEWTAB = `chrome-extension://${extensionId(EXT)}/newtab.html`;
 
-const page = await ctx.newPage();
+let page = await ctx.newPage();
 const errors = [];
-page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
-page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
+const watchPage = (p) => {
+  p.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+  p.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
+};
+watchPage(page);
 
 await page.goto(NEWTAB, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(300);
 
-// Observe where the page tries to go by aborting outbound navigations rather
-// than stubbing the page's own APIs: window.location.assign is non-configurable
-// in Chrome, and stubbing chrome.search would test the stub instead of the real
-// API. An aborted navigation leaves the document intact, so the page survives
-// for the next case.
 const nav = [];
-await page.route(/^https?:/, (route) => {
+await ctx.route(/^https?:/, (route) => {
   const req = route.request();
   if (req.isNavigationRequest()) nav.push(req.url());
-  // 204 rather than abort(): a No Content response to a main-frame navigation
-  // leaves the current document in place, so one page survives every case.
-  // abort() swaps in an error page and every later fill() then times out.
   return route.fulfill({ status: 204, body: "" });
 });
+
+async function resetPageAfterNavigation() {
+  const old = page;
+  page = await ctx.newPage();
+  watchPage(page);
+  await old.close().catch(() => {});
+  await page.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(150);
+}
 
 // --- the page itself ---------------------------------------------------------
 
@@ -79,6 +83,16 @@ check(
   (await page.evaluate(() => getComputedStyle(document.body).backgroundColor)) !== "rgba(0, 0, 0, 0)",
 );
 
+check(
+  "fresh install opens in Auto",
+  (await page.locator("#modeLabel").innerText()).trim() === "Auto",
+  await page.locator("#modeLabel").innerText(),
+);
+check(
+  "fresh install presses no destination pill",
+  (await page.locator('.target[aria-pressed="true"]').count()) === 0,
+);
+
 // --- routing -----------------------------------------------------------------
 
 // chrome.search sends the tab to the profile's default engine, which in a fresh
@@ -89,9 +103,11 @@ const SEARCH_ENGINE = /[?&]q=/;
 async function submit(text, mods = []) {
   nav.length = 0;
   await page.fill("#query", text);
-  await page.locator("#query").press([...mods, "Enter"].join("+"));
+  await page.locator("#query").press([...mods, "Enter"].join("+"), { noWaitAfter: true });
   await page.waitForTimeout(250);
-  return nav.slice();
+  const urls = nav.slice();
+  if (urls.length > 0) await resetPageAfterNavigation();
+  return urls;
 }
 
 const isSearchFor = (urls, text) =>
@@ -155,9 +171,10 @@ await page.fill("#query", "example.com");
 check("send arms once there is something to send", await page.locator("#send").isEnabled());
 
 nav.length = 0;
-await page.locator("#send").click();
+await page.locator("#send").click({ noWaitAfter: true });
 await page.waitForTimeout(250);
 check("clicking send routes the same as Enter", nav[0]?.startsWith("https://example.com"), JSON.stringify(nav));
+if (nav.length > 0) await resetPageAfterNavigation();
 
 await page.fill("#query", "gone");
 await page.locator("#query").press("Escape");
@@ -285,7 +302,7 @@ check("Escape returns focus to the button", await modeButton.evaluate((b) => b =
 // --- routing per mode --------------------------------------------------------
 
 async function chooseMode(mode) {
-  await modeButton.click();
+  await page.locator("#modeButton").click();
   await page.locator(`[role=option][data-mode="${mode}"]`).click();
   await page.waitForTimeout(120);
 }
@@ -385,6 +402,12 @@ await afterDismiss.close();
 // which gates *reading* a tab's url/title. Navigation above proves the call
 // lands; this proves we did not pay for it. See the ledger in docs/ROADMAP.md.
 const manifest = await page.evaluate(() => chrome.runtime.getManifest());
+check(
+  "extension display name matches the listing",
+  manifest.name === "Archer — AI new tab",
+  manifest.name,
+);
+check("short name is Archer", manifest.short_name === "Archer", manifest.short_name);
 check(
   "the manifest asks for no more than search + storage",
   JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(["search", "storage"]),
@@ -519,6 +542,7 @@ check(
   isSearchFor(nav, "tide times for saturday"),
   JSON.stringify(nav),
 );
+if (nav.length > 0) await resetPageAfterNavigation();
 
 // --- pin and dismiss ---------------------------------------------------------
 
@@ -754,8 +778,8 @@ const sse = (parts, usage) =>
 let apiCalls = 0;
 let apiBody = null;
 
-const answerPage = await answerCtx.newPage();
-await answerPage.route("https://api.openai.com/**", async (r) => {
+let answerPage = await answerCtx.newPage();
+await answerCtx.route("https://api.openai.com/**", async (r) => {
   apiCalls++;
   apiBody = JSON.parse(r.request().postData() ?? "null");
   return r.fulfill({
@@ -779,16 +803,25 @@ await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
 await answerPage.waitForTimeout(400);
 
 const answerNav = [];
-await answerPage.route(/^https?:(?!\/\/api\.openai\.com)/, (r) => {
+await answerCtx.route(/^https?:(?!\/\/api\.openai\.com)/, (r) => {
   if (r.request().isNavigationRequest()) answerNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
 
+async function resetAnswerPage() {
+  const old = answerPage;
+  answerPage = await answerCtx.newPage();
+  await old.close().catch(() => {});
+  await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
+  await answerPage.waitForTimeout(200);
+}
+
 async function ask(text) {
   answerNav.length = 0;
   await answerPage.fill("#query", text);
-  await answerPage.locator("#query").press("Enter");
+  await answerPage.locator("#query").press("Enter", { noWaitAfter: true });
   await answerPage.waitForTimeout(600);
+  if (answerNav.length > 0) await resetAnswerPage();
 }
 
 await ask("what is a nock");
@@ -965,7 +998,7 @@ await doomed.goto("https://example.com/fletching", { waitUntil: "load" });
 await doomed.waitForTimeout(200);
 await doomed.close();
 
-const power = await powerCtx.newPage();
+let power = await powerCtx.newPage();
 await power.goto(POWER_NEWTAB, { waitUntil: "domcontentloaded" });
 await power.waitForTimeout(300);
 
@@ -986,17 +1019,29 @@ await power.goto(POWER_NEWTAB, { waitUntil: "domcontentloaded" });
 await power.waitForTimeout(500);
 
 const powerNav = [];
-await power.route(/^https?:/, (r) => {
+await powerCtx.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) powerNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
 
+let powerPage = power;
+
+async function resetPowerPage() {
+  const old = power;
+  power = await powerCtx.newPage();
+  await old.close().catch(() => {});
+  await power.goto(POWER_NEWTAB, { waitUntil: "domcontentloaded" });
+  await power.waitForTimeout(200);
+}
+
 async function powerSubmit(text, mods = []) {
   powerNav.length = 0;
   await power.fill("#query", text);
-  await power.locator("#query").press([...mods, "Enter"].join("+"));
+  await power.locator("#query").press([...mods, "Enter"].join("+"), { noWaitAfter: true });
   await power.waitForTimeout(250);
-  return powerNav.slice();
+  const urls = powerNav.slice();
+  if (urls.length > 0) await resetPowerPage();
+  return urls;
 }
 
 // --- multi-target routing -------------------------------------------------------
@@ -1292,8 +1337,8 @@ const dashCtx = await chromium.launchPersistentContext("", {
 });
 const DASH_NEWTAB = `chrome-extension://${extensionId(dashFixture)}/newtab.html`;
 
-const dash = await dashCtx.newPage();
-await dash.route("https://geocoding-api.open-meteo.com/**", (r) =>
+let dash = await dashCtx.newPage();
+await dashCtx.route("https://geocoding-api.open-meteo.com/**", (r) =>
   r.fulfill({
     status: 200,
     contentType: "application/json",
@@ -1302,7 +1347,7 @@ await dash.route("https://geocoding-api.open-meteo.com/**", (r) =>
     }),
   }),
 );
-await dash.route("https://api.open-meteo.com/**", (r) =>
+await dashCtx.route("https://api.open-meteo.com/**", (r) =>
   r.fulfill({
     status: 200,
     contentType: "application/json",
@@ -1429,18 +1474,34 @@ check(
 await dash.bringToFront();
 
 const dashNav = [];
-await dash.route(/^https?:(?!\/\/(api|geocoding-api)\.open-meteo)/, (r) => {
+await dashCtx.route(/^https?:(?!\/\/(api|geocoding-api)\.open-meteo)/, (r) => {
   if (r.request().isNavigationRequest()) dashNav.push(r.request().url());
   return r.fulfill({ status: 204, body: "" });
 });
 
-await dash.fill("#query", "what is a nock");
-await dash.locator("#query").press("Enter");
-await dash.waitForTimeout(300);
+async function resetDashPage() {
+  const old = dash;
+  dash = await dashCtx.newPage();
+  await old.close().catch(() => {});
+  await dash.goto(DASH_NEWTAB, { waitUntil: "domcontentloaded" });
+  await dash.waitForTimeout(200);
+}
+
+async function dashSubmit(text) {
+  dashNav.length = 0;
+  await dash.fill("#query", text);
+  await dash.locator("#query").press("Enter", { noWaitAfter: true });
+  await dash.waitForTimeout(300);
+  const urls = dashNav.slice();
+  if (urls.length > 0) await resetDashPage();
+  return urls;
+}
+
+const routed = await dashSubmit("what is a nock");
 check(
   "the pill actually routes the query",
-  dashNav[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
-  JSON.stringify(dashNav),
+  routed[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
+  JSON.stringify(routed),
 );
 
 // Choosing in the menu has to move the pill back the other way.
@@ -1468,25 +1529,23 @@ check(
 
 await dash.locator('.target[data-mode="google"]').click();
 await dash.waitForTimeout(200);
-dashNav.length = 0;
-await dash.fill("#query", "submit an extension to the chrome store");
-await dash.locator("#query").press("Enter");
-await dash.waitForTimeout(400);
-check(
-  "the Google pill reaches Google, not the default engine",
-  (dashNav[0] ?? "").startsWith("https://www.google.com/search?q=submit"),
-  JSON.stringify(dashNav),
-);
+{
+  const urls = await dashSubmit("submit an extension to the chrome store");
+  check(
+    "the Google pill reaches Google, not the default engine",
+    (urls[0] ?? "").startsWith("https://www.google.com/search?q=submit"),
+    JSON.stringify(urls),
+  );
+}
 
-dashNav.length = 0;
-await dash.fill("#query", "example.com");
-await dash.locator("#query").press("Enter");
-await dash.waitForTimeout(400);
-check(
-  "...and a URL still just opens in Google mode",
-  (dashNav[0] ?? "").startsWith("https://example.com"),
-  JSON.stringify(dashNav),
-);
+{
+  const urls = await dashSubmit("example.com");
+  check(
+    "...and a URL still just opens in Google mode",
+    (urls[0] ?? "").startsWith("https://example.com"),
+    JSON.stringify(urls),
+  );
+}
 await dash.fill("#query", "");
 
 // A mode with no pill leaves them all unpressed rather than lying about one.
@@ -1567,13 +1626,14 @@ check(
 
 dashNav.length = 0;
 await dash.bringToFront();
-await dash.locator(".tile").first().locator(".tileLink").click();
+await dash.locator(".tile").first().locator(".tileLink").click({ noWaitAfter: true });
 await dash.waitForTimeout(300);
 check(
   "clicking a tile opens it",
   dashNav[0] === "https://github.com/",
   JSON.stringify(dashNav),
 );
+if (dashNav.length > 0) await resetDashPage();
 
 await dash.locator(".tile").first().locator(".tileRemove").click();
 await dash.waitForTimeout(300);
@@ -1646,7 +1706,7 @@ check("...and arms send even with an empty box", await dash.locator("#send").isE
 
 dashNav.length = 0;
 await dash.fill("#query", "explain this");
-await dash.locator("#query").press("Enter");
+await dash.locator("#query").press("Enter", { noWaitAfter: true });
 await dash.waitForTimeout(400);
 const sent = decodeURIComponent((dashNav[0] ?? "").replace(/^[^?]*\?q=/, ""));
 check(
@@ -1655,6 +1715,7 @@ check(
   JSON.stringify(sent.slice(0, 120)),
 );
 check("...and the chip is cleared afterwards", (await dash.locator(".chip").count()) === 0);
+if (dashNav.length > 0) await resetDashPage();
 
 await dash.fill("#query", "");
 await dash.setInputFiles("#attachInput", ATTACH);
@@ -1815,7 +1876,7 @@ check(
 
 dashNav.length = 0;
 await dash.fill("#query", "summarise this");
-await dash.locator("#query").press("Enter");
+await dash.locator("#query").press("Enter", { noWaitAfter: true });
 await dash.waitForTimeout(500);
 const docxSent = decodeURIComponent((dashNav[0] ?? "").replace(/^[^?]*\?q=/, ""));
 check(
@@ -1823,6 +1884,7 @@ check(
   docxSent.includes("Quarterly review") && docxSent.includes("Revenue rose four percent"),
   JSON.stringify(docxSent.slice(0, 160)),
 );
+if (dashNav.length > 0) await resetDashPage();
 rmSync(DOCX, { force: true });
 
 // A scan has no text layer, and saying so beats attaching nothing while the
@@ -1944,6 +2006,7 @@ check(
   bystander.url() === "about:blank" && dashNav.some((u) => u.startsWith("https://example.com")),
   JSON.stringify({ bystander: bystander.url(), dashNav }),
 );
+if (dashNav.length > 0) await resetDashPage();
 await bystander.close();
 await dash.bringToFront();
 
