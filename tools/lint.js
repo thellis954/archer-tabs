@@ -296,7 +296,12 @@ if (existsSync(join(ROOT, "web/index.html"))) {
     existsSync(join(ROOT, "web", rel)) ||
     (!extname(rel) && existsSync(join(ROOT, "web", `${rel}.html`)));
 
+  // /_vercel/* is served by the platform, not from web/: Web Analytics adds its
+  // script there once it is enabled on the project. It is not a file to find.
+  const platformRoute = (rel) => rel.startsWith("_vercel/");
+
   for (const rel of referenced) {
+    if (platformRoute(rel)) continue;
     if (!servable(rel)) fail("web/index.html", `references missing file: /${rel}`);
   }
 }

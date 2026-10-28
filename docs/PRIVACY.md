@@ -1,6 +1,6 @@
 # Archer — privacy policy
 
-Last updated: 2026-08-07. Applies to the Archer Chrome extension, every version.
+Last updated: 2026-10-28. Applies to the Archer Chrome extension, every version.
 
 This file is the canonical text. The Chrome Web Store requires a *hosted* policy URL — publishing
 this at `https://archertabs.app/privacy` is website work and is tracked separately; keep the two in
@@ -91,6 +91,21 @@ the feature, and Archer's settings page lists all of them with an on/off switch:
 | `api.open-meteo.com`, `geocoding-api.open-meteo.com` | Saving a weather place | The weather card |
 
 Revoking any of them in Archer's settings turns off the feature and nothing else.
+
+---
+
+## This website
+
+archertabs.app (the website, not the extension) uses Vercel Web Analytics to count page views on
+its home page. It is cookieless: it sets no cookies and stores nothing in your browser. Vercel
+records aggregate, anonymous data only: the page, the referrer, country, browser, operating system
+and device type. A visit is told apart only by a hash made from the request that is discarded after 24
+hours, so it cannot identify you or follow you across sites. This privacy page loads no scripts at
+all.
+
+None of this is connected to the extension. The extension sends nothing to us, and installing it
+adds nothing to these numbers.
+[Vercel's Web Analytics privacy notes](https://vercel.com/docs/analytics/privacy-policy).
 
 ---
 
