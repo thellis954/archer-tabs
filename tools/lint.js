@@ -383,6 +383,15 @@ if (existsSync(join(ROOT, "vercel.json"))) {
   }
 }
 
+// --- 12. web/vercel.json stays identical to the root vercel.json -------------
+// The live site was not applying the root vercel.json's headers or redirects
+// (Oct 2026), so a copy also ships inside the output directory. Keep them in
+// sync so the two can never drift apart.
+
+if (existsSync(join(ROOT, "vercel.json")) && read("web/vercel.json") !== read("vercel.json")) {
+  fail("web/vercel.json", "must be an exact copy of the root vercel.json (cp vercel.json web/vercel.json)");
+}
+
 // --- report ------------------------------------------------------------------
 
 if (problems.length) {
