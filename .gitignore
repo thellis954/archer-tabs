@@ -1,3 +1,6 @@
 node_modules/
 shots/
 store/
+
+graphify-out/**
+!graphify-out/graph.json
