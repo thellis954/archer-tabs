@@ -4,8 +4,8 @@
 // `history` is an *optional* permission: it is not in the install-time prompt,
 // and Chrome asks for it the moment the user turns recent conversations on —
 // never before. Archer reads nothing else from history: the query is scoped to
-// chatgpt.com conversation URLs and every other result is dropped before it is
-// looked at. See docs/ROADMAP.md §3.3 and the permissions ledger.
+// ChatGPT and Claude conversation URLs and every other result is dropped before
+// it is looked at. See docs/ROADMAP.md §3.3 and the permissions ledger.
 
 import { identify, PROVIDERS } from "./conversations.js";
 

@@ -9,7 +9,7 @@ risk, and one that understates loses the install.
 ## Name
 
 ```
-Archer — new tab
+Archer — AI new tab
 ```
 
 Under the 45-character limit. Not "Atlas New Tab": naming another company's discontinued product in
@@ -40,7 +40,7 @@ A clock, the weather, and the handful of sites you open without thinking.
 WHAT IT DOES
 • One box: ask or navigate, and it tells the difference — "node.js" is a question, "claude.ai" is a
   place. It uses the real list of top-level domains to decide, the way the address bar does.
-• Pick a destination: Search, ChatGPT, Claude or Perplexity, one click above the box.
+• Pick a destination: Google, ChatGPT, Claude or Perplexity, one click above the box, or Auto, Default engine and Answer here from the menu.
 • Pick up where you left off: recent conversations and past prompts as rows you can filter by
   typing, pin, or dismiss.
 • Saved prompts with fill-in-the-blanks, opened by typing "/".
@@ -72,9 +72,7 @@ Privacy policy: https://archertabs.app/privacy
 https://archertabs.app/privacy
 ```
 
-Required for any extension that handles user data. **This page does not exist yet** — the site is
-worked on separately. `docs/PRIVACY.md` is the canonical text to publish there. The listing cannot
-be submitted until the URL resolves.
+Required for any extension that handles user data. Live at the URL above (served from `web/privacy.html`; `docs/PRIVACY.md` is the canonical text, and the two must stay in step).
 
 ## Single purpose
 
@@ -93,10 +91,11 @@ Paste these against each permission in the dashboard. They must match the code.
 |---|---|
 | `search` | Hands the query to the user's own default search engine through Chrome's API, so their choice of provider is respected rather than replaced. |
 | `storage` | Keeps the user's settings, saved prompts, favourites and prompt history on their own device. Nothing is sent anywhere. |
-| `history` *(optional)* | Requested only when the user enables "recent conversations". Used to find `chatgpt.com` conversation addresses so they can be listed on the new tab. Every other history entry is discarded before it is read. |
+| `history` *(optional)* | Requested only when the user enables "recent conversations". Used to find ChatGPT (`chatgpt.com`, `chat.openai.com`) and Claude (`claude.ai`) conversation addresses so they can be listed on the new tab. Every other history entry is discarded before it is read. |
 | `topSites` *(optional)* | Requested only when the user enables top sites. Lists their most-visited sites as rows on the new tab. |
 | `sessions`, `tabs` *(optional)* | Requested together, only when the user enables "recently closed tabs", so a closed tab can be reopened. `sessions` alone does not expose a closed tab's title or URL. |
 | `clipboardRead` *(optional)* | Requested only when the user chooses "Paste" in the + menu, and read only at that moment. |
+| `favicon` *(optional)* | Requested when the user adds a favourite; reads the icon from Chrome's local favicon cache so the tile shows the site's icon. No request is made to the site. |
 | `host: api.openai.com` *(optional)* | Requested only when the user saves their own OpenAI API key. The new tab page calls the API directly with that key; nothing is proxied through a third party. |
 | `host: *.open-meteo.com` *(optional)* | Requested only when the user sets a place for the weather card. Sends the place name and its coordinates; no user identifier and no browser geolocation. |
 
@@ -112,8 +111,8 @@ code fetched at runtime.
 | Financial and payment information | No |
 | Authentication information | **Yes** — the user's own OpenAI API key, stored locally and sent only to OpenAI |
 | Personal communications | No |
-| Location | No |
-| Web history | **Yes** — read locally to list ChatGPT conversations; never transmitted |
+| Location | **Yes** — only with the weather card on: a typed place name and its coordinates go to Open-Meteo; no browser geolocation |
+| Web history | **Yes** — read locally to list ChatGPT and Claude conversations (and top sites / closed tabs when enabled); never transmitted |
 | User activity | No |
 | Website content | No |
 
@@ -149,4 +148,4 @@ Screenshot order, chosen so the first frame explains the product without a capti
 - [ ] Load unpacked from a clean profile and click every control once
 - [ ] Open each of the four icon PNGs and look at them (they shipped blank once — see Phase 1)
 - [ ] `npm run store` regenerated after any UI change
-- [ ] Privacy policy live at the URL above (site work — not in this repo's extension folder)
+- [x] Privacy policy live at the URL above (confirmed 2026-10-28; re-check it matches docs/PRIVACY.md before each submission)

@@ -1,10 +1,8 @@
 # Archer — privacy policy
 
-Last updated: 2026-08-07. Applies to the Archer Chrome extension, every version.
+Last updated: 2026-10-28. Applies to the Archer Chrome extension, every version.
 
-This file is the canonical text. The Chrome Web Store requires a *hosted* policy URL — publishing
-this at `https://archertabs.app/privacy` is website work and is tracked separately; keep the two in
-step, and don't submit the listing until that page is live.
+This file is the canonical text. It is published at https://archertabs.app/privacy (`web/privacy.html`), which is the policy URL on the Chrome Web Store listing. Change the two together; `npm run lint` checks that their dates match.
 
 ---
 
@@ -26,7 +24,7 @@ of it leaves the device except where the next section says so.
 
 | What | Why | Kept until |
 |---|---|---|
-| Your chosen destination (Search, ChatGPT, Claude, Perplexity, …) | So a new tab opens the way you left it | You change it |
+| Your chosen destination (Auto, Default engine, Google, ChatGPT, Claude, Perplexity or Answer here) | So a new tab opens the way you left it | You change it |
 | Prompts you launch from the new tab | To offer them back as rows, and to label a conversation with the prompt that started it | The most recent 200; "Clear prompt history" in settings erases them |
 | Pinned and dismissed rows | So the list stays the way you arranged it | You unpin, or dismiss again |
 | Saved prompts | The `/slash` library | You delete them |
@@ -44,14 +42,11 @@ of it leaves the device except where the next section says so.
 
 Only these, and only for the features you switch on.
 
-**Your search terms, to your own default search engine.** When a prompt is routed to "Search",
-Archer calls Chrome's own `chrome.search` API. Chrome sends the query to whatever engine *you* have
-set as default. Archer does not choose the engine, does not see the response, and does not have a
-search provider of its own.
+**Your search terms, to your own default search engine.** In Auto and Default engine modes, Archer calls Chrome's own `chrome.search` API. Chrome sends the query to whatever engine *you* have set as default. Archer does not choose the engine, does not see the response, and does not have a search provider of its own.
 
-**Your prompt, to the site you picked.** Choosing ChatGPT, Claude or Perplexity navigates the tab to
-that site with your prompt in the address, exactly as if you had typed it there. Their privacy
-policies apply from that point, as they would anyway.
+**Your prompt, to the site you picked.** Choosing Google, ChatGPT, Claude or Perplexity navigates the tab to that site with your prompt in the address, exactly as if you had typed it there. Their privacy policies apply from that point, as they would anyway.
+
+**Files you attach, with your prompt.** If you attach a file, the text Archer extracts from it goes with that one prompt: trimmed to fit the address for a hand-off to a site, or in full to OpenAI for "Answer here". Images are sent only with "Answer here". Attachments are held in memory for the next send and are never stored.
 
 **Your prompt and your API key, to OpenAI** — only if you have entered a key and chosen "Answer
 here". The request goes from your browser straight to `api.openai.com`. It is not proxied, mirrored
@@ -65,6 +60,8 @@ Archer does not request the `geolocation` permission at all.
 [Open-Meteo's privacy policy](https://open-meteo.com/en/terms).
 
 That is the complete list.
+
+Archer's use of information received from Chrome APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.
 
 ---
 
@@ -82,7 +79,7 @@ the feature, and Archer's settings page lists all of them with an on/off switch:
 
 | Permission | Enabled by | Used for |
 |---|---|---|
-| `history` | "Show your recent conversations" | Finding `chatgpt.com` conversation addresses so they can be rows. Every other history entry is discarded before it is read |
+| `history` | "Show your recent conversations" | Finding ChatGPT (`chatgpt.com`, `chat.openai.com`) and Claude (`claude.ai`) conversation addresses from the last 30 days so they can be rows. Every other history entry is discarded before it is read |
 | `topSites` | "Show top sites" in the + menu | The sites you visit most, as rows |
 | `sessions` + `tabs` | "Show recently closed tabs" in the + menu | Reopening a tab you closed. Chrome will not reveal a closed tab's title without `tabs`, which is why this one asks for more |
 | `clipboardRead` | "Paste" in the + menu | Reading the clipboard at the moment you choose Paste, and at no other time |
