@@ -93,12 +93,13 @@ Revoking any of them in Archer's settings turns off the feature and nothing else
 
 ## This website
 
-archertabs.app (the website, not the extension) measures visits to its home page with two tools.
+archertabs.app (the website, not the extension) measures visits to its home page and its
+/atlas-alternative page with two tools.
 Vercel Web Analytics is cookieless: it records aggregate, anonymous data only (the page, the
 referrer, country, browser, operating system and device type), and a visit is told apart only by a
 hash made from the request that is discarded after 24 hours.
 
-The home page also uses Google Analytics. It sets first-party cookies (named `_ga` and
+Those two pages also use Google Analytics. It sets first-party cookies (named `_ga` and
 `_ga_<id>`) to tell returning visitors apart, and sends Google your page views, the referrer, your
 browser and device details and an approximate location derived from your IP address. Google does
 not log or store IP addresses for Google Analytics. We use it only to see how many people visit and

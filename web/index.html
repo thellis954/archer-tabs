@@ -4,17 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Archer - AI on every new tab</title>
-<meta name="description" content="Turn every new tab into ChatGPT, Claude or Perplexity. Save the prompts you reuse, pull them up with a slash, and make the page look how you want. Free for Chrome.">
+<title>Archer - AI on every new tab in Chrome, free and open source</title>
+<meta name="description" content="A free, open-source new tab for Chrome. One box: ask ChatGPT, Claude or Perplexity, or type a site and go straight there. No account, no tracking in the extension.">
+<link rel="canonical" href="https://archertabs.app/">
 
+<meta property="og:site_name" content="Archer">
 <meta property="og:title" content="Archer - AI on every new tab">
-<meta property="og:description" content="Turn every new tab into ChatGPT, Claude or Perplexity. Save your prompts, customise the page, and get more out of your browser.">
+<meta property="og:description" content="One box in Chrome's new tab: ask ChatGPT, Claude or Perplexity, or type a site and go there. Free and open source, no account.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://archertabs.app">
+<meta property="og:url" content="https://archertabs.app/">
 <meta property="og:image" content="https://archertabs.app/assets/og.png">
 <meta property="og:image:width" content="1600">
 <meta property="og:image:height" content="840">
+<meta property="og:image:alt" content="Archer, AI on every new tab">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Archer - AI on every new tab">
+<meta name="twitter:description" content="One box in Chrome's new tab: ask ChatGPT, Claude or Perplexity, or type a site and go there. Free and open source.">
+<meta name="twitter:image" content="https://archertabs.app/assets/og.png">
 
 <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
@@ -22,6 +28,23 @@
 <!-- Google tag (gtag.js). The config lives in /gtag.js so the CSP needs no 'unsafe-inline'. -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZLDNFDQLZ"></script>
 <script src="/gtag.js"></script>
+<!-- Structured data. A data block, not a script: browsers never execute it, so the CSP's script-src does not apply. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Archer",
+  "description": "A free, open-source new tab for Chrome with one box: ask ChatGPT, Claude or Perplexity, or type a site and go straight there.",
+  "url": "https://archertabs.app/",
+  "applicationCategory": "BrowserApplication",
+  "operatingSystem": "Chrome",
+  "softwareVersion": "1.11.0",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "codeRepository": "https://github.com/thellis954/archer-tabs",
+  "downloadUrl": "https://github.com/thellis954/archer-tabs/releases/latest",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
 </head>
 
 <body>
@@ -317,10 +340,9 @@
       <li>
         <h3>Download it</h3>
         <p>
-          Open <a href="https://github.com/thellis954/archer-tabs">the project page</a>,
-          click the green <strong>Code</strong> button, then
-          <strong>Download ZIP</strong>. Unzip it somewhere you will remember,
-          like your Documents folder.
+          Get <strong>archer-v1.11.0.zip</strong> from the
+          <a href="https://github.com/thellis954/archer-tabs/releases/latest">latest release</a>
+          and unzip it somewhere you will remember, like your Documents folder.
         </p>
       </li>
       <li>
@@ -334,9 +356,8 @@
       <li>
         <h3>Add the folder</h3>
         <p>
-          Click <strong>Load unpacked</strong>, then find the folder you unzipped
-          and choose the one inside it called <strong>extension</strong>. Not the
-          outer folder, the one named <em>extension</em>.
+          Click <strong>Load unpacked</strong> and choose the folder you
+          unzipped: the one with <strong>manifest.json</strong> directly inside it.
         </p>
       </li>
       <li>
@@ -373,6 +394,7 @@
     </p>
     <p class="footLinks">
       <a href="/privacy">Privacy policy</a>
+      <a href="/atlas-alternative">Coming from ChatGPT Atlas?</a>
       <a href="https://github.com/thellis954/archer-tabs">Project page</a>
       <a href="https://github.com/thellis954/archer-tabs/issues">Something wrong?</a>
     </p>

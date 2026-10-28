@@ -762,6 +762,13 @@ h3 { font-size: 1.06rem; letter-spacing: -0.015em; }
 }
 
 .docList { margin: 1.5rem 0 0; display: grid; gap: 1.5rem; }
+
+/* Buttons inside a document (/atlas-alternative) must not pick up the
+   underlined link style above. */
+.docBody .cta { margin-top: 1.5rem; }
+.docBody .btn { text-decoration: none; }
+.docBody .btn:not(.primary) { color: var(--text); }
+.docHead .eyebrow { margin-bottom: 1rem; }
 .docList dt { font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
 .docList dd { margin: 0.5rem 0 0; color: var(--muted); font-size: 15.5px; }
 

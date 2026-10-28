@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>A ChatGPT Atlas alternative for Chrome's new tab - Archer</title>
+<meta name="description" content="ChatGPT Atlas is retired. Archer is a free, open-source Chrome new tab with one box: ask ChatGPT, Claude or Perplexity, or type a site and go there. What it does, and what it does not.">
+<link rel="canonical" href="https://archertabs.app/atlas-alternative">
+
+<meta property="og:site_name" content="Archer">
+<meta property="og:title" content="A ChatGPT Atlas alternative for Chrome's new tab - Archer">
+<meta property="og:description" content="Atlas is gone. Archer brings its one-box new tab to the Chrome you already use: ask an AI or go to a site from the same box. Free and open source.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://archertabs.app/atlas-alternative">
+<meta property="og:image" content="https://archertabs.app/assets/og.png">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="840">
+<meta property="og:image:alt" content="Archer, AI on every new tab">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="A ChatGPT Atlas alternative for Chrome's new tab - Archer">
+<meta name="twitter:description" content="Atlas is gone. Archer brings its one-box new tab to the Chrome you already use. Free and open source.">
+<meta name="twitter:image" content="https://archertabs.app/assets/og.png">
+
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.css">
+<!-- Google tag (gtag.js). The config lives in /gtag.js so the CSP needs no 'unsafe-inline'. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KZLDNFDQLZ"></script>
+<script src="/gtag.js"></script>
+</head>
+
+<!--
+  /atlas-alternative (cleanUrls). A document page in the same shape as /privacy.
+  Every claim about Atlas here is sourced from OpenAI's own announcement and
+  help center; keep it nominative, keep it dated, and keep the not-affiliated
+  line. Archer's claims must stay checkable against the code.
+-->
+<body class="doc">
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/" aria-label="Archer, home">
+    <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+      <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+    </svg>
+    <span class="brandName">Archer</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="/#tricks">What it does</a>
+    <a href="#compare">Compare</a>
+    <a href="#faq">Questions</a>
+    <a class="navCta" href="#install">Get it</a>
+  </nav>
+</header>
+
+<main id="main" class="docBody">
+
+  <header class="docHead">
+    <p class="eyebrow">After Atlas</p>
+    <h1>A ChatGPT Atlas alternative for the new tab</h1>
+    <p class="docDate">Written 2026-10-28. Archer 1.11.0.</p>
+  </header>
+
+  <section class="docLead">
+    <p>
+      <strong>ChatGPT Atlas has been retired.</strong> OpenAI announced on July 9,
+      2026 that it was winding down its Atlas browser, and its help center gave
+      August 9, 2026 as the date Atlas would stop working.
+    </p>
+    <p>
+      Archer is a free, open-source Chrome extension that keeps one part of
+      Atlas alive: a new tab with a single box where you can ask a question or
+      type a site, and it works out which you meant. It runs in the Chrome you
+      already use. It is not a browser, and it is not made by OpenAI.
+    </p>
+  </section>
+
+  <section>
+    <h2>What Atlas users tend to miss</h2>
+    <p>
+      Atlas launched on macOS in October 2025 as a browser with ChatGPT built
+      in. In OpenAI's words, its new tab page let you
+      <a href="https://openai.com/index/introducing-chatgpt-atlas/" rel="noreferrer">"ask a question or enter a URL"</a>
+      from the same place. That one habit is the hardest to give up: open a
+      tab, type, press Enter, and not think about whether it was a search, a
+      question or an address.
+    </p>
+    <p>
+      Atlas also had a ChatGPT sidebar that could read the page you were on,
+      optional browser memories, and an agent mode that could click around
+      sites for you. OpenAI says those ideas are moving into ChatGPT's own
+      desktop app and a ChatGPT extension for Chrome
+      (<a href="https://techcrunch.com/2026/07/09/openai-is-shutting-down-atlas-but-its-ai-browser-ambitions-are-still-growing/" rel="noreferrer">TechCrunch</a>).
+      Archer does not try to
+      replace any of that.
+    </p>
+  </section>
+
+  <section>
+    <h2>What Archer does</h2>
+    <dl class="docList">
+      <div>
+        <dt>One box for questions and sites</dt>
+        <dd>
+          Type <code>youtube.com</code> and you land on YouTube. Type
+          <code>explain the offside rule</code> and it goes to the AI you picked.
+          The decision uses the real list of top-level domains, the way the
+          address bar does, and only web addresses are ever opened.
+        </dd>
+      </div>
+      <div>
+        <dt>Your choice of destination</dt>
+        <dd>
+          Send questions to ChatGPT, Claude or Perplexity, where they open with
+          the question already typed. Or send them to Google or whatever search
+          engine Chrome is set to use. One click on the buttons above the box
+          switches it.
+        </dd>
+      </div>
+      <div>
+        <dt>Answers on the page, if you want them</dt>
+        <dd>
+          Add your own OpenAI API key and short answers stream onto the new tab
+          itself, billed to your OpenAI account. You pick the model and can set a
+          daily budget. This is optional; without a key everything else works.
+        </dd>
+      </div>
+      <div>
+        <dt>The rest of a good new tab</dt>
+        <dd>
+          Saved prompts you bring back with a slash, recent ChatGPT and Claude
+          conversations under the box (if you turn that on), favourites, a clock
+          and a weather card.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>What Archer does not do</h2>
+    <dl class="docList">
+      <div>
+        <dt>It does not read the pages you visit</dt>
+        <dd>
+          There is no sidebar that chats about the current page. Archer has no
+          content scripts and no access to the sites you browse, on purpose.
+        </dd>
+      </div>
+      <div>
+        <dt>No agent, no browser memories</dt>
+        <dd>
+          Archer will not click through sites for you, and it does not build a
+          memory of your browsing.
+        </dd>
+      </div>
+      <div>
+        <dt>No chatbot of its own</dt>
+        <dd>
+          Questions go to the service you chose, and you use that service's own
+          account and plan there. Archer has no account and no server.
+        </dd>
+      </div>
+      <div>
+        <dt>Not in the Chrome Web Store yet</dt>
+        <dd>
+          For now you install it by hand, which takes a few minutes, and updates
+          are manual too. The steps are below.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="compare">
+    <h2>Side by side</h2>
+    <p>Atlas is described as it was when it was available.</p>
+
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Chrome's own new tab</th>
+            <th scope="col">ChatGPT Atlas</th>
+            <th scope="col">Archer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Available today</td>
+            <td>Yes</td>
+            <td>No, retired in 2026</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Where it runs</td>
+            <td>Chrome</td>
+            <td>Its own browser, on macOS</td>
+            <td>Chrome on the desktop, as an extension</td>
+          </tr>
+          <tr>
+            <td>Send a question to ChatGPT, Claude or Perplexity</td>
+            <td>No</td>
+            <td>ChatGPT, built in</td>
+            <td>Yes, any of the three, or answers on the page with your own OpenAI key</td>
+          </tr>
+          <tr>
+            <td>Type a site and go straight there</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Chat about the page you are on</td>
+            <td>No</td>
+            <td>Yes, in a sidebar</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Agent that acts on websites</td>
+            <td>No</td>
+            <td>Yes, as a preview</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Cost and licence</td>
+            <td>Free</td>
+            <td>Free to download</td>
+            <td>Free, GPL-3.0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install it in a few minutes</h2>
+    <p>
+      Archer is not in the Chrome Web Store yet, so you add it yourself once.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h3>Download it</h3>
+        <p>
+          Get <strong>archer-v1.11.0.zip</strong> from the
+          <a href="https://github.com/thellis954/archer-tabs/releases/latest">latest release</a>
+          and unzip it somewhere you will keep it, like your Documents folder.
+        </p>
+      </li>
+      <li>
+        <h3>Open Chrome's extensions page</h3>
+        <p>
+          Type <span class="key">chrome://extensions</span> into the address bar
+          and press Enter. Turn on <strong>Developer mode</strong> with the
+          switch in the top right corner.
+        </p>
+      </li>
+      <li>
+        <h3>Add the folder</h3>
+        <p>
+          Click <strong>Load unpacked</strong> and choose the folder you
+          unzipped: the one with <strong>manifest.json</strong> directly inside it.
+        </p>
+      </li>
+      <li>
+        <h3>Open a new tab</h3>
+        <p>That is it. Nothing to sign in to.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <dl class="docList">
+      <div>
+        <dt>Is Archer made by OpenAI, or a continuation of Atlas?</dt>
+        <dd>
+          No. Archer is an independent open-source project. It is not affiliated
+          with or endorsed by OpenAI, and it does not use any Atlas code.
+        </dd>
+      </div>
+      <div>
+        <dt>Does it bring back my Atlas bookmarks or history?</dt>
+        <dd>
+          No. Archer has nothing to do with Atlas data. If you exported your
+          bookmarks from Atlas, OpenAI's
+          <a href="https://help.openai.com/en/articles/20001371-chatgpt-atlas-retirement" rel="noreferrer">retirement article</a>
+          explains how to import them into Chrome.
+        </dd>
+      </div>
+      <div>
+        <dt>Do I need a ChatGPT account or an API key?</dt>
+        <dd>
+          Not for Archer. Questions open on chatgpt.com, claude.ai or
+          perplexity.ai, which work the way they always do, signed in or not.
+          An OpenAI API key is only needed for answers on the page.
+        </dd>
+      </div>
+      <div>
+        <dt>Is it free?</dt>
+        <dd>
+          Yes. Archer is free and open source under the GPL-3.0. If you use your
+          own OpenAI key, OpenAI bills you for that usage directly.
+        </dd>
+      </div>
+      <div>
+        <dt>What does it collect?</dt>
+        <dd>
+          The extension has no server, no analytics and no telemetry. Your
+          settings and prompts stay in your browser. The
+          <a href="/privacy">privacy policy</a> lists exactly what leaves the
+          device and when.
+        </dd>
+      </div>
+      <div>
+        <dt>Does it work in other browsers?</dt>
+        <dd>
+          It is built and tested for desktop Chrome. Other Chromium browsers are
+          not tested.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Keep an eye on it</h2>
+    <p>
+      If Archer is useful to you, a star on GitHub helps other people find it.
+      Watch the project for new releases, including when it reaches the
+      Chrome Web Store. Bugs and ideas are welcome as issues.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/thellis954/archer-tabs">Star on GitHub</a>
+      <a class="btn" href="/">See it in action</a>
+    </div>
+    <p>
+      Sources:
+      <a href="https://openai.com/index/introducing-chatgpt-atlas/" rel="noreferrer">Introducing ChatGPT Atlas</a> (OpenAI, October 21, 2025);
+      <a href="https://help.openai.com/en/articles/20001371-chatgpt-atlas-retirement" rel="noreferrer">ChatGPT Atlas retirement</a> (OpenAI Help Center);
+      <a href="https://techcrunch.com/2026/07/09/openai-is-shutting-down-atlas-but-its-ai-browser-ambitions-are-still-growing/" rel="noreferrer">TechCrunch, July 9, 2026</a>.
+      ChatGPT and ChatGPT Atlas are OpenAI products, named here only to
+      describe what Archer is an alternative to.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footInner">
+    <a class="brand" href="/" aria-label="Archer, home">
+      <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+        <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+      </svg>
+      <span class="brandName">Archer</span>
+    </a>
+    <p>
+      Archer is free and open source. Not affiliated with OpenAI, Google,
+      Anthropic or Perplexity.
+    </p>
+    <p class="footLinks">
+      <a href="/">Home</a>
+      <a href="/privacy">Privacy policy</a>
+      <a href="https://github.com/thellis954/archer-tabs">Project page</a>
+      <a href="https://github.com/thellis954/archer-tabs/issues">Something wrong?</a>
+    </p>
+  </div>
+</footer>
+
+<script defer src="/_vercel/insights/script.js"></script>
+
+</body>
+</html>
