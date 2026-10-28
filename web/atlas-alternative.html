@@ -28,6 +28,72 @@
 <!-- Google tag (gtag.js). The config lives in /gtag.js so the CSP needs no 'unsafe-inline'. -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZLDNFDQLZ"></script>
 <script src="/gtag.js"></script>
+<!-- Structured data. A data block, not a script: browsers never execute it, so the CSP's script-src does not apply.
+     Keep every answer below in step with the visible #faq section. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is Archer made by OpenAI, or a continuation of Atlas?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Archer is an independent open-source project. It is not affiliated with or endorsed by OpenAI, and it does not use any Atlas code."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it bring back my Atlas bookmarks or history?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Archer has nothing to do with Atlas data. If you exported your bookmarks from Atlas, OpenAI's retirement article explains how to import them into Chrome."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need a ChatGPT account or an API key?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not for Archer. Questions open on chatgpt.com, claude.ai or perplexity.ai, which work the way they always do, signed in or not. An OpenAI API key is only needed for answers on the page."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is it free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Archer is free and open source under the GPL-3.0. If you use your own OpenAI key, OpenAI bills you for that usage directly."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does it collect?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The extension has no server, no analytics and no telemetry. Your settings and prompts stay in your browser. The privacy policy lists exactly what leaves the device and when."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work on Windows?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Atlas only ever shipped for macOS. Archer is a Chrome extension, so it runs in desktop Chrome rather than on a particular operating system."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work in other browsers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It is built and tested for desktop Chrome. Other Chromium browsers are not tested."
+      }
+    }
+  ]
+}
+</script>
 </head>
 
 <!--
@@ -175,7 +241,11 @@
 
   <section id="compare">
     <h2>Side by side</h2>
-    <p>Atlas is described as it was when it was available.</p>
+    <p>
+      Atlas is described as it was when it was available. For Perplexity Comet
+      and OpenAI's ChatGPT extensions too, see the
+      <a href="/compare">full comparison</a>.
+    </p>
 
     <div class="tableWrap">
       <table>
@@ -238,8 +308,17 @@
   <section id="install">
     <h2>Install it in a few minutes</h2>
     <p>
-      Archer is not in the Chrome Web Store yet, so you add it yourself once.
+      Archer is waiting on Chrome Web Store review, so for now you add it
+      yourself, once.
     </p>
+    <!-- CHROME WEB STORE LINK: when the listing is approved, add
+         <a class="btn primary" href="https://chromewebstore.google.com/detail/REPLACE-WITH-ITEM-ID">Add to Chrome</a>
+         as the first button below, demote the zip button to a plain .btn, and
+         replace the manual steps with a one-line note. Same spot exists in /compare. -->
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/thellis954/archer-tabs/releases/latest">Download archer-v1.11.0.zip</a>
+      <a class="btn" href="/compare">Compare the options</a>
+    </div>
 
     <ol class="steps">
       <li>
@@ -316,6 +395,13 @@
         </dd>
       </div>
       <div>
+        <dt>Does it work on Windows?</dt>
+        <dd>
+          Atlas only ever shipped for macOS. Archer is a Chrome extension, so it
+          runs in desktop Chrome rather than on a particular operating system.
+        </dd>
+      </div>
+      <div>
         <dt>Does it work in other browsers?</dt>
         <dd>
           It is built and tested for desktop Chrome. Other Chromium browsers are
@@ -363,6 +449,7 @@
     </p>
     <p class="footLinks">
       <a href="/">Home</a>
+      <a href="/compare">Compare</a>
       <a href="/privacy">Privacy policy</a>
       <a href="https://github.com/thellis954/archer-tabs">Project page</a>
       <a href="https://github.com/thellis954/archer-tabs/issues">Something wrong?</a>
