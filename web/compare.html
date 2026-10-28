@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Archer vs ChatGPT Atlas, Perplexity Comet and Chrome's new tab - Archer</title>
+<meta name="description" content="A fair comparison of AI new tab options for Chrome: Archer, Chrome's own new tab, the retired ChatGPT Atlas, Perplexity Comet, and OpenAI's ChatGPT extensions. What each one does, where it runs, and what it costs.">
+<link rel="canonical" href="https://archertabs.app/compare">
+
+<meta property="og:site_name" content="Archer">
+<meta property="og:title" content="Archer vs ChatGPT Atlas, Perplexity Comet and Chrome's new tab">
+<meta property="og:description" content="What each AI new tab and AI browser option actually does, where it runs and what it costs. Sourced, dated, and fair.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://archertabs.app/compare">
+<meta property="og:image" content="https://archertabs.app/assets/og.png">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="840">
+<meta property="og:image:alt" content="Archer, AI on every new tab">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Archer vs ChatGPT Atlas, Perplexity Comet and Chrome's new tab">
+<meta name="twitter:description" content="What each AI new tab and AI browser option actually does, where it runs and what it costs.">
+<meta name="twitter:image" content="https://archertabs.app/assets/og.png">
+
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.css">
+<!-- Google tag (gtag.js). The config lives in /gtag.js so the CSP needs no 'unsafe-inline'. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KZLDNFDQLZ"></script>
+<script src="/gtag.js"></script>
+<!-- Structured data. A data block, not a script: browsers never execute it, so the CSP's script-src does not apply.
+     Keep every answer below word-for-word in step with the visible #faq section. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which of these is closest to the ChatGPT Atlas new tab?",
+      "acceptedAnswer": { "@type": "Answer", "text": "For the new tab alone (one box where you ask a question or type a site), Archer is the closest in Chrome. For Atlas's other features, the sidebar that reads the page and the agent that acts on websites, OpenAI points people to its ChatGPT extension for Chrome and the ChatGPT desktop app." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use more than one of these at once?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Mostly, yes. Archer only replaces the new tab page, so it can sit next to OpenAI's ChatGPT extension for Chrome or Gemini in Chrome. Chrome allows one extension to control the new tab, so Archer and another new tab extension cannot both be active. Comet is a separate browser, so it does not mix with Chrome extensions installed in Chrome." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Archer free?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Archer is free and open source under the GPL-3.0, with no account. The optional answers on the page use your own OpenAI API key, and OpenAI bills you for that usage directly." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Archer work on Windows?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Archer is a Chrome extension, so it runs in desktop Chrome rather than on a particular operating system. ChatGPT Atlas only ever shipped for macOS." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this comparison sponsored or affiliated with any of these companies?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Archer is an independent open-source project and is not affiliated with OpenAI, Google, Anthropic or Perplexity. Every claim about another product links to that company's own page or to reporting about it, checked on 2026-10-28." }
+    }
+  ]
+}
+</script>
+</head>
+
+<!--
+  /compare (cleanUrls). A document page in the same shape as /atlas-alternative.
+  Rules for editing: every claim about another product must link to that
+  company's own page (or named reporting) and stay dated; describe, never
+  disparage; Archer's own claims must stay checkable against the code. Keep
+  the FAQPage JSON-LD above identical to the visible #faq answers.
+-->
+<body class="doc">
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/" aria-label="Archer, home">
+    <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+      <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+    </svg>
+    <span class="brandName">Archer</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="/#tricks">What it does</a>
+    <a href="/atlas-alternative">After Atlas</a>
+    <a href="#faq">Questions</a>
+    <a class="navCta" href="#install">Get it</a>
+  </nav>
+</header>
+
+<main id="main" class="docBody">
+
+  <header class="docHead">
+    <p class="eyebrow">Compare</p>
+    <h1>AI on the new tab: the options, side by side</h1>
+    <p class="docDate">Checked 2026-10-28. Archer 1.11.0.</p>
+  </header>
+
+  <section class="docLead">
+    <p>
+      There are a few ways to get AI into the place you start browsing. Some
+      are whole browsers, some live in Chrome's address bar or side panel, and
+      some, like Archer, replace the new tab page. They do different jobs, and
+      the right one depends on what you want help with.
+    </p>
+    <p>
+      This page describes each one from its maker's own pages. Archer is
+      ours, so we have tried hard to be fair to the others, and to say plainly
+      what Archer does not do.
+    </p>
+  </section>
+
+  <section id="glance">
+    <h2>At a glance</h2>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Option</th>
+            <th scope="col">What it is</th>
+            <th scope="col">Where it runs</th>
+            <th scope="col">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Archer</td>
+            <td>A new tab page for Chrome: one box to ask ChatGPT, Claude or Perplexity, search, or type a site</td>
+            <td>Desktop Chrome, as an extension</td>
+            <td>Free, open source (GPL-3.0)</td>
+          </tr>
+          <tr>
+            <td>Chrome's own new tab</td>
+            <td>Google search box and shortcuts, with an AI Mode button where Google has rolled it out</td>
+            <td>Chrome</td>
+            <td>Free</td>
+          </tr>
+          <tr>
+            <td>ChatGPT Atlas</td>
+            <td>OpenAI's browser with ChatGPT built in. <strong>Retired in 2026</strong></td>
+            <td>macOS only, while it was available</td>
+            <td>Was free to download</td>
+          </tr>
+          <tr>
+            <td>Perplexity Comet</td>
+            <td>Perplexity's AI browser, with an assistant that works across your tabs</td>
+            <td>Its own browser: Mac, Windows, iOS, Android</td>
+            <td>Free to download; paid Perplexity plans available</td>
+          </tr>
+          <tr>
+            <td>ChatGPT extension for Chrome</td>
+            <td>OpenAI's extension: ChatGPT in a side panel that can read and act on your tabs</td>
+            <td>Chrome and other Chromium browsers</td>
+            <td>Free to install; uses your ChatGPT account</td>
+          </tr>
+          <tr>
+            <td>ChatGPT search extension</td>
+            <td>OpenAI's extension that makes ChatGPT search Chrome's default search engine</td>
+            <td>Chrome's address bar</td>
+            <td>Free to install; needs a chatgpt.com login</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>What each one does</h2>
+    <p>For the products that are still available. Atlas has <a href="#atlas">its own section</a> below.</p>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Archer</th>
+            <th scope="col">Chrome new tab</th>
+            <th scope="col">Comet</th>
+            <th scope="col">ChatGPT extension</th>
+            <th scope="col">ChatGPT search extension</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Keep using the Chrome you have</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>No, it is a separate browser</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Ask a question from the new tab</td>
+            <td>Yes</td>
+            <td>Yes, to Google, or AI Mode where available</td>
+            <td>Yes, in Comet's own new tab</td>
+            <td>Not from the new tab; from the side panel</td>
+            <td>From the address bar, which is on every tab</td>
+          </tr>
+          <tr>
+            <td>Which AI answers</td>
+            <td>Your pick: ChatGPT, Claude or Perplexity, or your search engine</td>
+            <td>Google</td>
+            <td>Perplexity</td>
+            <td>ChatGPT</td>
+            <td>ChatGPT search</td>
+          </tr>
+          <tr>
+            <td>Type a site and go there from the same box</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>Not applicable</td>
+            <td>Yes, it is the address bar</td>
+          </tr>
+          <tr>
+            <td>Chat about the page you are on</td>
+            <td>No</td>
+            <td>Gemini in Chrome does this, where available</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Agent that acts on websites for you</td>
+            <td>No</td>
+            <td>Gemini in Chrome's auto browse, for some paid Google AI plans in the US</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Needs an account</td>
+            <td>No</td>
+            <td>No; some AI features need a Google sign-in</td>
+            <td>Not stated on Perplexity's Comet page</td>
+            <td>Yes, a ChatGPT account</td>
+            <td>Yes, logged in to chatgpt.com</td>
+          </tr>
+          <tr>
+            <td>Can read the sites you browse</td>
+            <td>No, by design</td>
+            <td>Gemini in Chrome uses your tab when you ask it</td>
+            <td>Yes, that is how its assistant works</td>
+            <td>Yes, with permission prompts</td>
+            <td>No</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      "Can read the sites you browse" is not a score. Reading the page is what
+      makes a sidebar or an agent useful. Archer leaves it out because its job
+      is the new tab, and a new tab does not need it.
+    </p>
+  </section>
+
+  <section id="pick">
+    <h2>Which one fits</h2>
+    <dl class="docList">
+      <div>
+        <dt>Archer, if you want the Atlas-style new tab in Chrome</dt>
+        <dd>
+          One box on every new tab: type a site and go, or ask a question and
+          it opens in ChatGPT, Claude or Perplexity with the question already
+          typed. Switch between them with the buttons above the box. Saved
+          prompts, favourites and recent conversations sit underneath. No
+          account, and the extension has no server and no analytics. It is not
+          in the Chrome Web Store yet, so you install it by hand.
+          <a href="/atlas-alternative">More on Archer as an Atlas alternative</a>.
+        </dd>
+      </div>
+      <div>
+        <dt>Chrome's own new tab, if Google is all you need</dt>
+        <dd>
+          Nothing to install. Google's help center says the new tab has an
+          <a href="https://support.google.com/chrome/answer/16704170" rel="noreferrer">AI Mode button</a>
+          beside the search box, which is still rolling out and may not be
+          available to you yet. For questions about the page you are on,
+          Google offers
+          <a href="https://support.google.com/chrome/answer/16283624" rel="noreferrer">Gemini in Chrome</a>,
+          also rolling out; its
+          <a href="https://support.google.com/gemini/answer/16821166" rel="noreferrer">auto browse</a>
+          agent is for eligible Google AI Pro and Ultra subscribers in the US.
+        </dd>
+      </div>
+      <div>
+        <dt>Perplexity Comet, if you want a whole AI browser</dt>
+        <dd>
+          Comet is a full browser built around Perplexity's assistant, which can
+          take on tasks across your tabs. Perplexity made it
+          <a href="https://www.perplexity.ai/hub/blog/comet-is-now-available-to-everyone-worldwide" rel="noreferrer">free to download</a>
+          in October 2025, and it is
+          <a href="https://www.perplexity.ai/comet" rel="noreferrer">available for Mac, Windows, iOS and Android</a>.
+          Moving to it means moving browsers, which is a bigger change than
+          adding an extension.
+        </dd>
+      </div>
+      <div>
+        <dt>OpenAI's ChatGPT extension, if you want ChatGPT beside every page</dt>
+        <dd>
+          OpenAI's
+          <a href="https://chromewebstore.google.com/detail/chatgpt/hehggadaopoacecdllhhajmbjkdcmajg" rel="noreferrer">ChatGPT extension</a>
+          puts ChatGPT in a side panel that can summarize and answer questions
+          about your tabs and carry out browser tasks with your permission.
+          This is where OpenAI moved the Atlas sidebar and agent ideas, along
+          with the ChatGPT desktop app
+          (<a href="https://techcrunch.com/2026/07/09/openai-is-shutting-down-atlas-but-its-ai-browser-ambitions-are-still-growing/" rel="noreferrer">TechCrunch</a>).
+          It does not change your new tab, so it can be used alongside Archer.
+        </dd>
+      </div>
+      <div>
+        <dt>OpenAI's ChatGPT search extension, if you want ChatGPT in the address bar</dt>
+        <dd>
+          The
+          <a href="https://chromewebstore.google.com/detail/chatgpt-search/ejcfepkfckglbgocfkanmcdngdijcgld" rel="noreferrer">ChatGPT search extension</a>
+          makes ChatGPT search Chrome's default search engine, so whatever you
+          type in the address bar goes to ChatGPT. You need to be logged in to
+          chatgpt.com, and typing <code>!g</code> before a query sends it to
+          Google instead. It replaces your search engine for everything; Archer
+          leaves your search engine alone and lets you choose per question.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="atlas">
+    <h2>What about ChatGPT Atlas?</h2>
+    <p>
+      OpenAI
+      <a href="https://openai.com/index/introducing-chatgpt-atlas/" rel="noreferrer">launched Atlas</a>
+      on macOS on October 21, 2025, as "a new web browser built with ChatGPT
+      at its core". Its new tab let you "ask a question or enter a URL", and it
+      had an Ask ChatGPT sidebar, optional browser memories, and an agent
+      mode in preview for paid plans.
+    </p>
+    <p>
+      On July 9, 2026 OpenAI announced it was shutting Atlas down and moving
+      its browsing features into the ChatGPT desktop app and a ChatGPT
+      extension for Chrome
+      (<a href="https://techcrunch.com/2026/07/09/openai-is-shutting-down-atlas-but-its-ai-browser-ambitions-are-still-growing/" rel="noreferrer">TechCrunch</a>).
+      OpenAI's help center gave August 9, 2026 as the date Atlas would stop
+      working, and now says Atlas
+      <a href="https://help.openai.com/en/articles/20001371-chatgpt-atlas-retirement" rel="noreferrer">"has been retired and no longer receives updates"</a>.
+    </p>
+    <p>
+      If what you miss is the new tab, that is what Archer is for. Read
+      <a href="/atlas-alternative">Archer as a ChatGPT Atlas alternative</a>
+      for what carries over and what does not.
+    </p>
+  </section>
+
+  <section id="install">
+    <h2>Try Archer</h2>
+    <p>
+      Archer is free. It is waiting on Chrome Web Store review, so for now you
+      install it by hand: download the zip, then load it in Chrome. It takes a
+      few minutes, once.
+    </p>
+    <!-- CHROME WEB STORE LINK: when the listing is approved, add
+         <a class="btn primary" href="https://chromewebstore.google.com/detail/REPLACE-WITH-ITEM-ID">Add to Chrome</a>
+         as the first button below, demote the zip button to a plain .btn, and
+         update the paragraph above. Same spot exists in /atlas-alternative. -->
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/thellis954/archer-tabs/releases/latest">Download archer-v1.11.0.zip</a>
+      <a class="btn" href="/#install">Install steps</a>
+    </div>
+    <p>
+      Chrome Web Store: under review, link coming here when it is approved.
+    </p>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <dl class="docList">
+      <div>
+        <dt>Which of these is closest to the ChatGPT Atlas new tab?</dt>
+        <dd>
+          For the new tab alone (one box where you ask a question or type a
+          site), Archer is the closest in Chrome. For Atlas's other features,
+          the sidebar that reads the page and the agent that acts on websites,
+          OpenAI points people to its ChatGPT extension for Chrome and the
+          ChatGPT desktop app.
+        </dd>
+      </div>
+      <div>
+        <dt>Can I use more than one of these at once?</dt>
+        <dd>
+          Mostly, yes. Archer only replaces the new tab page, so it can sit next
+          to OpenAI's ChatGPT extension for Chrome or Gemini in Chrome. Chrome
+          allows one extension to control the new tab, so Archer and another new
+          tab extension cannot both be active. Comet is a separate browser, so
+          it does not mix with Chrome extensions installed in Chrome.
+        </dd>
+      </div>
+      <div>
+        <dt>Is Archer free?</dt>
+        <dd>
+          Yes. Archer is free and open source under the GPL-3.0, with no
+          account. The optional answers on the page use your own OpenAI API
+          key, and OpenAI bills you for that usage directly.
+        </dd>
+      </div>
+      <div>
+        <dt>Does Archer work on Windows?</dt>
+        <dd>
+          Archer is a Chrome extension, so it runs in desktop Chrome rather than
+          on a particular operating system. ChatGPT Atlas only ever shipped for
+          macOS.
+        </dd>
+      </div>
+      <div>
+        <dt>Is this comparison sponsored or affiliated with any of these companies?</dt>
+        <dd>
+          No. Archer is an independent open-source project and is not
+          affiliated with OpenAI, Google, Anthropic or Perplexity. Every claim
+          about another product links to that company's own page or to
+          reporting about it, checked on 2026-10-28.
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Sources</h2>
+    <p>
+      <a href="https://openai.com/index/introducing-chatgpt-atlas/" rel="noreferrer">Introducing ChatGPT Atlas</a> (OpenAI, October 21, 2025);
+      <a href="https://help.openai.com/en/articles/20001371-chatgpt-atlas-retirement" rel="noreferrer">ChatGPT Atlas retirement</a> (OpenAI Help Center);
+      <a href="https://techcrunch.com/2026/07/09/openai-is-shutting-down-atlas-but-its-ai-browser-ambitions-are-still-growing/" rel="noreferrer">TechCrunch, July 9, 2026</a>;
+      <a href="https://www.perplexity.ai/comet" rel="noreferrer">Comet</a> and
+      <a href="https://www.perplexity.ai/hub/blog/comet-is-now-available-to-everyone-worldwide" rel="noreferrer">Comet is now available to everyone</a> (Perplexity, October 2, 2025);
+      <a href="https://support.google.com/chrome/answer/16704170" rel="noreferrer">Use AI Mode in Chrome</a> and
+      <a href="https://support.google.com/chrome/answer/16283624" rel="noreferrer">Use Gemini in Chrome</a> (Google Chrome Help);
+      <a href="https://support.google.com/gemini/answer/16821166" rel="noreferrer">auto browse</a> (Gemini Apps Help);
+      <a href="https://chromewebstore.google.com/detail/chatgpt/hehggadaopoacecdllhhajmbjkdcmajg" rel="noreferrer">ChatGPT</a> and
+      <a href="https://chromewebstore.google.com/detail/chatgpt-search/ejcfepkfckglbgocfkanmcdngdijcgld" rel="noreferrer">ChatGPT search</a> (Chrome Web Store listings by OpenAI);
+      <a href="https://learn.chatgpt.com/docs/chrome-extension" rel="noreferrer">Browser extension</a> (ChatGPT Learn).
+      Products change; if something here is out of date,
+      <a href="https://github.com/thellis954/archer-tabs/issues">tell us</a>.
+      ChatGPT, Atlas, Chrome, Gemini, Claude, Perplexity and Comet are
+      trademarks of their owners, named here only to describe them.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footInner">
+    <a class="brand" href="/" aria-label="Archer, home">
+      <svg class="brandMark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path class="legs" d="M6 26.5 L16 5.5 L26 26.5"/>
+        <path class="bow" d="M9.8 18.5 Q16 24.5 22.2 18.5"/>
+      </svg>
+      <span class="brandName">Archer</span>
+    </a>
+    <p>
+      Archer is free and open source. Not affiliated with OpenAI, Google,
+      Anthropic or Perplexity.
+    </p>
+    <p class="footLinks">
+      <a href="/">Home</a>
+      <a href="/atlas-alternative">Coming from ChatGPT Atlas?</a>
+      <a href="/privacy">Privacy policy</a>
+      <a href="https://github.com/thellis954/archer-tabs">Project page</a>
+      <a href="https://github.com/thellis954/archer-tabs/issues">Something wrong?</a>
+    </p>
+  </div>
+</footer>
+
+<script defer src="/_vercel/insights/script.js"></script>
+
+</body>
+</html>
