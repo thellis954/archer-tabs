@@ -296,7 +296,12 @@ if (existsSync(join(ROOT, "web/index.html"))) {
     existsSync(join(ROOT, "web", rel)) ||
     (!extname(rel) && existsSync(join(ROOT, "web", `${rel}.html`)));
 
+  // /_vercel/* is served by the platform, not from web/: Web Analytics adds its
+  // script there once it is enabled on the project. It is not a file to find.
+  const platformRoute = (rel) => rel.startsWith("_vercel/");
+
   for (const rel of referenced) {
+    if (platformRoute(rel)) continue;
     if (!servable(rel)) fail("web/index.html", `references missing file: /${rel}`);
   }
 }
@@ -376,6 +381,15 @@ if (existsSync(join(ROOT, "vercel.json"))) {
       fail("vercel.json", "CSP allows no self-hosted fonts, but the site self-hosts Geist");
     }
   }
+}
+
+// --- 12. web/vercel.json stays identical to the root vercel.json -------------
+// The live site was not applying the root vercel.json's headers or redirects
+// (Oct 2026), so a copy also ships inside the output directory. Keep them in
+// sync so the two can never drift apart.
+
+if (existsSync(join(ROOT, "vercel.json")) && read("web/vercel.json") !== read("vercel.json")) {
+  fail("web/vercel.json", "must be an exact copy of the root vercel.json (cp vercel.json web/vercel.json)");
 }
 
 // --- report ------------------------------------------------------------------

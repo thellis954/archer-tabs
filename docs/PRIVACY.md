@@ -91,6 +91,21 @@ Revoking any of them in Archer's settings turns off the feature and nothing else
 
 ---
 
+## This website
+
+archertabs.app (the website, not the extension) uses Vercel Web Analytics to count page views on
+its home page. It is cookieless: it sets no cookies and stores nothing in your browser. Vercel
+records aggregate, anonymous data only: the page, the referrer, country, browser, operating system
+and device type. A visit is told apart only by a hash made from the request that is discarded after 24
+hours, so it cannot identify you or follow you across sites. This privacy page loads no scripts at
+all.
+
+None of this is connected to the extension. The extension sends nothing to us, and installing it
+adds nothing to these numbers.
+[Vercel's Web Analytics privacy notes](https://vercel.com/docs/analytics/privacy-policy).
+
+---
+
 ## Children
 
 Archer is not directed at children and collects nothing from anyone.
