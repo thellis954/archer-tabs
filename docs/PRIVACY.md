@@ -93,16 +93,24 @@ Revoking any of them in Archer's settings turns off the feature and nothing else
 
 ## This website
 
-archertabs.app (the website, not the extension) uses Vercel Web Analytics to count page views on
-its home page. It is cookieless: it sets no cookies and stores nothing in your browser. Vercel
-records aggregate, anonymous data only: the page, the referrer, country, browser, operating system
-and device type. A visit is told apart only by a hash made from the request that is discarded after 24
-hours, so it cannot identify you or follow you across sites. This privacy page loads no scripts at
-all.
+archertabs.app (the website, not the extension) measures visits to its home page with two tools.
+Vercel Web Analytics is cookieless: it records aggregate, anonymous data only (the page, the
+referrer, country, browser, operating system and device type), and a visit is told apart only by a
+hash made from the request that is discarded after 24 hours.
+
+The home page also uses Google Analytics. It sets first-party cookies (named `_ga` and
+`_ga_<id>`) to tell returning visitors apart, and sends Google your page views, the referrer, your
+browser and device details and an approximate location derived from your IP address. Google does
+not log or store IP addresses for Google Analytics. We use it only to see how many people visit and
+where they come from; we do not use it for advertising and have not enabled Google signals or ad
+personalisation. You can block it with any content blocker or Google's
+[opt-out add-on](https://tools.google.com/dlpage/gaoptout), and clear the cookies at any time. This
+privacy page loads no scripts at all.
 
 None of this is connected to the extension. The extension sends nothing to us, and installing it
 adds nothing to these numbers.
-[Vercel's Web Analytics privacy notes](https://vercel.com/docs/analytics/privacy-policy).
+[Vercel's Web Analytics privacy notes](https://vercel.com/docs/analytics/privacy-policy) and
+[how Google uses data from sites that use its services](https://policies.google.com/technologies/partner-sites).
 
 ---
 
