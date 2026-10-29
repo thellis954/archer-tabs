@@ -10,6 +10,12 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/archer-ai-new-tab/hagjdfgpkcfefgkpkelhfbeklkijeoah"><strong>➜ Add to Chrome</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/archer-ai-new-tab/hagjdfgpkcfefgkpkelhfbeklkijeoah"><img alt="Chrome Web Store version" src="https://img.shields.io/chrome-web-store/v/hagjdfgpkcfefgkpkelhfbeklkijeoah?label=Chrome%20Web%20Store"></a>
+  <a href="https://chromewebstore.google.com/detail/archer-ai-new-tab/hagjdfgpkcfefgkpkelhfbeklkijeoah"><img alt="Chrome Web Store users" src="https://img.shields.io/chrome-web-store/users/hagjdfgpkcfefgkpkelhfbeklkijeoah"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/thellis954/archer-tabs"></a>
   <a href="https://github.com/thellis954/archer-tabs/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/thellis954/archer-tabs/ci.yml?branch=main&label=CI"></a>
   <a href="extension/manifest.json"><img alt="Extension version" src="https://img.shields.io/github/manifest-json/v/thellis954/archer-tabs?filename=extension%2Fmanifest.json&label=version"></a>
@@ -91,7 +97,12 @@ for anything.
 
 ## Install
 
-Archer isn't in the Chrome Web Store yet, so you add it yourself. It takes about five minutes, once.
+**[Add Archer to Chrome](https://chromewebstore.google.com/detail/archer-ai-new-tab/hagjdfgpkcfefgkpkelhfbeklkijeoah)** from the Chrome Web Store. One click, and Chrome keeps it up to
+date. Open a new tab and you're done.
+
+### Install from source
+
+Prefer to run the code straight from this repo? Load it unpacked. It takes about five minutes, once.
 
 1. **Download it.** On this page click the green **Code** button → **Download ZIP**, then unzip it
    somewhere you'll keep it (for example, your Documents folder).
@@ -109,7 +120,7 @@ Archer isn't in the Chrome Web Store yet, so you add it yourself. It takes about
 > **Note:** The first tab of a new browser session can briefly show Chrome's own new tab while the
 > extension is still loading. That's expected behaviour.
 
-⭐ **Star this repo** and GitHub will let you know when Archer reaches the Chrome Web Store.
+⭐ **Star this repo** to follow new releases.
 
 ## Privacy
 
