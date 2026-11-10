@@ -60,7 +60,7 @@ const nav = [];
 await ctx.route(/^https?:/, (route) => {
   const req = route.request();
   if (req.isNavigationRequest()) nav.push(req.url());
-  return route.fulfill({ status: 204, body: "" });
+  return route.abort("aborted");
 });
 
 async function resetPageAfterNavigation() {
@@ -83,15 +83,61 @@ check(
   (await page.evaluate(() => getComputedStyle(document.body).backgroundColor)) !== "rgba(0, 0, 0, 0)",
 );
 
+// --- first run: where should questions go? ------------------------------------------
+//
+// The service worker marks a fresh install on onInstalled, which can land after
+// this tab has painted; the page listens for it, so wait rather than race.
+
+const pickerBox = page.locator("#picker");
+await pickerBox.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+check("a fresh profile is asked where questions should go", await pickerBox.isVisible());
 check(
-  "fresh install opens in Auto",
+  "...in those words",
+  (await page.locator("#pickerTitle").innerText()).trim() === "Where should questions go?",
+);
+check(
+  "the picker offers ChatGPT, Claude, Perplexity and Answer here, in that order",
+  JSON.stringify(await page.locator('#picker input[name="destination"]').evaluateAll((els) => els.map((e) => e.value))) ===
+    JSON.stringify(["chatgpt", "claude", "perplexity", "answer"]),
+);
+check("ChatGPT is preselected", await page.locator('#picker input[value="chatgpt"]').isChecked());
+check(
+  "until it is answered, nothing is routed anywhere new: the page is on Auto",
   (await page.locator("#modeLabel").innerText()).trim() === "Auto",
   await page.locator("#modeLabel").innerText(),
 );
 check(
-  "fresh install presses no destination pill",
+  "...and presses no destination pill",
   (await page.locator('.target[aria-pressed="true"]').count()) === 0,
 );
+check(
+  "the picker says web searches keep using Chrome's default engine",
+  (await page.locator(".pickerNote").innerText()).includes("Chrome's default search engine"),
+);
+// Headless Chromium has the Prompt API but no model, which is the common case.
+const pickerAnswerHint = await page.locator("#pickerAnswerHint").innerText();
+check(
+  "with no built-in AI, the Answer-here choice says what it needs and where questions go meanwhile",
+  pickerAnswerHint.includes("OpenAI key") && pickerAnswerHint.includes("go to ChatGPT"),
+  pickerAnswerHint,
+);
+check("no console or page errors while the picker is up", errors.length === 0, errors.join("; "));
+
+// This context goes on to test the default engine, so it takes that way out.
+await page.click("#pickerDefault");
+await page.waitForTimeout(200);
+check("answering the picker closes it", !(await pickerBox.isVisible()));
+check(
+  "choosing Chrome's default engine keeps Auto",
+  (await page.locator("#modeLabel").innerText()).trim() === "Auto",
+);
+check(
+  "the answer is stored, so the question is never asked again",
+  (await page.evaluate(() => chrome.storage.local.get("onboarding"))).onboarding === "done",
+);
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForTimeout(300);
+check("a later tab does not ask again", !(await pickerBox.isVisible()));
 
 // --- routing -----------------------------------------------------------------
 
@@ -120,6 +166,10 @@ check("bare domain navigates to https", r[0]?.startsWith("https://example.com"),
 
 r = await submit("localhost:3000");
 check("localhost keeps http", r[0]?.startsWith("http://localhost:3000"), JSON.stringify(r));
+
+// QA P2-1: "example.com:" has the shape of a URL scheme, so this was searched.
+r = await submit("example.com:8080/admin");
+check("a domain with a port navigates", r[0] === "https://example.com:8080/admin", JSON.stringify(r));
 
 r = await submit("vue.js tutorial");
 check("multi-word with a dot searches, not navigates", isSearchFor(r, "vue.js tutorial"), JSON.stringify(r));
@@ -601,6 +651,9 @@ cpSync(EXT, fixture, { recursive: true });
 {
   const path = join(fixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
+  // No service worker, so no first-run picker: these fixtures test what comes
+  // after it. The picker has its own contexts below.
+  delete m.background;
   // Only `history` — promoting every optional permission would light up top
   // sites too, and this fixture is meant to isolate the conversations path.
   m.permissions = [...m.permissions, "history"];
@@ -717,7 +770,7 @@ check(
 const convoNav = [];
 await convoPage.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) convoNav.push(r.request().url());
-  return r.fulfill({ status: 204, body: "" });
+  return r.abort("aborted");
 });
 // The *nameless* one specifically: opening it is the entire point of keeping
 // it, and clicking whichever row happens to be first would not prove that.
@@ -754,6 +807,7 @@ cpSync(EXT, answerFixture, { recursive: true });
 {
   const path = join(answerFixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
+  delete m.background; // no first-run picker — see the history fixture
   m.host_permissions = m.optional_host_permissions;
   delete m.optional_host_permissions;
   writeFileSync(path, JSON.stringify(m, null, 2));
@@ -805,7 +859,7 @@ await answerPage.waitForTimeout(400);
 const answerNav = [];
 await answerCtx.route(/^https?:(?!\/\/api\.openai\.com)/, (r) => {
   if (r.request().isNavigationRequest()) answerNav.push(r.request().url());
-  return r.fulfill({ status: 204, body: "" });
+  return r.abort("aborted");
 });
 
 async function resetAnswerPage() {
@@ -824,10 +878,22 @@ async function ask(text) {
   if (answerNav.length > 0) await resetAnswerPage();
 }
 
+// QA P2-2: this used to search the default engine without a word.
+check(
+  "answer mode with nothing to answer says so, under the box",
+  (await answerPage.locator("#modeNote").isVisible()) &&
+    (await answerPage.locator("#modeNoteText").innerText()).includes("go to ChatGPT"),
+  await answerPage.locator("#modeNoteText").innerText(),
+);
+check(
+  "...and the box names where the question will go",
+  (await answerPage.locator("#query").getAttribute("placeholder")) === "Ask ChatGPT, or type a URL",
+  await answerPage.locator("#query").getAttribute("placeholder"),
+);
 await ask("what is a nock");
 check(
-  "answer mode with no key falls back to a search",
-  answerNav.some((u) => /[?&]q=/.test(u)),
+  "answer mode with nothing to answer hands off to ChatGPT, not a silent search",
+  answerNav.length === 1 && answerNav[0] === "https://chatgpt.com/?q=what%20is%20a%20nock",
   JSON.stringify(answerNav),
 );
 check("...and nothing was sent to the API", apiCalls === 0, `${apiCalls} calls`);
@@ -840,6 +906,7 @@ await answerPage.evaluate(() =>
 await answerPage.goto(ANSWER_NEWTAB, { waitUntil: "domcontentloaded" });
 await answerPage.waitForTimeout(400);
 
+check("with a key the mode note is gone", await answerPage.locator("#modeNote").isHidden());
 await ask("what is a nock");
 check("the answer streams onto the page", apiCalls === 1, `${apiCalls} calls`);
 check(
@@ -883,6 +950,49 @@ check(
     (await answerPage.locator("#answerText").evaluate((n) => n.querySelectorAll("img, b").length)) === 0,
 );
 
+// QA P2-6: Markdown arrived as raw asterisks and hashes.
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: sse(
+      ["## Nocks\n\nA **nock** is the ", "slot at the end.\n\n- ", "plastic\n- wood\n\n", "Use `glue` sparingly. ",
+        "[Read more](https://example.com/nocks) or [not this](javascript:alert(1)).\n\n```\nfletch(arrow)\n```"],
+      { total_tokens: 9 },
+    ),
+  }),
+);
+await ask("explain nocks");
+const md = await answerPage.locator("#answerText").evaluate((n) => ({
+  heading: n.querySelector("h4")?.textContent,
+  strong: n.querySelector("strong")?.textContent,
+  items: [...n.querySelectorAll("ul > li")].map((li) => li.textContent),
+  code: n.querySelector("p code")?.textContent,
+  pre: n.querySelector("pre code")?.textContent,
+  links: [...n.querySelectorAll("a")].map((a) => a.getAttribute("href")),
+  raw: n.textContent.includes("**") || n.textContent.includes("##"),
+}));
+check(
+  "answers render as Markdown: heading, bold, list, code",
+  md.heading === "Nocks" && md.strong === "nock" && JSON.stringify(md.items) === '["plastic","wood"]' &&
+    md.code === "glue" && md.pre === "fletch(arrow)" && !md.raw,
+  JSON.stringify(md),
+);
+check(
+  "...and only http(s) links become links",
+  JSON.stringify(md.links) === '["https://example.com/nocks"]',
+  JSON.stringify(md.links),
+);
+
+// QA P3-15: a stream with no text left an empty card.
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) =>
+  r.fulfill({ status: 200, contentType: "text/event-stream", body: sse([], { total_tokens: 3 }) }),
+);
+await ask("say nothing");
+check("an empty answer says so", (await statusText()).includes("No answer came back"), await statusText());
+
 // An API error has to say what went wrong, not fail silently.
 await answerPage.unroute("https://api.openai.com/**");
 await answerPage.route("https://api.openai.com/**", (r) =>
@@ -890,10 +1000,102 @@ await answerPage.route("https://api.openai.com/**", (r) =>
 );
 await ask("this will fail");
 check(
-  "an API error surfaces the API's own message",
-  (await answerPage.locator("#answerMeta").innerText()).includes("Incorrect API key"),
+  "a rejected key is explained in plain words, with where to get a good one",
+  (await answerPage.locator("#answerMeta").innerText()).includes("didn't accept that key") &&
+    (await answerPage.locator("#answerMeta").innerText()).includes("platform.openai.com/api-keys"),
   await answerPage.locator("#answerMeta").innerText(),
 );
+
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) =>
+  r.fulfill({
+    status: 429,
+    contentType: "application/json",
+    body: JSON.stringify({ error: { message: "You exceeded your current quota.", type: "insufficient_quota", code: "insufficient_quota" } }),
+  }),
+);
+await ask("no credit yet");
+check(
+  "an account with no credit is told so, with where to add it and the free way out",
+  (await answerPage.locator("#answerMeta").innerText()).startsWith("Your OpenAI account has no credit yet. Add $5+"),
+  await answerPage.locator("#answerMeta").innerText(),
+);
+
+// QA P2-7: "Failed to fetch".
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) => r.abort("internetdisconnected"));
+await ask("offline");
+check(
+  "no network reads as no network, not \"Failed to fetch\"",
+  (await answerPage.locator("#answerMeta").innerText()) === "Couldn't reach OpenAI — check your connection.",
+  await answerPage.locator("#answerMeta").innerText(),
+);
+
+// QA P2-4 and P2-5, with a key set. Restore a working API first.
+await answerPage.unroute("https://api.openai.com/**");
+await answerPage.route("https://api.openai.com/**", (r) => {
+  apiCalls++;
+  apiBody = JSON.parse(r.request().postData() ?? "null");
+  return r.fulfill({ status: 200, contentType: "text/event-stream", body: sse(["Done."], { total_tokens: 4 }) });
+});
+await answerPage.fill("#query", "");
+await answerPage.locator("#attachInput").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Arrows have nocks.") });
+await answerPage.waitForTimeout(300);
+check("an attachment alone enables send", await answerPage.locator("#send").isEnabled());
+const callsBeforeAttach = apiCalls;
+await answerPage.locator("#send").click();
+await answerPage.waitForTimeout(600);
+const sentContent = JSON.stringify(apiBody?.messages?.[0]?.content ?? "");
+check(
+  "send with only an attachment asks a default question instead of doing nothing",
+  apiCalls === callsBeforeAttach + 1 && sentContent.startsWith('"Summarize this.') && sentContent.includes("Arrows have nocks."),
+  `${apiCalls - callsBeforeAttach} calls, ${sentContent.slice(0, 80)}`,
+);
+
+// QA P1-1: a PDF Chrome itself printed came through as glyph ids and NUL bytes.
+const printer = await answerCtx.newPage();
+await printer.setContent(
+  "<h1>Quarterly memo</h1><p>Café owners in Zürich asked about “smart quotes” — and naïve résumés.</p>",
+);
+const printed = await printer.pdf();
+await printer.close();
+await answerPage.bringToFront();
+await answerPage.locator("#attachInput").setInputFiles({ name: "memo.pdf", mimeType: "application/pdf", buffer: printed });
+await answerPage.waitForTimeout(500);
+check(
+  "a PDF Chrome printed is read as words",
+  /PDF — \d+ words/.test(await answerPage.locator(".chipSize").innerText()),
+  await answerPage.locator(".chipSize").innerText(),
+);
+await answerPage.fill("#query", "what does it say");
+await answerPage.locator("#query").press("Enter");
+await answerPage.waitForTimeout(600);
+const sentPdf = apiBody?.messages?.[0]?.content ?? "";
+check(
+  "...and what reaches the model is the memo's own text, accents and quotes intact",
+  typeof sentPdf === "string" && sentPdf.includes("Quarterly memo") &&
+    sentPdf.includes("Café owners in Zürich asked about “smart quotes” — and naïve résumés."),
+  JSON.stringify(sentPdf).slice(0, 300),
+);
+
+await answerPage.evaluate(() => chrome.storage.local.set({ mode: "chatgpt" }));
+await answerPage.waitForTimeout(200);
+const PNG_1PX = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+await answerPage.locator("#attachInput").setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: PNG_1PX });
+await answerPage.waitForTimeout(300);
+check(
+  "with a key set, ChatGPT mode still warns that an image won't go",
+  (await answerPage.locator("#attachStatus").innerText()).includes("Images can't go to ChatGPT"),
+  await answerPage.locator("#attachStatus").innerText(),
+);
+await answerPage.evaluate(() => chrome.storage.local.set({ mode: "answer" }));
+await answerPage.waitForTimeout(200);
+check(
+  "...and the warning goes once the mode can carry it",
+  !(await answerPage.locator("#attachStatus").innerText()).includes("Images can't"),
+  await answerPage.locator("#attachStatus").innerText(),
+);
+await answerPage.locator(".chipRemove").click();
 
 // The budget has to actually stop it.
 await answerPage.evaluate(() =>
@@ -913,11 +1115,14 @@ check(
 // --- the options page ----------------------------------------------------------
 
 const optionsPage = await answerCtx.newPage();
+// What a real new account lists: chat models among image, speech and legacy ones.
 await optionsPage.route("https://api.openai.com/v1/models", (r) =>
   r.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ data: [{ id: "model-b" }, { id: "model-a" }] }),
+    body: JSON.stringify({
+      data: ["babbage-002", "dall-e-3", "gpt-4o-mini", "gpt-6-luna", "gpt-image-1", "tts-1", "whisper-1"].map((id) => ({ id })),
+    }),
   }),
 );
 await optionsPage.goto(`chrome-extension://${extensionId(answerFixture)}/options.html`, {
@@ -936,18 +1141,63 @@ check(
   (await optionsPage.locator("#keyStatus").innerText()).includes("Paste a key"),
 );
 
-await optionsPage.fill("#apiKey", "sk-another");
+await optionsPage.fill("#apiKey", "not-a-key");
+await optionsPage.locator("#saveKey").click();
+await optionsPage.waitForTimeout(200);
+check(
+  "something that is plainly not a key is caught before any request",
+  (await optionsPage.locator("#keyStatus").innerText()).includes("start with “sk-”"),
+  await optionsPage.locator("#keyStatus").innerText(),
+);
+
+// QA P1-2: saving a key never chose a model, so Answer here silently searched.
+await optionsPage.evaluate(() => chrome.storage.local.set({ model: "" }));
+await optionsPage.fill("#apiKey", "sk-test-0123456789abcdefghij");
 await optionsPage.locator("#saveKey").click();
 await optionsPage.waitForTimeout(500);
 check(
-  "a key is validated against the API before it is stored",
-  (await optionsPage.locator("#keyStatus").innerText()).includes("2 models"),
+  "a key is validated against the API, and a model is picked for it",
+  (await optionsPage.locator("#keyStatus").innerText()).includes("Answers will use gpt-6-luna"),
   await optionsPage.locator("#keyStatus").innerText(),
 );
 check(
-  "the model list comes from the key, not from a hardcoded list",
-  (await optionsPage.locator("#model option").allInnerTexts()).join(",") === "model-a,model-b",
+  "...and stored, so answers work with no other setting",
+  (await optionsPage.evaluate(() => chrome.storage.local.get({ model: "" }).then((r) => r.model))) === "gpt-6-luna",
 );
+check(
+  "the model list comes from the key and holds chat models only",
+  (await optionsPage.locator("#model option").allInnerTexts()).join(",") === "gpt-4o-mini,gpt-6-luna",
+  (await optionsPage.locator("#model option").allInnerTexts()).join(","),
+);
+check(
+  "the Answers header updates without a reload",
+  (await optionsPage.locator("#stateAnswers").innerText()).trim() === "Your OpenAI key",
+  await optionsPage.locator("#stateAnswers").innerText(),
+);
+check(
+  "the key steps link to sign-up, billing and API keys",
+  JSON.stringify(await optionsPage.locator("#keySteps a").evaluateAll((as) => as.map((a) => a.href))) ===
+    JSON.stringify([
+      "https://platform.openai.com/signup",
+      "https://platform.openai.com/settings/organization/billing",
+      "https://platform.openai.com/api-keys",
+    ]),
+);
+const costNote = await optionsPage.locator("#costNote").innerText();
+check(
+  "the cost note names the $5 minimum and what an answer typically costs",
+  costNote.includes("$5") && costNote.includes("tenth of a cent"),
+  costNote,
+);
+
+// QA P2-8: hovering a primary button painted cream on cream.
+await optionsPage.locator("#saveKey").hover();
+await optionsPage.waitForTimeout(200);
+const hovered = await optionsPage.locator("#saveKey").evaluate((b) => {
+  const s = getComputedStyle(b);
+  return { bg: s.backgroundColor, fg: s.color };
+});
+check("a primary button keeps its brass fill on hover", hovered.bg === "rgb(180, 83, 9)", JSON.stringify(hovered));
 
 await optionsPage.locator("#clearKey").click();
 await optionsPage.waitForTimeout(250);
@@ -959,6 +1209,270 @@ check(
 await answerCtx.close();
 rmSync(answerFixture, { recursive: true, force: true });
 
+// --- Chrome's built-in AI --------------------------------------------------------
+//
+// Headless Chromium exposes LanguageModel but has no model, so availability()
+// is always "unavailable" here. An init script stands in for the API in each
+// state a real machine can be in; which one is read from the page's own
+// localStorage, so a reload can switch it.
+
+const builtinFixture = mkdtempSync(join(tmpdir(), "archer-builtin-"));
+cpSync(EXT, builtinFixture, { recursive: true });
+{
+  const path = join(builtinFixture, "manifest.json");
+  const m = JSON.parse(readFileSync(path, "utf8"));
+  delete m.background; // no first-run picker — see the history fixture
+  writeFileSync(path, JSON.stringify(m, null, 2));
+}
+const builtinCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${builtinFixture}`, `--load-extension=${builtinFixture}`, "--no-sandbox"],
+});
+const BUILTIN_ID = extensionId(builtinFixture);
+await builtinCtx.addInitScript(() => {
+  const state = localStorage.getItem("lmState") ?? "available";
+  if (state === "absent") {
+    delete globalThis.LanguageModel;
+    globalThis.LanguageModel = undefined;
+    return;
+  }
+  globalThis.__lm = { creates: 0, destroyed: 0, prompt: null, options: null };
+  globalThis.LanguageModel = {
+    availability: async () => state,
+    async create(options) {
+      __lm.creates++;
+      __lm.options = JSON.parse(JSON.stringify({ in: options.expectedInputs, out: options.expectedOutputs }));
+      const monitor = new EventTarget();
+      options.monitor?.(monitor);
+      if (state !== "available") {
+        for (const loaded of [0, 0.5, 1]) {
+          monitor.dispatchEvent(Object.assign(new Event("downloadprogress"), { loaded }));
+          await new Promise((r) => setTimeout(r, 40));
+        }
+      }
+      return {
+        promptStreaming(text) {
+          __lm.prompt = text;
+          return (async function* () {
+            yield "On-device ";
+            yield "**answer**.";
+          })();
+        },
+        destroy() {
+          __lm.destroyed++;
+        },
+      };
+    },
+  };
+});
+
+let builtinRequests = 0;
+const builtinNav = [];
+await builtinCtx.route(/^https?:/, (r) => {
+  builtinRequests++;
+  if (r.request().isNavigationRequest()) builtinNav.push(r.request().url());
+  return r.abort("aborted");
+});
+
+const lmPage = await builtinCtx.newPage();
+const lmErrors = [];
+lmPage.on("pageerror", (e) => lmErrors.push(e.message));
+const BUILTIN_NEWTAB = `chrome-extension://${BUILTIN_ID}/newtab.html`;
+async function openBuiltin(state, storage = {}) {
+  await lmPage.goto(BUILTIN_NEWTAB, { waitUntil: "domcontentloaded" });
+  await lmPage.evaluate(
+    ([s, values]) => {
+      localStorage.setItem("lmState", s);
+      return chrome.storage.local.set({ mode: "answer", apiKey: "", model: "", engineNudgeDismissed: true, ...values });
+    },
+    [state, storage],
+  );
+  await lmPage.reload({ waitUntil: "domcontentloaded" });
+  await lmPage.waitForTimeout(400);
+}
+async function askBuiltin(text) {
+  await lmPage.evaluate(() => {
+    globalThis.__statuses = [];
+    new MutationObserver(() => __statuses.push(document.getElementById("answerStatus").textContent)).observe(
+      document.getElementById("answerStatus"),
+      { childList: true, characterData: true, subtree: true },
+    );
+  });
+  await lmPage.fill("#query", text);
+  await lmPage.locator("#query").press("Enter");
+  await lmPage.waitForTimeout(600);
+}
+
+await openBuiltin("available");
+check("with the built-in model and no key, Answer here needs no note", await lmPage.locator("#modeNote").isHidden());
+check(
+  "...and the box says the answer appears here",
+  (await lmPage.locator("#query").getAttribute("placeholder")) === "Ask, and the answer appears here",
+);
+check(
+  "the menu says who answers",
+  (await lmPage.locator("#answerModeHint").evaluate((n) => n.textContent)).includes("Chrome's built-in AI"),
+);
+builtinRequests = 0;
+await askBuiltin("what is a nock");
+check(
+  "the built-in model answers on the page, rendered as Markdown",
+  (await lmPage.locator("#answerText").innerText()).trim() === "On-device answer." &&
+    (await lmPage.locator("#answerText strong").count()) === 1,
+  await lmPage.locator("#answerText").innerText(),
+);
+check(
+  "...says it ran on this device",
+  (await lmPage.locator("#answerMeta").innerText()).includes("Answered on this device"),
+  await lmPage.locator("#answerMeta").innerText(),
+);
+check("...and made no network request at all", builtinRequests === 0 && builtinNav.length === 0, `${builtinRequests} requests`);
+const lm = await lmPage.evaluate(() => globalThis.__lm);
+check("the prompt reached the model", lm.prompt === "what is a nock", JSON.stringify(lm.prompt));
+check(
+  "...with the same English text options availability() was asked with",
+  JSON.stringify(lm.options) ===
+    JSON.stringify({ in: [{ type: "text", languages: ["en"] }], out: [{ type: "text", languages: ["en"] }] }),
+  JSON.stringify(lm.options),
+);
+check("the session is freed after answering", lm.destroyed === 1);
+
+const PNG_DOT = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+await lmPage.locator("#attachInput").setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: PNG_DOT });
+await lmPage.waitForTimeout(300);
+check(
+  "an image with the built-in model says it reads text only",
+  (await lmPage.locator("#attachStatus").innerText()).includes("reads text only"),
+  await lmPage.locator("#attachStatus").innerText(),
+);
+await lmPage.locator(".chipRemove").click();
+
+await openBuiltin("downloadable");
+await askBuiltin("first question");
+const statuses = await lmPage.evaluate(() => globalThis.__statuses);
+check(
+  "a model that needs downloading shows the download's progress",
+  statuses.some((t) => t === "Downloading Chrome's built-in AI — 50%"),
+  JSON.stringify(statuses),
+);
+check(
+  "...then answers",
+  (await lmPage.locator("#answerStatus").innerText()).toLowerCase().includes("complete"),
+  await lmPage.locator("#answerStatus").innerText(),
+);
+
+const lmOptions = await builtinCtx.newPage();
+await lmOptions.goto(`chrome-extension://${BUILTIN_ID}/options.html`, { waitUntil: "domcontentloaded" });
+await lmOptions.waitForTimeout(400);
+check(
+  "settings says the built-in model is a one-time download away",
+  (await lmOptions.locator("#builtinStatus").innerText()).includes("one-time download") &&
+    (await lmOptions.locator("#prepareBuiltin").isVisible()),
+  await lmOptions.locator("#builtinStatus").innerText(),
+);
+await lmOptions.locator("#prepareBuiltin").click();
+await lmOptions.waitForTimeout(500);
+check(
+  "...and its Download button fetches it there and then",
+  (await lmOptions.locator("#builtinProgress").innerText()).includes("Downloaded"),
+  await lmOptions.locator("#builtinProgress").innerText(),
+);
+await lmOptions.close();
+
+// The picker, shown again by marking onboarding pending, as the service worker does.
+await openBuiltin("available");
+await lmPage.evaluate(() => chrome.storage.local.set({ onboarding: "pending" }));
+await lmPage.locator("#picker").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+check(
+  "on a machine with the built-in model, the picker offers Answer here as free and on-device",
+  (await lmPage.locator("#pickerAnswerHint").innerText()).includes("free, and nothing leaves this computer"),
+  await lmPage.locator("#pickerAnswerHint").innerText(),
+);
+await lmPage.locator('#picker input[value="answer"]').check();
+await lmPage.click("#pickerDone");
+await lmPage.waitForTimeout(250);
+check(
+  "choosing Answer here in the picker sets the mode",
+  (await lmPage.evaluate(() => chrome.storage.local.get(["mode", "onboarding"]))).mode === "answer",
+);
+
+// No API at all — an older Chrome, or another Chromium.
+lmErrors.length = 0;
+await openBuiltin("absent", { fallbackMode: "claude" });
+check("no LanguageModel API: no errors", lmErrors.length === 0, lmErrors.join("; "));
+check(
+  "...and a clear one-line fallback, naming the chosen hand-off",
+  (await lmPage.locator("#modeNote").isVisible()) &&
+    (await lmPage.locator("#modeNoteText").innerText()).includes("go to Claude"),
+  await lmPage.locator("#modeNoteText").innerText(),
+);
+builtinNav.length = 0;
+await lmPage.fill("#query", "what is a nock");
+await lmPage.locator("#query").press("Enter", { noWaitAfter: true });
+await lmPage.waitForTimeout(400);
+check(
+  "...and the question goes there",
+  builtinNav[0] === "https://claude.ai/new?q=what%20is%20a%20nock",
+  JSON.stringify(builtinNav),
+);
+
+await builtinCtx.close();
+rmSync(builtinFixture, { recursive: true, force: true });
+
+// --- first run, taking the default ---------------------------------------------------
+//
+// The real extension, service worker and all, on a profile that has never run it.
+
+const firstCtx = await chromium.launchPersistentContext("", {
+  headless: true,
+  channel: "chromium",
+  args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, "--no-sandbox"],
+});
+const firstNav = [];
+await firstCtx.route(/^https?:/, (r) => {
+  if (r.request().isNavigationRequest()) firstNav.push(r.request().url());
+  return r.abort("aborted");
+});
+let first = await firstCtx.newPage();
+await first.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+await first.locator("#picker").waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+check("a second fresh profile is asked too", await first.locator("#picker").isVisible());
+check("Done has focus, so Enter takes the default", await first.evaluate(() => document.activeElement?.id === "pickerDone"));
+await first.keyboard.press("Enter");
+await first.waitForTimeout(300);
+check(
+  "taking the default chooses ChatGPT",
+  (await first.locator("#modeLabel").innerText()).trim() === "ChatGPT" &&
+    (await first.locator('.target[aria-pressed="true"]').getAttribute("data-mode")) === "chatgpt",
+  await first.locator("#modeLabel").innerText(),
+);
+await first.fill("#query", "what is a nock");
+await first.locator("#query").press("Enter", { noWaitAfter: true });
+await first.waitForTimeout(400);
+check(
+  "...and a question then opens chatgpt.com/?q=",
+  firstNav[0] === "https://chatgpt.com/?q=what%20is%20a%20nock",
+  JSON.stringify(firstNav),
+);
+first = await firstCtx.newPage();
+await first.goto(NEWTAB, { waitUntil: "domcontentloaded" });
+await first.waitForTimeout(500);
+check("the next tab is not asked again", await first.locator("#picker").isHidden());
+
+// Escape is a way out too, and it keeps whatever was selected.
+await first.evaluate(() => chrome.storage.local.set({ onboarding: "pending" }));
+await first.locator("#picker").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+await first.locator('#picker input[value="perplexity"]').check();
+await first.keyboard.press("Escape");
+await first.waitForTimeout(300);
+check(
+  "Escape closes the picker and keeps the selected choice",
+  (await first.locator("#picker").isHidden()) && (await first.locator("#modeLabel").innerText()).trim() === "Perplexity",
+  await first.locator("#modeLabel").innerText(),
+);
+await firstCtx.close();
+
 // --- Phase 5: power features ----------------------------------------------------
 
 const powerFixture = mkdtempSync(join(tmpdir(), "archer-power-"));
@@ -968,6 +1482,7 @@ cpSync(EXT, powerFixture, { recursive: true });
   // headless — same fixture trick as history and api.openai.com.
   const path = join(powerFixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
+  delete m.background; // no first-run picker — see the history fixture
   m.permissions = [...m.permissions, "topSites", "sessions", "tabs"];
   m.optional_permissions = m.optional_permissions.filter(
     (p) => !["topSites", "sessions", "tabs"].includes(p),
@@ -1021,7 +1536,7 @@ await power.waitForTimeout(500);
 const powerNav = [];
 await powerCtx.route(/^https?:/, (r) => {
   if (r.request().isNavigationRequest()) powerNav.push(r.request().url());
-  return r.fulfill({ status: 204, body: "" });
+  return r.abort("aborted");
 });
 
 let powerPage = power;
@@ -1159,6 +1674,28 @@ check(
   "Tab leaves the field when there is no blank left",
   await power.evaluate(() => document.activeElement?.id !== "query"),
 );
+
+// QA P2-3: Enter with no row highlighted sent the literal "/tr" somewhere.
+powerNav.length = 0;
+await power.fill("#query", "/tr");
+await power.waitForTimeout(200);
+await power.locator("#query").press("Enter");
+await power.waitForTimeout(300);
+check(
+  "/name + Enter uses the best-matching saved prompt",
+  (await power.inputValue("#query")) === "Translate {{text}} into {{language}}" && powerNav.length === 0,
+  `${await power.inputValue("#query")} ${JSON.stringify(powerNav)}`,
+);
+await power.fill("#query", "/nothing-called-this");
+await power.waitForTimeout(200);
+await power.locator("#query").press("Enter");
+await power.waitForTimeout(300);
+check(
+  "...and with nothing matching, it sends nothing and says why",
+  powerNav.length === 0 && (await power.locator("#attachStatus").innerText()).includes("No saved prompt matches"),
+  `${JSON.stringify(powerNav)} ${await power.locator("#attachStatus").innerText()}`,
+);
+await power.fill("#query", "");
 
 // --- the + menu -------------------------------------------------------------------
 
@@ -1321,6 +1858,7 @@ cpSync(EXT, dashFixture, { recursive: true });
   // headless, so the fixture holds it outright.
   const path = join(dashFixture, "manifest.json");
   const m = JSON.parse(readFileSync(path, "utf8"));
+  delete m.background; // no first-run picker — see the history fixture
   m.host_permissions = m.optional_host_permissions.filter((o) => o.includes("open-meteo"));
   m.optional_host_permissions = m.optional_host_permissions.filter((o) => !o.includes("open-meteo"));
   // Same reason for `favicon`: its dialog never resolves headless either, and
@@ -1476,7 +2014,7 @@ await dash.bringToFront();
 const dashNav = [];
 await dashCtx.route(/^https?:(?!\/\/(api|geocoding-api)\.open-meteo)/, (r) => {
   if (r.request().isNavigationRequest()) dashNav.push(r.request().url());
-  return r.fulfill({ status: 204, body: "" });
+  return r.abort("aborted");
 });
 
 async function resetDashPage() {
@@ -1774,10 +2312,48 @@ check(
   `${placeholders[0].length} vs ${placeholders[1].length}`,
 );
 
+// QA (v1.11.0): with a real icon, tiles rendered it oversized, over the label.
+// A fresh profile has no icons, so put a 64px one in place the way paintIcon does.
+const tileBox = await dash.evaluate(async () => {
+  const icon = document.querySelector(".tile .tileIcon");
+  const canvas = Object.assign(document.createElement("canvas"), { width: 64, height: 64 });
+  canvas.getContext("2d").fillRect(0, 0, 64, 64);
+  icon.src = canvas.toDataURL();
+  await icon.decode();
+  icon.hidden = false;
+  const box = (el) => el.getBoundingClientRect().toJSON();
+  return {
+    face: box(document.querySelector(".tile .tileFace")),
+    icon: box(icon),
+    name: box(document.querySelector(".tile .tileName")),
+  };
+});
+check(
+  "a tile's icon fills its 38px face and stops above the label",
+  Math.round(tileBox.face.width) === 38 && Math.round(tileBox.face.height) === 38 &&
+    Math.round(tileBox.icon.width) === 38 && Math.round(tileBox.icon.height) === 38 &&
+    tileBox.icon.bottom <= tileBox.name.top,
+  JSON.stringify(tileBox),
+);
+
 await dash.evaluate(() => chrome.storage.local.set({ favorites: [] }));
 await dash.reload({ waitUntil: "domcontentloaded" });
 await dash.bringToFront();
 await dash.waitForTimeout(400);
+
+// QA P2-9: unpressed pills were --muted on the tray, 4.1:1.
+const pillContrast = await dash.evaluate(() => {
+  const rgb = (c) => c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+  const lum = ([r, g, b]) => {
+    const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const pill = document.querySelector('.target[aria-pressed="false"]');
+  const a = lum(rgb(getComputedStyle(pill).color));
+  const b = lum(rgb(getComputedStyle(document.querySelector(".targets")).backgroundColor));
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+});
+check("an unpressed pill's label meets AA on its tray", pillContrast >= 4.5, `${pillContrast.toFixed(2)}:1`);
 
 // --- the default-engine hint only appears where it is true ------------------------
 //
@@ -2090,7 +2666,7 @@ check(
   "a section's state is readable from its header",
   (await shipOptions.locator("#stateDestination").innerText()).trim().length > 0 &&
     (await shipOptions.locator("#stateWeather").innerText()).trim() === "Off" &&
-    (await shipOptions.locator("#stateAnswers").innerText()).trim() === "No key set",
+    (await shipOptions.locator("#stateAnswers").innerText()).trim() === "Off",
   [
     await shipOptions.locator("#stateDestination").innerText(),
     await shipOptions.locator("#stateWeather").innerText(),

@@ -1,4 +1,5 @@
-// The settings page. Its whole job is the API key, the model, and the budget.
+// The settings page: where questions go, how Answer here answers (Chrome's
+// built-in AI or the user's own key), the model, the budget, and the rest.
 //
 // Every message here is set with textContent. Model ids come back from the API
 // and the error strings come back from the API too — neither is ours to trust
@@ -18,8 +19,19 @@ import {
   saveWeatherCache,
   loadSettings,
   saveMode,
+  saveFallback,
 } from "./src/settings.js";
-import { listModels, estimateCost, API_ORIGIN } from "./src/answer.js";
+import { listModels, checkKey, keyProblem, pickModel, estimateCost, API_ORIGIN } from "./src/answer.js";
+import {
+  builtinAvailability,
+  openSession,
+  describeBuiltinFailure,
+  percent,
+  AVAILABLE,
+  DOWNLOADABLE,
+  DOWNLOADING,
+} from "./src/builtin.js";
+import { targetName } from "./src/router.js";
 
 import { findPlace, fetchWeather, WEATHER_ORIGINS } from "./src/weather.js";
 import { variableNames } from "./src/library.js";
@@ -36,6 +48,7 @@ const modelStatus = $("modelStatus");
 const budgetCard = $("budgetCard");
 
 let settings = await loadAnswerSettings();
+let builtin = await builtinAvailability();
 render();
 
 function render() {
@@ -50,7 +63,11 @@ function render() {
   // A nav link to a hidden section scrolls to nothing.
   $("navModel").hidden = !hasKey;
   $("navBudget").hidden = !hasKey;
-  setState("stateAnswers", hasKey ? "On" : "No key set", hasKey);
+  setState(
+    "stateAnswers",
+    hasKey && settings.model ? "Your OpenAI key" : builtin === AVAILABLE ? "Chrome's built-in AI" : hasKey ? "Key set, no model" : "Off",
+    (hasKey && Boolean(settings.model)) || builtin === AVAILABLE,
+  );
   setState("stateModel", settings.model || "None chosen", Boolean(settings.model));
   setState(
     "stateBudget",
@@ -94,6 +111,14 @@ function paintModeState() {
   const label = (defaultMode.selectedOptions[0]?.textContent ?? "").split(" — ")[0];
   setState("stateDestination", label, true);
 }
+
+const fallbackMode = $("fallbackMode");
+fallbackMode.value = (await loadSettings()).fallback;
+
+fallbackMode.addEventListener("change", async () => {
+  await saveFallback(fallbackMode.value);
+  say($("modeStatus"), `When Answer here can't answer, questions go to ${targetName(fallbackMode.value)}.`);
+});
 
 defaultMode.addEventListener("change", async () => {
   await saveMode(defaultMode.value);
@@ -354,8 +379,9 @@ $("clearHistory").addEventListener("click", async () => {
 
 $("saveKey").addEventListener("click", async () => {
   const key = apiKey.value.trim();
-  if (!key) {
-    say(keyStatus, "Paste a key first.", true);
+  const problem = keyProblem(key);
+  if (problem) {
+    say(keyStatus, problem, true);
     return;
   }
 
@@ -363,21 +389,37 @@ $("saveKey").addEventListener("click", async () => {
   // user gesture. Reaching api.openai.com at all needs this origin, and asking
   // here means it is never in the install-time prompt.
   const granted = await requestApiAccess();
+  await paintApiAccess();
   if (!granted) {
-    say(keyStatus, "Archer needs permission to reach api.openai.com before it can use a key.", true);
+    say(
+      keyStatus,
+      "Not saved yet — Chrome asks permission to reach api.openai.com in a popup at the top of the window, " +
+        "and Deny is its default. Your key is still typed in: press Save key again and choose Allow.",
+      true,
+    );
     return;
   }
 
-  say(keyStatus, "Checking the key…");
+  say(keyStatus, "Checking the key with OpenAI…");
   try {
-    const models = await listModels(key);
-    await saveAnswerSettings({ apiKey: key });
+    const { models, model: picked } = await checkKey(key);
+    // A model chosen earlier that this key can still reach is kept; otherwise
+    // the pick. Saving a key used to leave the model empty, so Answer here
+    // never answered (QA P1-2).
+    const model = models.includes(settings.model) ? settings.model : picked ?? "";
+    await saveAnswerSettings({ apiKey: key, model });
     settings = await loadAnswerSettings();
-    modelCard.hidden = false;
-    budgetCard.hidden = false;
+    render();
     setModelOptions(models, settings.model);
-    showUsage();
-    say(keyStatus, `Saved. ${models.length} models available to this key.`);
+    say(
+      keyStatus,
+      model
+        ? `Saved, and it works. Answers will use ${model} — nothing else to set.`
+        : models.length
+          ? "Saved. This key can't reach any of the models Archer picks from — choose one under Model."
+          : "Saved, but this key can't reach any chat models. Check the key's project permissions on platform.openai.com.",
+      !model,
+    );
   } catch (error) {
     // The key is not stored unless it worked — a saved key that 401s would be a
     // silent failure on the new tab page later.
@@ -388,11 +430,30 @@ $("saveKey").addEventListener("click", async () => {
 $("clearKey").addEventListener("click", async () => {
   await saveAnswerSettings({ apiKey: "", model: "" });
   settings = await loadAnswerSettings();
-  apiKey.value = "";
-  modelCard.hidden = true;
-  budgetCard.hidden = true;
-  say(keyStatus, "Key cleared. Answer mode falls back to your default search engine.");
+  render();
+  const fallback = targetName((await loadSettings()).fallback);
+  say(
+    keyStatus,
+    builtin === AVAILABLE || builtin === DOWNLOADABLE || builtin === DOWNLOADING
+      ? "Key cleared. Answer here uses Chrome's built-in AI now."
+      : `Key cleared. Answer here sends questions to ${fallback} until a key is set.`,
+  );
 });
+
+async function hasApiAccess() {
+  if (!globalThis.chrome?.permissions?.contains) return true;
+  try {
+    return await chrome.permissions.contains({ origins: [API_ORIGIN] });
+  } catch {
+    return false;
+  }
+}
+
+async function paintApiAccess() {
+  $("apiAccessHint").hidden = await hasApiAccess();
+}
+
+await paintApiAccess();
 
 async function requestApiAccess() {
   if (!globalThis.chrome?.permissions?.request) return true; // plain-file dev
@@ -403,6 +464,62 @@ async function requestApiAccess() {
     return false;
   }
 }
+
+// A key saved by an earlier version never got a model. Pick one now, quietly,
+// rather than leave Answer here dead until someone finds the Model card.
+if (settings.apiKey && !settings.model && (await hasApiAccess())) {
+  checkKey(settings.apiKey)
+    .then(async ({ models, model }) => {
+      if (!model) return;
+      await saveAnswerSettings({ model });
+      settings = await loadAnswerSettings();
+      render();
+      setModelOptions(models, model);
+      say(modelStatus, `Picked ${model} for you. Change it here any time.`);
+    })
+    .catch(() => {});
+}
+
+// --- Chrome's built-in AI --------------------------------------------------------
+
+paintBuiltin();
+
+function paintBuiltin() {
+  const status = $("builtinStatus");
+  const button = $("prepareBuiltin");
+  button.hidden = !(builtin === DOWNLOADABLE || builtin === DOWNLOADING);
+  button.textContent = builtin === DOWNLOADING ? "Show download progress" : "Download it now";
+  status.textContent =
+    builtin === AVAILABLE
+      ? "Ready on this computer. Answers are made here — free, and nothing is sent anywhere."
+      : builtin === DOWNLOADABLE
+        ? "This computer can run it after a one-time download by Chrome. Download it now so the first answer doesn't wait, or let the first question start it."
+        : builtin === DOWNLOADING
+          ? "Chrome is downloading it now."
+          : "Not available here. It needs a recent desktop Chrome on a computer with plenty of memory and about 22 GB of free disk space. A key, below, works anywhere.";
+}
+
+$("prepareBuiltin").addEventListener("click", async () => {
+  const progress = $("builtinProgress");
+  const button = $("prepareBuiltin");
+  button.disabled = true;
+  say(progress, "Starting the download…");
+  try {
+    // Inside the click: Chrome only starts the download for a user gesture.
+    const session = await openSession({
+      onProgress: (loaded) => say(progress, `Downloading Chrome's built-in AI — ${percent(loaded)}%`),
+    });
+    session.destroy?.();
+    builtin = await builtinAvailability();
+    say(progress, "Downloaded. Answer here can use it now.");
+  } catch (error) {
+    say(progress, describeBuiltinFailure(error), true);
+  } finally {
+    button.disabled = false;
+    paintBuiltin();
+    render();
+  }
+});
 
 // --- the model ----------------------------------------------------------------
 
@@ -435,8 +552,16 @@ $("refreshModels").addEventListener("click", async () => {
   say(modelStatus, "Loading…");
   try {
     const models = await listModels(settings.apiKey);
+    if (!models.includes(settings.model)) {
+      const picked = pickModel(models);
+      if (picked) {
+        await saveAnswerSettings({ model: picked });
+        settings = await loadAnswerSettings();
+        render();
+      }
+    }
     setModelOptions(models, settings.model);
-    say(modelStatus, `${models.length} models available.`);
+    say(modelStatus, `${models.length} chat model${models.length === 1 ? "" : "s"} available.`);
   } catch (error) {
     say(modelStatus, error.message, true);
   }

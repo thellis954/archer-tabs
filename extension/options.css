@@ -214,14 +214,20 @@ code {
 .rowButtons button:hover  { background: var(--pressed); }
 .rowButtons button:active { background: var(--pressed); }
 
-.rowButtons .primary {
+/* `button.primary`, not `.primary`: `.rowButtons button:hover` above is
+   (0,2,1) and beat a (0,2,0) .primary, so hovering Save painted the cream
+   label on the --pressed fill and the word vanished (1.1:1). */
+.rowButtons button.primary,
+.rowButtons button.primary:hover,
+.rowButtons button.primary:active {
   border-color: transparent;
   background: var(--accent);
   color: var(--onAccent);
 }
 
-.rowButtons .primary:hover  { filter: brightness(1.08); }
-.rowButtons .primary:active { filter: brightness(.94); }
+.rowButtons button.primary:hover  { filter: brightness(1.08); }
+.rowButtons button.primary:active { filter: brightness(.94); }
+.rowButtons button:disabled { opacity: .55; cursor: default; }
 
 .status,
 .usage {
@@ -413,3 +419,49 @@ kbd {
   padding-left: 11px;
   border-left: 2px solid var(--border);
 }
+
+/* ---------- answers: built-in AI and the key steps ---------- */
+
+.engineHead {
+  margin: 18px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.engineHead:first-of-type { margin-top: 4px; }
+
+.steps {
+  margin: 8px 0 14px;
+  padding-left: 1.3em;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.steps li + li { margin-top: 6px; }
+.steps strong { color: var(--text); }
+
+.steps a,
+.prose a,
+.hint a {
+  color: var(--text);
+  text-decoration-color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+.steps a:hover,
+.prose a:hover,
+.hint a:hover { color: var(--accent); }
+
+.costNote {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.costNote strong { color: var(--text); }
