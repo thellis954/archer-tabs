@@ -11,6 +11,8 @@
 // a format nothing here understands — the attachment still goes, carrying its
 // name and type, with `note` explaining that the contents did not.
 
+import { pdfText, looksGarbled } from "./pdf.js";
+
 /** Beyond this, an attachment stops being context and starts being a corpus. */
 export const MAX_TEXT_CHARS = 200_000;
 
@@ -266,114 +268,9 @@ export function readRows(xml, shared = []) {
 
 // --- pdf ----------------------------------------------------------------------------
 
-/**
- * Undo PDF string escaping: the C-style ones plus three-digit octal.
- *
- * A backslash before a newline is a line continuation and disappears, which is
- * why this cannot just be a table lookup.
- */
-export function unescapePdf(text) {
-  return text.replace(/\\(?:(\d{1,3})|(\r\n|[\r\n])|(.))/gs, (whole, octal, newline, char) => {
-    if (octal !== undefined) return String.fromCharCode(parseInt(octal, 8) & 0xff);
-    if (newline !== undefined) return "";
-    return { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" }[char] ?? char;
-  });
-}
-
-/**
- * The text out of one decoded PDF content stream.
- *
- * PDF has no notion of a word or a line at this level — it has "draw this
- * string at this position". So the text operators are read in order, and the
- * operators that move the cursor to a new line become newlines. It is an
- * approximation, and a good one for the documents people attach: reports,
- * invoices, papers.
- */
-export function pdfTextFromStream(content) {
-  const out = [];
-  // Literal strings, hex strings, the array form of TJ, and the line movers.
-  //
-  // The operators cannot use \b on both sides: `T*` ends in a non-word
-  // character, so a trailing \b never fires and T* — the most common newline in
-  // a PDF — silently never matched. Lookarounds for letters instead.
-  const tokens =
-    /\((?:\\[\s\S]|[^\\()])*\)|<[0-9a-fA-F\s]*>|(?<![A-Za-z])(?:TJ|Tj|T\*|TD|Td|ET)(?![A-Za-z])|'|"/g;
-
-  let pending = [];
-  for (const [token] of content.matchAll(tokens)) {
-    if (token[0] === "(") {
-      pending.push(unescapePdf(token.slice(1, -1)));
-    } else if (token[0] === "<") {
-      pending.push(fromHexString(token.slice(1, -1)));
-    } else if (token === "TJ" || token === "Tj" || token === "'" || token === '"') {
-      if (pending.length) out.push(pending.join(""));
-      pending = [];
-      // The quote operators move to the next line before drawing.
-      if (token === "'" || token === '"') out.push("\n");
-    } else {
-      // T*, Td, TD, ET: a new line, or the end of a text object.
-      pending = [];
-      out.push("\n");
-    }
-  }
-  if (pending.length) out.push(pending.join(""));
-
-  return out
-    .join("")
-    .replace(/[ \t]+/g, " ")
-    .replace(/ ?\n ?/g, "\n")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-function fromHexString(hex) {
-  const clean = hex.replace(/\s+/g, "");
-  let out = "";
-  for (let at = 0; at + 1 < clean.length; at += 2) out += String.fromCharCode(parseInt(clean.slice(at, at + 2), 16));
-  return out;
-}
-
-/**
- * Every content stream in a PDF, inflated where it needs to be.
- *
- * Streams are found by their delimiters rather than by walking the xref table,
- * because the xref is the part of PDF most likely to be subtly broken in a file
- * that still opens fine everywhere. A stream that will not inflate is skipped.
- */
-export async function pdfText(bytes) {
-  const marker = new TextDecoder("latin1").decode(bytes);
-  const out = [];
-
-  const opens = /stream\r\n|stream\n|stream\r/g;
-  for (const open of marker.matchAll(opens)) {
-    const from = open.index + open[0].length;
-    const to = marker.indexOf("endstream", from);
-    if (to === -1) continue;
-
-    // The dictionary immediately before the stream says how it is encoded.
-    const dict = marker.slice(Math.max(0, open.index - 600), open.index);
-    // The EOL before `endstream` is a delimiter, not payload. Leaving it on the
-    // end is trailing garbage, and DecompressionStream rejects the whole stream
-    // over it rather than returning what it already decoded.
-    let stop = to;
-    while (stop > from && (bytes[stop - 1] === 0x0a || bytes[stop - 1] === 0x0d)) stop--;
-    const raw = bytes.subarray(from, stop);
-
-    let decoded;
-    if (/\/(?:Fl|FlateDecode)\b/.test(dict)) {
-      decoded = await inflate(raw, "deflate").catch(() => inflate(raw, "deflate-raw").catch(() => null));
-      if (!decoded) continue;
-    } else if (/\/(?:LZW|DCT|CCITT|JPX|RunLength|ASCII85)/.test(dict)) {
-      continue; // an image or an encoding this does not implement
-    } else {
-      decoded = raw;
-    }
-
-    const text = pdfTextFromStream(new TextDecoder("latin1").decode(decoded));
-    if (text.trim()) out.push(text);
-  }
-
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
+// The PDF reader is big enough to be its own module; these are re-exported so
+// everything an attachment can be is still reachable from one place.
+export { unescapePdf, pdfTextFromStream, pdfText, looksGarbled } from "./pdf.js";
 
 // --- the one entry point ------------------------------------------------------------
 
@@ -410,6 +307,10 @@ export async function extract(file) {
     // A PDF of scans is a stack of images with no text layer. Saying so beats
     // attaching nothing and letting the model answer from the filename.
     if (!text) return { ...base, text: "", note: "no text layer — it looks like a scan" };
+    // Text that decodes to noise is worse than none: a model will answer from it.
+    if (looksGarbled(text)) {
+      return { ...base, text: "", note: "its text is stored in a way Archer can't read — copy and paste the part you need" };
+    }
     return { ...base, text: clamp(text) };
   }
 
