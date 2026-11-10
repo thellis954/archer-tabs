@@ -59,8 +59,22 @@
             <option value="perplexity">Perplexity</option>
             <option value="auto">Auto — your default search engine</option>
             <option value="search">Default engine only — never treat what I type as a URL</option>
-            <option value="answer">Answer here — needs an API key, below</option>
+            <option value="answer">Answer here — Chrome's built-in AI or your own key, below</option>
           </select>
+        </div>
+
+        <div class="field">
+          <label for="fallbackMode">When Answer here can't answer, send questions to</label>
+          <select id="fallbackMode">
+            <option value="chatgpt">ChatGPT</option>
+            <option value="claude">Claude</option>
+            <option value="perplexity">Perplexity</option>
+            <option value="google">Google</option>
+          </select>
+          <p class="hint">
+            Used when this computer has no built-in AI and no key is set. The new tab says so
+            under the box, so a question is never sent somewhere you didn't expect.
+          </p>
         </div>
 
         <details class="why">
@@ -162,8 +176,45 @@
         </header>
 
         <p class="prose">
-          With your own OpenAI Platform key, Archer can stream an answer straight onto the new tab
-          instead of sending you somewhere. Everything else keeps working exactly as it does now.
+          <strong>Answer here</strong> puts the answer on the new tab instead of sending you somewhere.
+          It can use Chrome's built-in AI, which is free and runs on this computer, or your own OpenAI
+          key, which is more capable and can read images. A key is used first when both are there.
+        </p>
+
+        <h3 class="engineHead">Chrome's built-in AI</h3>
+        <p class="hint" id="builtinStatus">Checking whether this computer has it…</p>
+        <div class="rowButtons">
+          <button type="button" class="primary" id="prepareBuiltin" hidden>Download it now</button>
+        </div>
+        <p class="status" id="builtinProgress" role="status"></p>
+
+        <h3 class="engineHead">Your own OpenAI key</h3>
+        <ol class="steps" id="keySteps">
+          <li>
+            <strong>Make an OpenAI Platform account</strong> at
+            <a href="https://platform.openai.com/signup" target="_blank" rel="noreferrer">platform.openai.com/signup</a>.
+            It is separate from a ChatGPT login, even with the same email.
+          </li>
+          <li>
+            <strong>Add credit</strong> under
+            <a href="https://platform.openai.com/settings/organization/billing" target="_blank" rel="noreferrer">Billing</a>.
+            OpenAI asks for at least $5 up front, and keys don't answer until there is some.
+          </li>
+          <li>
+            <strong>Create a key</strong> under
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">API keys</a>
+            — "Create new secret key" — and copy it. It starts with <code>sk-</code>.
+          </li>
+          <li><strong>Paste it below and press Save key.</strong> Archer checks it and picks a model, so there is nothing else to set.</li>
+        </ol>
+
+        <p class="costNote" id="costNote">
+          <strong>What it costs:</strong> OpenAI bills your account per answer, not per month.
+          With the model Archer picks first, a typical answer of a few hundred words costs
+          <strong>well under a tenth of a cent</strong> — $5 covers thousands of them. Prices are
+          OpenAI's to change; the current ones are on their
+          <a href="https://platform.openai.com/docs/pricing" target="_blank" rel="noreferrer">pricing page</a>.
+          Billing can top itself up automatically; turn that off on the Billing page if you'd rather it didn't.
         </p>
 
         <div class="field">
@@ -174,6 +225,13 @@
             separate accounts, and a Platform key cannot see your ChatGPT conversations.
           </p>
         </div>
+
+        <!-- Not in a disclosure: Chrome's popup opens at the top of the window
+             with Deny focused, and a folded warning is no warning. -->
+        <p class="hint heads-up" id="apiAccessHint" hidden>
+          Saving asks Chrome for permission to reach <code>api.openai.com</code> — its popup opens at the
+          <strong>top of the window</strong>, and Deny is the default. Choose <strong>Allow</strong>.
+        </p>
 
         <div class="rowButtons">
           <button type="button" class="primary" id="saveKey">Save key</button>
@@ -190,6 +248,11 @@
             Archer server, nothing is proxied, and nothing is logged anywhere else. You are billed by
             OpenAI for what you use, on your own account.
           </p>
+          <p class="hint">
+            <strong>Chrome's built-in AI sends nothing.</strong> Chrome downloads the model once, from
+            Google, into its own storage; after that every question and answer stays on this computer.
+            Archer makes no request of its own for it.
+          </p>
         </details>
       </section>
 
@@ -199,8 +262,10 @@
           <span class="cardState" id="stateModel"></span>
         </header>
         <p class="prose">
-          Listed from your own key, so this is what your account can actually reach rather than a list
-          baked into the extension.
+          Archer picks one when you save a key — the first of <code>gpt-6-luna</code>,
+          <code>gpt-5.6-luna</code>, <code>gpt-5.4-mini</code>, <code>gpt-5-mini</code>,
+          <code>gpt-4.1-mini</code> and <code>gpt-4o-mini</code> your account can reach. The list is
+          read from your own key and holds chat models only, so anything here can answer.
         </p>
 
         <div class="field">

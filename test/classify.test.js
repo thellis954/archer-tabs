@@ -45,6 +45,14 @@ const CASES = [
   ["example.com.", URL_KIND, "https://example.com."],
   ["example.com/path?q=1#frag", URL_KIND, "https://example.com/path?q=1#frag"],
 
+  // --- a port on a real domain is a port, not a scheme (QA P2-1) ---
+  ["example.com:8080", URL_KIND, "https://example.com:8080"],
+  ["example.com:8080/admin?x=1", URL_KIND, "https://example.com:8080/admin?x=1"],
+  ["dev.example.co.uk:3000#top", URL_KIND, "https://dev.example.co.uk:3000#top"],
+  ["example.com:99999", PROMPT],
+  ["example.com:80abc", PROMPT],
+  ["notatld.zzzz:8080", PROMPT],
+
   // --- not domains ---
   ["notatld.zzzz", PROMPT],
   ["hello", PROMPT],
@@ -62,6 +70,8 @@ const CASES = [
 
   // --- single label with port stays a query; type a scheme to force it ---
   ["myserver:8080", PROMPT],
+  ["javascript:1", PROMPT],
+  ["about:1234", PROMPT],
 
   // --- whitespace trimmed, not treated as content ---
   ["  example.com  ", URL_KIND, "https://example.com"],

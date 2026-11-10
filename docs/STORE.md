@@ -46,7 +46,7 @@ WHAT IT DOES
 • Saved prompts with fill-in-the-blanks, opened by typing "/".
 • Attach a text file — code, notes, CSV, JSON — and it goes with your question.
 • A clock, greeting and date; a weather card; a favourites bar.
-• Answers on the page, streamed from your own OpenAI key, with a daily token budget.
+• Answers on the page: free with Chrome's built-in AI, on your device, or streamed from your own OpenAI key with a daily token budget.
 • Light and dark, and a full keyboard model.
 
 WHAT IT DOESN'T DO

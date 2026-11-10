@@ -14,6 +14,90 @@ const ENDPOINT = "https://api.openai.com/v1";
 /** The host permission this needs. Optional, and requested when a key is saved. */
 export const API_ORIGIN = "https://api.openai.com/*";
 
+/** What every failure to reach api.openai.com says, instead of "Failed to fetch". */
+export const OFFLINE = "Couldn't reach OpenAI — check your connection.";
+
+/**
+ * The models Archer picks from on its own, cheapest-capable first. A key that
+ * can reach none of them still works — the Model card lists every chat model
+ * it can — but nobody should have to know a model name to get an answer.
+ */
+export const PREFERRED_MODELS = ["gpt-6-luna", "gpt-5.6-luna", "gpt-5.4-mini", "gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini"];
+
+// Everything /v1/models lists that cannot hold a chat: images, speech, search,
+// embeddings, the realtime and agent models, and the legacy completions ones.
+const NOT_CHAT =
+  /(^|[-.])(dall-e|image|audio|realtime|tts|transcribe|whisper|embedding|moderation|search|codex|computer-use|live|pro|deep-research|instruct|babbage|davinci|sora|cyber|rosalind)([-.]|$)/i;
+
+export const isChatModel = (id) =>
+  typeof id === "string" && /^(gpt-|o\d|chatgpt-)/i.test(id) && !NOT_CHAT.test(id);
+
+/**
+ * The model to use when the user has not chosen one: the first of
+ * {@link PREFERRED_MODELS} this key can reach, exact id first, then a dated
+ * snapshot of it ("gpt-4o-mini-2024-07-18"). Null when none is reachable.
+ */
+export function pickModel(ids) {
+  const have = new Set(ids);
+  for (const want of PREFERRED_MODELS) if (have.has(want)) return want;
+  for (const want of PREFERRED_MODELS) {
+    const snapshot = [...have].filter((id) => id.startsWith(want + "-") && /-\d{4}-\d{2}-\d{2}$/.test(id)).sort().at(-1);
+    if (snapshot) return snapshot;
+  }
+  return null;
+}
+
+/** Why a pasted string cannot be a key, before spending a request finding out. */
+export function keyProblem(key) {
+  const value = String(key ?? "").trim();
+  if (!value) return "Paste a key first.";
+  if (/\s/.test(value)) return "That has spaces in it — copy the key again, on its own.";
+  if (!value.startsWith("sk-")) return "That doesn't look like an OpenAI API key — they start with “sk-”.";
+  if (value.length < 20) return "That key looks cut short — copy it again.";
+  return null;
+}
+
+/**
+ * OpenAI's failure, in words someone without a Platform account can act on.
+ * Pure, so every message is tested; the API's own text is kept only where it
+ * is the most specific thing there is to say.
+ *
+ * @param {number} status
+ * @param {any} body  the parsed error body, if it was JSON
+ */
+export function explainFailure(status, body) {
+  const error = body?.error ?? {};
+  const detail = typeof error.message === "string" ? error.message : "";
+  const code = error.code ?? error.type ?? "";
+
+  if (status === 401) {
+    return "OpenAI didn't accept that key. Copy it again from platform.openai.com/api-keys — or keep using ChatGPT hand-off for free.";
+  }
+  if (status === 429 && /insufficient_quota|billing/i.test(`${code} ${detail}`)) {
+    return "Your OpenAI account has no credit yet. Add $5+ at platform.openai.com/settings/organization/billing — or keep using ChatGPT hand-off for free.";
+  }
+  if (status === 429) return "OpenAI is rate-limiting this key. Wait a moment and try again.";
+  if (status === 404 || code === "model_not_found") {
+    return "This key can't use that model. Pick another under Settings → Model.";
+  }
+  if (status === 403) return detail || "OpenAI refused this request for this key's project.";
+  if (status >= 500) return `OpenAI is having trouble right now (${status}). Try again in a moment.`;
+  return detail || `OpenAI returned an error (${status}).`;
+}
+
+/** A fetch that fails for want of a network says so, in words. Aborts pass through. */
+async function request(url, init) {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw offline(error);
+  }
+}
+
+function offline(error) {
+  return error?.name === "AbortError" ? error : new Error(OFFLINE, { cause: error });
+}
+
 export class SpendCapReached extends Error {
   constructor(used, cap) {
     super(`This session has used ${used} of its ${cap} token budget.`);
@@ -48,7 +132,7 @@ export function contentFor(prompt, images = []) {
  * @returns {Promise<{text: string, usage: {prompt: number, completion: number, total: number}}>}
  */
 export async function streamAnswer({ key, model, prompt, images = [], signal, onText }) {
-  const response = await fetch(`${ENDPOINT}/chat/completions`, {
+  const response = await request(`${ENDPOINT}/chat/completions`, {
     method: "POST",
     signal,
     headers: {
@@ -74,7 +158,13 @@ export async function streamAnswer({ key, model, prompt, images = [], signal, on
   let usage = { prompt: 0, completion: 0, total: 0 };
 
   for (;;) {
-    const { value, done } = await reader.read();
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      throw offline(error);
+    }
+    const { value, done } = chunk;
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
@@ -95,9 +185,9 @@ export async function streamAnswer({ key, model, prompt, images = [], signal, on
   return { text, usage };
 }
 
-/** Lists the models this key can actually reach, newest first. */
+/** Lists the chat models this key can actually reach, in name order. */
 export async function listModels(key, signal) {
-  const response = await fetch(`${ENDPOINT}/models`, {
+  const response = await request(`${ENDPOINT}/models`, {
     signal,
     headers: { Authorization: `Bearer ${key}` },
   });
@@ -106,23 +196,29 @@ export async function listModels(key, signal) {
   const body = await response.json();
   return (body.data ?? [])
     .map((m) => m.id)
-    .filter((id) => typeof id === "string")
+    .filter(isChatModel)
     .sort();
 }
 
+/**
+ * Checks a key against /v1/models and chooses a model for it, so a saved key
+ * answers with no further settings. Throws the explained failure.
+ *
+ * @returns {Promise<{models: string[], model: string|null}>}
+ */
+export async function checkKey(key, signal) {
+  const models = await listModels(key, signal);
+  return { models, model: pickModel(models) };
+}
+
 async function describeFailure(response) {
-  // OpenAI's error bodies are the useful part; the status alone sends people
-  // hunting. Fall back to the status when the body is not JSON.
-  let detail = "";
+  let body = null;
   try {
-    const body = await response.json();
-    detail = body?.error?.message ?? "";
+    body = await response.json();
   } catch {
     /* not JSON */
   }
-  if (response.status === 401) return detail || "That key was rejected. Check it and try again.";
-  if (response.status === 429) return detail || "Rate limited, or this key is out of quota.";
-  return detail || `The API returned ${response.status}.`;
+  return explainFailure(response.status, body);
 }
 
 // --- pure parts, so they can be tested without a network ---------------------

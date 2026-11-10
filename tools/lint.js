@@ -6,7 +6,7 @@
 // Deliberately dependency-free — see docs/ROADMAP.md "Engineering foundation".
 // Run: npm run lint
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join, extname } from "node:path";
@@ -25,19 +25,25 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 // Shipped = loaded by the extension page. Tooling is checked for syntax but is
 // exempt from the browser-facing rules below, since it never runs in a page.
 const SHIPPED_JS = [
+  "extension/background.js",
   "extension/newtab.js",
   "extension/options.js",
   "extension/src/analytics.js",
   "extension/src/answer.js",
   "extension/src/browsing.js",
+  "extension/src/builtin.js",
   "extension/src/classify.js",
   "extension/src/clock.js",
   "extension/src/conversations.js",
   "extension/src/dashboard.js",
+  "extension/src/extract.js",
   "extension/src/favorites.js",
   "extension/src/history.js",
   "extension/src/library.js",
+  "extension/src/markdown.js",
   "extension/src/modemenu.js",
+  "extension/src/onboarding.js",
+  "extension/src/pdf.js",
   "extension/src/router.js",
   "extension/src/rows.js",
   "extension/src/permissions.js",
@@ -45,6 +51,15 @@ const SHIPPED_JS = [
   "extension/src/weather.js",
   "extension/src/tlds.js",
 ];
+// A module missing from the list above skips every browser-facing rule below
+// without a word — extract.js did, for its whole life — so the list is checked
+// against the folder.
+for (const name of readdirSync(join(ROOT, "extension/src"))) {
+  if (name.endsWith(".js") && !SHIPPED_JS.includes(`extension/src/${name}`)) {
+    fail(`extension/src/${name}`, "not in SHIPPED_JS in tools/lint.js, so no shipped-code rule checks it");
+  }
+}
+
 const JS_FILES = [...SHIPPED_JS, "tools/lint.js", "tools/png.js", "tools/genicons.mjs"];
 
 for (const f of JS_FILES) {
@@ -124,6 +139,7 @@ if (manifest) {
   const refs = [
     manifest.chrome_url_overrides?.newtab,
     manifest.options_page,
+    manifest.background?.service_worker,
     ...Object.values(manifest.icons ?? {}),
   ].filter(Boolean);
 

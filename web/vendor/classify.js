@@ -14,6 +14,9 @@ const ANY_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const LOCALHOST = /^localhost(:\d{1,5})?([/?#]|$)/i;
 const IPV6 = /^\[[0-9a-f:.]+\](:\d{1,5})?([/?#]|$)/i;
 const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+// "example.com:8080" has the shape of a scheme too: "example.com" is a legal
+// scheme name. A run of digits ending the authority is a port, never a path.
+const HOST_PORT = /^[^:/?#@]+:(\d{1,5})(?=[/?#]|$)/;
 
 /**
  * @param {string} raw   what the user typed
@@ -42,7 +45,9 @@ export function classify(raw, force = null) {
   // Anything else carrying a scheme is not a promise we keep. javascript:,
   // data: and file: must never reach location.href — this page is a privileged
   // extension origin, so a javascript: URL would execute *here*.
-  if (ANY_SCHEME.test(value)) return { kind: PROMPT, text: value };
+  const port = HOST_PORT.exec(value)?.[1];
+  if (port === undefined && ANY_SCHEME.test(value)) return { kind: PROMPT, text: value };
+  if (port !== undefined && Number(port) > 65535) return { kind: PROMPT, text: value };
 
   const authority = value.split(/[/?#]/, 1)[0];
 

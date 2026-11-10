@@ -1,6 +1,6 @@
 # Archer — privacy policy
 
-Last updated: 2026-10-28. Applies to the Archer Chrome extension, every version.
+Last updated: 2026-11-10. Applies to the Archer Chrome extension, every version.
 
 This file is the canonical text. It is published at https://archertabs.app/privacy (`web/privacy.html`), which is the policy URL on the Chrome Web Store listing. Change the two together; `npm run lint` checks that their dates match.
 
@@ -25,6 +25,7 @@ of it leaves the device except where the next section says so.
 | What | Why | Kept until |
 |---|---|---|
 | Your chosen destination (Auto, Default engine, Google, ChatGPT, Claude, Perplexity or Answer here) | So a new tab opens the way you left it | You change it |
+| Where questions go when Archer can't answer them itself, and whether you have answered the first-run question | So the first new tab asks once, and never again | You change it |
 | Prompts you launch from the new tab | To offer them back as rows, and to label a conversation with the prompt that started it | The most recent 200; "Clear prompt history" in settings erases them |
 | Pinned and dismissed rows | So the list stays the way you arranged it | You unpin, or dismiss again |
 | Saved prompts | The `/slash` library | You delete them |
@@ -48,6 +49,8 @@ Only these, and only for the features you switch on.
 
 **Files you attach, with your prompt.** If you attach a file, the text Archer extracts from it goes with that one prompt: trimmed to fit the address for a hand-off to a site, or in full to OpenAI for "Answer here". Images are sent only with "Answer here". Attachments are held in memory for the next send and are never stored.
 
+**Nothing, for Chrome's built-in AI.** If your Chrome has its built-in AI model, "Answer here" can use it without a key. The model runs on your device: your prompt and attachments are handed to Chrome's own `LanguageModel` API and are not sent anywhere by Archer. The first use may make Chrome download the model, which is Chrome's download from Google, not a request carrying your prompt. [Chrome's built-in AI](https://developer.chrome.com/docs/ai/built-in).
+
 **Your prompt and your API key, to OpenAI** — only if you have entered a key and chosen "Answer
 here". The request goes from your browser straight to `api.openai.com`. It is not proxied, mirrored
 or logged anywhere else, and the key is never transmitted to anyone but OpenAI.
@@ -67,7 +70,7 @@ Archer's use of information received from Chrome APIs adheres to the Chrome Web 
 
 ## Permissions, and what each is for
 
-Archer asks for two permissions when you install it:
+Archer asks for two permissions when you install it. It also runs a small background script, which does nothing but record, when it is first installed, that the new tab should ask where questions go:
 
 - **`search`** — to hand a query to your default search engine through Chrome's own API. This is
   also what the Chrome Web Store requires of a new tab page, so that your choice of search provider

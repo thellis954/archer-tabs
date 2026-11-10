@@ -209,6 +209,14 @@
     <!-- Attachments are chips, not text pasted into the box. An <input type=text>
          strips newlines, so inlining a file destroyed it; and a chip can be
          removed, which inlined text cannot. -->
+    <!-- One line, only when the mode cannot do what it says: Answer here with
+         nothing on this device or this key to answer. Says where the question
+         goes instead, because a silent change of destination reads as a bug. -->
+    <p class="modeNote" id="modeNote" role="status" hidden>
+      <span id="modeNoteText"></span>
+      <button type="button" class="linkButton" id="modeNoteSetup">Set up Answer here</button>
+    </p>
+
     <ul class="attachments" id="attachments" aria-label="Attached files"></ul>
     <p class="attachStatus" id="attachStatus" hidden role="status"></p>
 
@@ -225,11 +233,12 @@
       </li>
     </template>
 
-    <!-- The streamed answer. Text only: everything in here comes back from the
-         API, and is written with textContent. -->
+    <!-- The streamed answer. Everything in here comes back from a model, so
+         src/markdown.js builds it with createElement and textContent — no
+         markup is ever parsed from it, and only http(s) links survive. -->
     <section class="answer" id="answer" hidden>
       <p class="answerStatus" id="answerStatus" role="status"></p>
-      <p class="answerText" id="answerText"></p>
+      <div class="answerText" id="answerText"></div>
       <p class="answerMeta" id="answerMeta"></p>
       <div class="answerActions">
         <button type="button" id="stopAnswer" hidden>Stop</button>
@@ -396,6 +405,46 @@
          reason the row markup is: nothing in src/ can turn text into an
          element. src/dashboard.js clones one of these by id. -->
 
+    <!-- Asked once, on a new profile: src/onboarding.js decides when. An update
+       never shows it, so nobody who already chose is asked again. Any way of
+       closing it keeps the selected choice, which starts on ChatGPT. -->
+    <dialog class="picker" id="picker" aria-labelledby="pickerTitle" aria-describedby="pickerLede">
+      <form method="dialog" class="pickerForm">
+        <h2 class="pickerTitle" id="pickerTitle">Where should questions go?</h2>
+        <p class="pickerLede" id="pickerLede">Addresses always open as addresses. Anything else goes where you choose here — you can change it any time in Settings.</p>
+
+        <fieldset class="pickerChoices">
+          <legend class="visuallyHidden">Where questions go</legend>
+          <label class="pickerChoice">
+            <input type="radio" name="destination" value="chatgpt" checked>
+            <span class="pickerName">ChatGPT <span class="pickerBadge">Default</span></span>
+            <span class="pickerHint">Opens chatgpt.com with your question filled in. Free with a ChatGPT account, or without one.</span>
+          </label>
+          <label class="pickerChoice">
+            <input type="radio" name="destination" value="claude">
+            <span class="pickerName">Claude</span>
+            <span class="pickerHint">Opens claude.ai with your question filled in.</span>
+          </label>
+          <label class="pickerChoice">
+            <input type="radio" name="destination" value="perplexity">
+            <span class="pickerName">Perplexity</span>
+            <span class="pickerHint">Opens perplexity.ai with your question filled in.</span>
+          </label>
+          <label class="pickerChoice">
+            <input type="radio" name="destination" value="answer">
+            <span class="pickerName">Answer here</span>
+            <span class="pickerHint" id="pickerAnswerHint">Answered on this page — by Chrome's built-in AI where your computer supports it, or with your own OpenAI key.</span>
+          </label>
+        </fieldset>
+
+        <p class="pickerNote">Web searches keep going to Chrome's default search engine: choose <strong>Auto</strong> or <strong>Default engine</strong> from the menu at the top whenever you want them.</p>
+
+        <div class="pickerActions">
+          <button type="submit" class="quiet" value="auto" id="pickerDefault">Use Chrome's default engine for everything</button>
+          <button type="submit" class="primary" value="choose" id="pickerDone">Done</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 
   <script type="module" src="newtab.js"></script>

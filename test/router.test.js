@@ -11,7 +11,14 @@ import {
   GOOGLE,
   CHATGPT,
   SEARCH_MODE,
+  ANSWER,
+  ANSWER_MODE,
+  CLAUDE,
+  PERPLEXITY,
   placeholderFor,
+  handoffURL,
+  targetName,
+  fallbackFor,
 } from "../extension/src/router.js";
 
 // [input, mode, force, expected action, expected url or text]
@@ -138,4 +145,62 @@ test("Google mode cannot be talked into a non-http(s) url either", () => {
       if (verdict.url) assert.match(verdict.url, /^https?:\/\//i, `${raw} force:${force}`);
     }
   }
+});
+
+// --- answer mode with nothing to answer (QA P2-2) ---------------------------------
+//
+// It used to become Auto, so the question went to the default engine with no
+// word said. It now goes to the hand-off the user chose, and the page says so.
+
+test("answer mode answers on the page when something can answer", () => {
+  assert.deepEqual(route("what is a nock", { mode: ANSWER_MODE, canAnswer: true }), {
+    action: ANSWER,
+    text: "what is a nock",
+  });
+});
+
+test("answer mode with nothing to answer hands off to ChatGPT by default", () => {
+  const verdict = route("what is a nock", { mode: ANSWER_MODE, canAnswer: false });
+  assert.equal(verdict.action, ASK);
+  assert.equal(verdict.url, "https://chatgpt.com/?q=what%20is%20a%20nock");
+});
+
+test("answer mode falls back to the hand-off the user picked", () => {
+  assert.equal(route("q", { mode: ANSWER_MODE, fallback: CLAUDE }).url, "https://claude.ai/new?q=q");
+  assert.equal(route("q", { mode: ANSWER_MODE, fallback: PERPLEXITY }).url, "https://www.perplexity.ai/search?q=q");
+});
+
+test("answer mode never falls back to a silent search, whatever the setting says", () => {
+  for (const fallback of [AUTO, SEARCH_MODE, ANSWER_MODE, "nonsense", undefined]) {
+    assert.equal(route("q", { mode: ANSWER_MODE, fallback }).action, ASK, String(fallback));
+  }
+});
+
+test("answer mode with nothing to answer still navigates a URL", () => {
+  assert.equal(route("example.com:8080", { mode: ANSWER_MODE }).url, "https://example.com:8080");
+});
+
+test("the placeholder names the fallback when answer mode cannot answer", () => {
+  assert.equal(placeholderFor(ANSWER_MODE, false), "Ask ChatGPT, or type a URL");
+  assert.equal(placeholderFor(ANSWER_MODE, false, CLAUDE), "Ask Claude, or type a URL");
+  assert.equal(placeholderFor(ANSWER_MODE, true), "Ask, and the answer appears here");
+});
+
+test("fallbackFor only accepts a hand-off", () => {
+  assert.equal(fallbackFor(CLAUDE), CLAUDE);
+  assert.equal(fallbackFor(AUTO), CHATGPT);
+  assert.equal(fallbackFor(GOOGLE), GOOGLE);
+});
+
+test("handoffURL builds the same link route() does, and refuses other modes", () => {
+  assert.equal(handoffURL(CHATGPT, "  a b "), "https://chatgpt.com/?q=a%20b");
+  assert.equal(handoffURL(AUTO, "a"), null);
+  assert.equal(handoffURL(ANSWER_MODE, "a"), null);
+});
+
+test("targetName names each destination", () => {
+  assert.equal(targetName(CHATGPT), "ChatGPT");
+  assert.equal(targetName(CLAUDE), "Claude");
+  assert.equal(targetName(PERPLEXITY), "Perplexity");
+  assert.equal(targetName(AUTO), "your search engine");
 });

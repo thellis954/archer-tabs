@@ -43,6 +43,28 @@ const TARGETS = {
 
 export const isHandoff = (mode) => Object.hasOwn(TARGETS, mode);
 
+/** The destination's own name, for sentences like "Sent to Claude instead." */
+const NAMES = {
+  [GOOGLE]: "Google",
+  [CHATGPT]: "ChatGPT",
+  [CLAUDE]: "Claude",
+  [PERPLEXITY]: "Perplexity",
+};
+
+export const targetName = (mode) => NAMES[mode] ?? "your search engine";
+
+/** The `?q=` link for a hand-off mode, or null for any other mode. */
+export const handoffURL = (mode, text) =>
+  isHandoff(mode) ? TARGETS[mode] + encodeURIComponent(String(text ?? "").trim()) : null;
+
+/**
+ * Where answer mode sends a question when nothing can answer it on the page.
+ * Only a hand-off qualifies: falling back to the default engine is the silent
+ * search QA reported, and it is exactly what this setting exists to prevent.
+ */
+export const DEFAULT_FALLBACK = CHATGPT;
+export const fallbackFor = (mode) => (isHandoff(mode) ? mode : DEFAULT_FALLBACK);
+
 /**
  * What the search box should say in each mode.
  *
@@ -61,21 +83,23 @@ const PLACEHOLDERS = {
   [ANSWER_MODE]: "Ask, and the answer appears here",
 };
 
-export const placeholderFor = (mode, canAnswer = true) =>
-  PLACEHOLDERS[mode === ANSWER_MODE && !canAnswer ? AUTO : mode] ?? PLACEHOLDERS[AUTO];
+export const placeholderFor = (mode, canAnswer = true, fallback = DEFAULT_FALLBACK) =>
+  PLACEHOLDERS[mode === ANSWER_MODE && !canAnswer ? fallbackFor(fallback) : mode] ?? PLACEHOLDERS[AUTO];
 
 /**
  * @param {string} raw   what the user typed
- * @param {{mode?: string, force?: "url"|"prompt"|null, canAnswer?: boolean}} [options]
- * @param options.canAnswer  whether an API key is set. Answer mode degrades to
- *                           a plain search without one, rather than failing.
+ * @param {{mode?: string, force?: "url"|"prompt"|null, canAnswer?: boolean, fallback?: string}} [options]
+ * @param options.canAnswer  whether anything can answer on the page — an API key
+ *                           with a model, or Chrome's built-in model.
+ * @param options.fallback   the hand-off answer mode uses when nothing can.
  * @returns {{action: string, url?: string, text?: string}}
  */
-export function route(raw, { mode = AUTO, force = null, canAnswer = false } = {}) {
-  // Answer mode with no key is not an error state — the key can be cleared long
-  // after the mode was chosen — so it quietly becomes the mode it would have
-  // been. docs/ROADMAP.md Phase 4: "degrades cleanly to Phase 2 navigation".
-  const effectiveMode = mode === ANSWER_MODE && !canAnswer ? AUTO : mode;
+export function route(raw, { mode = AUTO, force = null, canAnswer = false, fallback = DEFAULT_FALLBACK } = {}) {
+  // Answer mode with nothing to answer is not an error state — the key can be
+  // cleared long after the mode was chosen — so the question goes to the
+  // hand-off the user picked for that case. It used to become Auto, which sent
+  // it to the default engine without a word (QA P2-2); newtab.js now says so.
+  const effectiveMode = mode === ANSWER_MODE && !canAnswer ? fallbackFor(fallback) : mode;
 
   // Search mode means "I am searching, not navigating", so it suppresses URL
   // detection entirely — it is the sticky form of ⌘+Enter. An explicit
@@ -93,7 +117,7 @@ export function route(raw, { mode = AUTO, force = null, canAnswer = false } = {}
     // button would not be.
     return {
       action: ASK,
-      url: TARGETS[effectiveMode] + encodeURIComponent(verdict.text),
+      url: handoffURL(effectiveMode, verdict.text),
       text: verdict.text,
     };
   }

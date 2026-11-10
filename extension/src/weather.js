@@ -78,13 +78,24 @@ const round = (value) => (Number.isFinite(Number(value)) ? Math.round(Number(val
 export const isStale = (cached, now = Date.now()) =>
   !cached || !Number.isFinite(cached.at) || now - cached.at > CACHE_MS;
 
+/** What a weather request that never reached the service says. */
+export const WEATHER_OFFLINE = "Couldn't reach the weather service — check your connection.";
+
+async function request(url, signal) {
+  try {
+    return await fetch(url, { signal });
+  } catch (error) {
+    throw error?.name === "AbortError" ? error : new Error(WEATHER_OFFLINE, { cause: error });
+  }
+}
+
 /**
  * Resolves a typed place name to coordinates.
  * @returns {Promise<{name: string, latitude: number, longitude: number}>}
  */
 export async function findPlace(query, signal) {
   const url = `${GEOCODE}?name=${encodeURIComponent(query)}&count=1&format=json`;
-  const response = await fetch(url, { signal });
+  const response = await request(url, signal);
   if (!response.ok) throw new Error(`Could not look that place up (${response.status}).`);
 
   const body = await response.json();
@@ -102,7 +113,7 @@ export async function fetchWeather({ latitude, longitude, name, unit = "celsius"
     `&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min` +
     `&temperature_unit=${encodeURIComponent(unit)}&timezone=auto&forecast_days=1`;
 
-  const response = await fetch(url, { signal });
+  const response = await request(url, signal);
   if (!response.ok) throw new Error(`The forecast service returned ${response.status}.`);
 
   return parseForecast(await response.json(), name, unit);
