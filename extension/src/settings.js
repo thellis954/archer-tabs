@@ -9,9 +9,12 @@
 //
 // Nothing here ever leaves the device.
 
-import { AUTO, MODES } from "./router.js";
+import { AUTO, MODES, DEFAULT_FALLBACK, fallbackFor } from "./router.js";
+import { installPatch, choicePatch, DONE } from "./onboarding.js";
 
 const KEY_MODE = "mode";
+const KEY_FALLBACK = "fallbackMode";
+const KEY_ONBOARDING = "onboarding";
 const KEY_NUDGE = "engineNudgeDismissed";
 const KEY_LAUNCHES = "launches";
 const KEY_PINNED = "pinned";
@@ -39,16 +42,24 @@ const fallback = {
 
 const store = () => globalThis.chrome?.storage?.local ?? fallback;
 
-/** @returns {Promise<{mode: string, nudgeDismissed: boolean}>} */
+/** @returns {Promise<{mode: string, fallback: string, onboarding: string, nudgeDismissed: boolean}>} */
 export async function loadSettings() {
-  // Auto on a fresh install: typed questions go through chrome.search to the
-  // user's own default engine (Chrome Web Store policy). Named destinations
-  // stay one click away on the pills; no pill is pressed until the user picks.
-  const raw = await store().get({ [KEY_MODE]: AUTO, [KEY_NUDGE]: false });
+  // Auto until the user says otherwise: typed questions go through
+  // chrome.search to their own default engine (Chrome Web Store policy). A new
+  // profile is asked where questions should go the first time it opens a tab;
+  // nothing is routed anywhere else before it answers.
+  const raw = await store().get({
+    [KEY_MODE]: AUTO,
+    [KEY_NUDGE]: false,
+    [KEY_FALLBACK]: DEFAULT_FALLBACK,
+    [KEY_ONBOARDING]: "",
+  });
   return {
     // A mode written by a newer version, or a corrupted one, falls back rather
     // than putting the page in a state with no routing rule.
     mode: MODES.includes(raw[KEY_MODE]) ? raw[KEY_MODE] : AUTO,
+    fallback: fallbackFor(raw[KEY_FALLBACK]),
+    onboarding: typeof raw[KEY_ONBOARDING] === "string" ? raw[KEY_ONBOARDING] : "",
     nudgeDismissed: raw[KEY_NUDGE] === true,
   };
 }
@@ -56,6 +67,31 @@ export async function loadSettings() {
 export async function saveMode(mode) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode: ${mode}`);
   await store().set({ [KEY_MODE]: mode });
+}
+
+/** Where Answer here sends a question it cannot answer. Hand-offs only. */
+export async function saveFallback(mode) {
+  await store().set({ [KEY_FALLBACK]: fallbackFor(mode) });
+}
+
+/** Called from the service worker's onInstalled: decides whether to ask. */
+export async function recordInstall(reason) {
+  const stored = await store().get({ [KEY_ONBOARDING]: "" });
+  const patch = installPatch(reason, stored);
+  if (patch) await store().set(patch);
+  return patch;
+}
+
+/** Answers the first-run question. Returns the mode now in force. */
+export async function finishOnboarding(choice) {
+  const patch = choicePatch(choice);
+  await store().set(patch);
+  return patch.mode;
+}
+
+/** For a picker closed some other way — another tab answered it, say. */
+export async function skipOnboarding() {
+  await store().set({ [KEY_ONBOARDING]: DONE });
 }
 
 export async function dismissEngineNudge() {
