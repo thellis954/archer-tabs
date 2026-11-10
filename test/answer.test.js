@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { splitEvents, parseFrame, estimateCost, checkCap } from "../extension/src/answer.js";
-import { route, ANSWER, SEARCH, NAVIGATE, ANSWER_MODE } from "../extension/src/router.js";
+import { route, ANSWER, ASK, NAVIGATE, ANSWER_MODE } from "../extension/src/router.js";
 import { dayStamp } from "../extension/src/settings.js";
 
 // --- SSE framing -------------------------------------------------------------
@@ -118,9 +118,9 @@ test("answer mode still opens a URL as a URL", () => {
   assert.equal(route("example.com", { mode: ANSWER_MODE, canAnswer: true }).action, NAVIGATE);
 });
 
-test("answer mode with no key degrades to a search rather than failing", () => {
+test("answer mode with nothing to answer hands off rather than searching silently", () => {
   const verdict = route("what is a nock", { mode: ANSWER_MODE, canAnswer: false });
-  assert.equal(verdict.action, SEARCH);
+  assert.equal(verdict.action, ASK);
   assert.equal(verdict.text, "what is a nock");
 });
 
