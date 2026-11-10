@@ -9,8 +9,14 @@ import {
   AUTO,
   GOOGLE,
   SEARCH_MODE,
+  ANSWER_MODE,
   MODES,
+  DEFAULT_FALLBACK,
   placeholderFor,
+  handoffURL,
+  targetName,
+  fallbackFor,
+  isHandoff,
 } from "./src/router.js";
 import {
   loadSettings,
@@ -24,9 +30,21 @@ import {
   loadAnswerSettings,
   readSpend,
   addSpend,
+  finishOnboarding,
 } from "./src/settings.js";
 import { readLibrary } from "./src/settings.js";
 import { streamAnswer, estimateCost, checkCap } from "./src/answer.js";
+import {
+  builtinAvailability,
+  chooseEngine,
+  streamBuiltin,
+  describeBuiltinFailure,
+  needsDownload,
+  percent,
+  UNAVAILABLE,
+} from "./src/builtin.js";
+import { needsPicker, DEFAULT_CHOICE } from "./src/onboarding.js";
+import { render as renderMarkdown } from "./src/markdown.js";
 import { createModeMenu } from "./src/modemenu.js";
 import { buildRows, filterRows, LINK_KINDS } from "./src/conversations.js";
 import { hasHistoryAccess, requestHistoryAccess, readConversationVisits } from "./src/history.js";
@@ -56,7 +74,13 @@ const noMatches = document.getElementById("noMatches");
 // --- mode ---------------------------------------------------------------------
 
 let mode = AUTO;
-/** Whether an API key is set. Answer mode degrades to Auto without one. */
+/** Where Answer here sends a question when nothing can answer it. */
+let fallback = DEFAULT_FALLBACK;
+/** Who answers on this page: "openai", "builtin", or null for nobody. */
+let engine = null;
+/** Chrome's built-in model, as availability() last reported it. */
+let builtin = UNAVAILABLE;
+/** Whether anything can answer here. Answer mode hands off without it. */
 let canAnswer = false;
 
 const menu = createModeMenu({
@@ -69,7 +93,7 @@ const menu = createModeMenu({
     syncTargets();
     // Picking a mode that needs setting up should take you to the setting up,
     // not silently do something else.
-    if (next === "answer" && !canAnswer) {
+    if (next === ANSWER_MODE && !canAnswer) {
       openSettings();
       return;
     }
@@ -80,18 +104,72 @@ const menu = createModeMenu({
 // The mode is read from storage asynchronously, but the user can type and hit
 // Enter before that resolves. Submits await this rather than racing it, so the
 // first query of a session is routed by the mode the user actually chose.
-const ready = Promise.all([loadSettings(), loadAnswerSettings()]).then(([settings, answer]) => {
-  mode = settings.mode;
-  nudgeDismissed = settings.nudgeDismissed;
-  menu.setMode(settings.mode);
-  syncTargets();
+const ready = Promise.all([loadSettings(), loadAnswerSettings(), builtinAvailability()]).then(
+  ([settings, answer, state]) => {
+    mode = settings.mode;
+    fallback = settings.fallback;
+    nudgeDismissed = settings.nudgeDismissed;
+    builtin = state;
+    menu.setMode(settings.mode);
+    setEngine(answer);
+    if (needsPicker(settings)) showPicker();
+  },
+);
 
-  canAnswer = Boolean(answer.apiKey && answer.model);
-  if (!canAnswer) {
-    document.getElementById("answerModeHint").textContent =
-      "Answer on this page with your own OpenAI key. Choose this to set one up.";
-  }
+/** Re-decides who answers here, and says so everywhere that depends on it. */
+function setEngine(answer) {
+  engine = chooseEngine({ apiKey: answer.apiKey, model: answer.model, builtin });
+  canAnswer = engine !== null;
+  document.getElementById("answerModeHint").textContent =
+    engine === "openai"
+      ? "URLs open. Anything else is answered on this page, using your own API key."
+      : engine === "builtin"
+        ? "URLs open. Anything else is answered on this page by Chrome's built-in AI — free, on this device."
+        : "Answer on this page with Chrome's built-in AI or your own OpenAI key. Choose this to set one up.";
+  document.getElementById("continueInChatGPT").textContent = `Continue in ${targetName(fallback)}`;
+  syncTargets();
+}
+
+// --- first run ---------------------------------------------------------------------
+
+const picker = document.getElementById("picker");
+
+/** Where should questions go? Asked once, on a new profile — see src/onboarding.js. */
+function showPicker() {
+  if (picker.open) return;
+  document.getElementById("pickerAnswerHint").textContent =
+    engine === "openai"
+      ? "Answered on this page, with your OpenAI key."
+      : builtin === "available"
+        ? "Answered on this page by Chrome's built-in AI — free, and nothing leaves this computer."
+        : needsDownload(builtin)
+          ? "Answered on this page by Chrome's built-in AI — free and on this computer, after a one-time download by Chrome."
+          : "Answered on this page with your own OpenAI key. Chrome's built-in AI isn't available on this computer, so until a key is set, questions go to ChatGPT.";
+  needsPickerAnswer = true;
+  picker.returnValue = "";
+  picker.showModal();
+  document.getElementById("pickerDone").focus();
+}
+
+// Every way out of the dialog — Done, the default-engine link, Escape — keeps
+// a choice, so the question is never asked twice and never left half-answered.
+picker.addEventListener("close", async () => {
+  if (!needsPickerAnswer) return;
+  needsPickerAnswer = false;
+  const chosen = picker.returnValue === "auto"
+    ? AUTO
+    : picker.querySelector('input[name="destination"]:checked')?.value ?? DEFAULT_CHOICE;
+  const next = await finishOnboarding(chosen);
+  mode = next;
+  if (isHandoff(next)) fallback = next;
+  menu.setMode(next);
+  setEngine(await loadAnswerSettings());
+  input.focus();
 });
+picker.addEventListener("cancel", () => {
+  picker.returnValue = "choose";
+});
+let needsPickerAnswer = false;
 
 // --- rows ---------------------------------------------------------------------
 
@@ -162,13 +240,30 @@ let nudgeDismissed = false;
 function syncTargets() {
   for (const pill of targets) pill.setAttribute("aria-pressed", String(pill.dataset.mode === mode));
   // The box says where the next Enter goes. Nothing else on the page does.
-  input.placeholder = placeholderFor(mode, canAnswer);
+  input.placeholder = placeholderFor(mode, canAnswer, fallback);
+  syncModeNote();
+  if (attachments.length) paintAttachments();
   // The hint is about the default engine, so it only makes sense in the two
   // modes that use one. In Google mode "prompts go to your default search
   // engine" is simply untrue, and a page that contradicts its own buttons
   // teaches you to stop reading it.
   nudge.hidden = nudgeDismissed || !(mode === AUTO || mode === SEARCH_MODE);
 }
+
+const modeNote = document.getElementById("modeNote");
+
+/** One visible line when Answer here cannot answer: says where questions go instead. */
+function syncModeNote() {
+  const show = mode === ANSWER_MODE && !canAnswer;
+  modeNote.hidden = !show;
+  if (show) {
+    document.getElementById("modeNoteText").textContent =
+      `Answer here needs Chrome's built-in AI, which this computer doesn't have, or your own OpenAI key — ` +
+      `questions go to ${targetName(fallback)} until then.`;
+  }
+}
+
+document.getElementById("modeNoteSetup").addEventListener("click", openSettings);
 
 async function refreshRows() {
   const [granted, tiles, closedTabs] = await Promise.all([
@@ -362,6 +457,12 @@ const MAX_ATTACH_BYTES = 10 * 1024 * 1024;
  */
 const HANDOFF_BUDGET = 4000;
 
+/**
+ * Chrome's built-in model has a small context window — a few thousand tokens —
+ * and refuses a prompt past it outright, so attached text is trimmed to fit.
+ */
+const BUILTIN_BUDGET = 9000;
+
 /** In-memory only: an attachment is for the next send, not a saved document. */
 let attachments = [];
 
@@ -434,13 +535,28 @@ function paintAttachments() {
   }
 
   const images = attachments.filter((f) => f.dataUrl).length;
-  if (images && !canAnswer) {
-    // An image can only be *sent* on the Answer-here path, which posts a request
-    // body. A hand-off puts the prompt in a URL, and a URL cannot carry a photo.
-    say("Set up Answer here in settings to send images — a website hand-off can only carry text.");
+  // An image can only be *sent* by Answer here with an OpenAI key, which posts
+  // a request body. A hand-off puts the prompt in a URL, which cannot carry a
+  // photo, and Chrome's built-in model reads text only. This used to warn only
+  // when no key was set, so with a key, ChatGPT mode dropped images silently.
+  const warning = images ? imageWarning() : "";
+  if (warning) {
+    say(warning);
   } else {
     say(`Attached. Type your question — the ${attachments.length === 1 ? "file goes" : "files go"} with it.`);
   }
+}
+
+/** Why an attached image will not be sent in the current mode, or "" if it will. */
+function imageWarning() {
+  const answering = mode === ANSWER_MODE && canAnswer;
+  if (answering && engine === "openai") return "";
+  if (answering) {
+    return "Chrome's built-in AI reads text only, so the image stays behind. Add an OpenAI key in settings to ask about images.";
+  }
+  const where = mode === ANSWER_MODE ? fallback : mode;
+  const place = isHandoff(where) ? targetName(where) : "a search engine";
+  return `Images can't go to ${place} — a link carries text only. Use Answer here with an OpenAI key to ask about an image.`;
 }
 
 /** "Excel · 42 rows" is more use on a chip than "18 KB". */
@@ -543,6 +659,20 @@ globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
       syncTargets();
     }
   }
+  if ("fallbackMode" in changes) fallback = fallbackFor(changes.fallbackMode.newValue);
+  if ("apiKey" in changes || "model" in changes || "fallbackMode" in changes) {
+    loadAnswerSettings().then(setEngine);
+  }
+  if ("onboarding" in changes) {
+    const next = changes.onboarding.newValue;
+    // The service worker writes "pending" moments after install, often after
+    // the first tab has already painted; another tab answering it closes it here.
+    if (needsPicker({ onboarding: next })) ready.then(showPicker);
+    else if (picker.open) {
+      needsPickerAnswer = false;
+      picker.close();
+    }
+  }
 });
 
 document.getElementById("enableHistory").addEventListener("click", async () => {
@@ -616,7 +746,7 @@ input.addEventListener("keydown", (event) => {
         return;
       }
       const force = event.metaKey || event.ctrlKey ? PROMPT : event.shiftKey ? URL_KIND : null;
-      go(input.value, force);
+      submit(force);
     }
   }
 });
@@ -641,37 +771,74 @@ function moveActive(delta) {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  go(input.value, null);
+  submit(null);
 });
+
+/**
+ * Enter, or the send button.
+ *
+ * A `/name` in the box is a search of the prompt library, not a question, so
+ * Enter with no row highlighted uses the best match rather than sending the
+ * literal "/tr" somewhere (QA P2-3). With nothing matching it says so and
+ * sends nothing; ⌘/Ctrl+Enter still sends exactly what was typed.
+ */
+function submit(force) {
+  if (force === null && parseSlash(input.value)) {
+    const best = visible.find((row) => row.kind === "template");
+    if (best) {
+      useTemplate(best.template);
+      return;
+    }
+    say(`No saved prompt matches “${input.value.trim()}”. Press ${MOD_KEY}+Enter to send it as typed.`);
+    return;
+  }
+  go(input.value, force);
+}
+
+const MOD_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+
+/**
+ * What an attachment sent with an empty box asks. Pressing send with only a
+ * file attached used to do nothing at all (QA P2-4).
+ */
+function defaultInstruction() {
+  const images = attachments.filter((f) => f.dataUrl).length;
+  if (images === attachments.length) return images === 1 ? "Describe this image." : "Describe these images.";
+  return attachments.length === 1 ? "Summarize this." : "Summarize these files.";
+}
 
 async function go(raw, force) {
   await ready;
-  const verdict = route(raw, { mode, force, canAnswer });
+  if (!String(raw ?? "").trim() && attachments.length) raw = defaultInstruction();
+  const verdict = route(raw, { mode, force, canAnswer, fallback });
 
   // Attachments ride with a prompt, never with a URL — "open this address" has
   // nothing to attach to.
   if (attachments.length && (verdict.action === SEARCH || verdict.action === ANSWER || verdict.action === ASK)) {
-    const budget = verdict.action === ANSWER ? Infinity : HANDOFF_BUDGET;
+    const budget = verdict.action !== ANSWER ? HANDOFF_BUDGET : engine === "builtin" ? BUILTIN_BUDGET : Infinity;
     const composed = composePrompt(raw, { budget });
-
+    // Said after the chips are cleared below, or paintAttachments() wipes it.
+    const notes = [];
     if (composed.trimmed) {
-      say(
-        "The attachment was trimmed to fit the address bar. Set up Answer here in settings to send " +
-          "the whole file.",
+      notes.push(
+        verdict.action === ANSWER
+          ? "The attachment was trimmed to what Chrome's built-in AI can read at once. An OpenAI key sends the whole file."
+          : "The attachment was trimmed to fit the address bar. Set up Answer here in settings to send the whole file.",
       );
     }
-    // A hand-off is a URL, and a URL cannot carry a picture. Better to say the
-    // image is being left behind than to let it disappear between two screens.
-    if (verdict.action !== ANSWER && attachments.some((f) => f.dataUrl)) {
-      say("Images can only be sent by Answer here — a website hand-off carries text only.");
-    }
-    const withFiles = route(composed.text, { mode, force: PROMPT, canAnswer });
-    // Read off before the list is cleared: only Answer here can carry them, and
-    // only because it posts a body rather than putting the prompt in a URL.
-    const images = withFiles.action === ANSWER ? attachments.filter((f) => f.dataUrl).map((f) => f.dataUrl) : [];
+    // Better to say the image is being left behind than to let it disappear
+    // between two screens.
+    const warning = attachments.some((f) => f.dataUrl) ? imageWarning() : "";
+    if (warning) notes.push(warning);
+    const withFiles = route(composed.text, { mode, force: PROMPT, canAnswer, fallback });
+    // Read off before the list is cleared: only Answer here with a key can
+    // carry them, because it posts a body rather than putting the prompt in a URL.
+    const images =
+      withFiles.action === ANSWER && engine === "openai" ? attachments.filter((f) => f.dataUrl).map((f) => f.dataUrl) : [];
     await recordLaunch(raw.trim() || attachments[0].name);
     attachments = [];
     paintAttachments();
+    if (notes.length) say(notes.join(" "));
 
     if (withFiles.action === ANSWER) return void (await answerHere(withFiles.text, images));
     if (withFiles.action === ASK) return void navigate(withFiles.url);
@@ -715,15 +882,40 @@ const stopButton = document.getElementById("stopAnswer");
 let inFlight = null;
 let lastPrompt = "";
 
+/** Paints the answer so far as Markdown, at most once a frame while it streams. */
+function answerPainter() {
+  let text = "";
+  let queued = false;
+  const paint = () => {
+    queued = false;
+    renderMarkdown(answerText, text);
+  };
+  return {
+    append(chunk) {
+      text += chunk;
+      if (!queued) {
+        queued = true;
+        requestAnimationFrame(paint);
+      }
+    },
+    flush() {
+      paint();
+      return text;
+    },
+  };
+}
+
 async function answerHere(prompt, images = []) {
   const config = await loadAnswerSettings();
   lastPrompt = prompt;
 
   answerPanel.hidden = false;
-  answerText.textContent = "";
+  answerText.replaceChildren();
   answerMeta.textContent = "";
   answerStatus.textContent = "Answering…";
   stopButton.hidden = false;
+
+  if (engine === "builtin") return answerOnDevice(prompt);
 
   const spend = await readSpend();
   const cap = checkCap(spend.tokens, config.tokenCap);
@@ -739,6 +931,7 @@ async function answerHere(prompt, images = []) {
   }
 
   inFlight = new AbortController();
+  const painter = answerPainter();
 
   try {
     const { usage } = await streamAnswer({
@@ -747,15 +940,19 @@ async function answerHere(prompt, images = []) {
       prompt,
       images,
       signal: inFlight.signal,
-      // Appending a text node rather than reassigning textContent keeps the
-      // already-painted text on screen instead of reflowing it every frame.
-      onText: (chunk) => answerText.append(chunk),
+      onText: (chunk) => painter.append(chunk),
     });
 
-    answerStatus.textContent = "Answer complete.";
+    const text = painter.flush();
     const total = await addSpend(usage.total);
-    answerMeta.textContent = describeUsage(usage, total, config);
+    if (text.trim()) {
+      answerStatus.textContent = "Answer complete.";
+      answerMeta.textContent = describeUsage(usage, total, config);
+    } else {
+      emptyAnswer();
+    }
   } catch (error) {
+    painter.flush();
     if (error.name === "AbortError") {
       answerStatus.textContent = "Stopped.";
     } else {
@@ -766,6 +963,54 @@ async function answerHere(prompt, images = []) {
     stopButton.hidden = true;
     inFlight = null;
   }
+}
+
+/** Chrome's built-in model: no key, no request, nothing leaves the device. */
+async function answerOnDevice(prompt) {
+  inFlight = new AbortController();
+  const painter = answerPainter();
+  const downloading = needsDownload(builtin);
+  if (downloading) answerStatus.textContent = "Getting Chrome's built-in AI ready…";
+
+  try {
+    await streamBuiltin({
+      prompt,
+      signal: inFlight.signal,
+      onProgress(loaded) {
+        // Chrome reports 0 and 1 even for a model already on disk; only a real
+        // download is worth narrating.
+        if (downloading) answerStatus.textContent = `Downloading Chrome's built-in AI — ${percent(loaded)}%`;
+      },
+      onText(chunk) {
+        if (answerStatus.textContent !== "Answering…") answerStatus.textContent = "Answering…";
+        painter.append(chunk);
+      },
+    });
+    builtin = "available";
+    if (painter.flush().trim()) {
+      answerStatus.textContent = "Answer complete.";
+      answerMeta.textContent = "Answered on this device by Chrome's built-in AI. Nothing was sent anywhere.";
+    } else {
+      emptyAnswer();
+    }
+  } catch (error) {
+    painter.flush();
+    if (error?.name === "AbortError") {
+      answerStatus.textContent = "Stopped.";
+    } else {
+      answerStatus.textContent = "That didn't work.";
+      answerMeta.textContent = describeBuiltinFailure(error);
+    }
+  } finally {
+    stopButton.hidden = true;
+    inFlight = null;
+  }
+}
+
+/** A stream that ended with no text gets a sentence, not an empty card. */
+function emptyAnswer() {
+  answerStatus.textContent = "No answer came back.";
+  answerMeta.textContent = `The model returned nothing. Try rephrasing it, or continue in ${targetName(fallback)}.`;
 }
 
 function describeUsage(usage, total, config) {
@@ -789,7 +1034,7 @@ document.getElementById("closeAnswer").addEventListener("click", () => {
 document.getElementById("continueInChatGPT").addEventListener("click", () => {
   const prompt = lastPrompt || input.value;
   if (!prompt.trim()) return;
-  navigate("https://chatgpt.com/?q=" + encodeURIComponent(prompt.trim()));
+  navigate(handoffURL(fallback, prompt));
 });
 
 /**

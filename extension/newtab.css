@@ -8,6 +8,7 @@
   --border:    #E8E2D9;
   --text:      #141416;   /* ink */
   --muted:     #78706A;   /* 4.6:1 on cream — descriptions are body text */
+  --mutedTray: #6B635C;   /* muted text on the --pressed tray: 5.0:1 (--muted is 4.1) */
   --faint:     #D9D2C7;   /* the oversized page mark */
   --accent:    #B45309;   /* brass — 4.7:1 on cream, passes AA */
   --onAccent:  #FBF7F0;   /* the glyph inside a brass fill */
@@ -26,6 +27,7 @@
     --border:   #2C2C30;
     --text:     #F2EFEA;
     --muted:    #948D84;   /* 5.6:1 on ink */
+    --mutedTray: #A39C93;  /* 5.5:1 on the dark tray */
     --faint:    #292927;
     --accent:   #F59E0B;   /* brass lifts to amber so it holds on ink */
     --onAccent: #141416;
@@ -300,7 +302,9 @@ body {
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
+  /* The pills sit on the --pressed tray, not on cream, and --muted there is
+     4.1:1 — under AA for 13.5px text. */
+  color: var(--mutedTray);
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
@@ -613,16 +617,59 @@ body {
   text-transform: uppercase;
 }
 
+/* Built by src/markdown.js from the model's Markdown, element by element. */
 .answerText {
   margin: 0;
-  /* The API returns plain text with real newlines in it. Honouring them is the
-     whole of the "formatting" here — nothing in this string is ever parsed. */
-  white-space: pre-wrap;
   font-size: 15px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .answerText:empty { display: none; }
+.answerText > :first-child { margin-top: 0; }
+.answerText > :last-child { margin-bottom: 0; }
+.answerText p,
+.answerText ul,
+.answerText ol,
+.answerText pre,
+.answerText blockquote,
+.answerText .tableWrap { margin: 0 0 .75em; }
+.answerText h3,
+.answerText h4,
+.answerText h5,
+.answerText h6 { margin: 1.1em 0 .4em; font-size: 15px; line-height: 1.4; }
+.answerText h3 { font-size: 17px; }
+.answerText ul,
+.answerText ol { padding-left: 1.4em; }
+.answerText li + li { margin-top: .25em; }
+.answerText code {
+  padding: .1em .35em;
+  border-radius: 5px;
+  background: var(--pressed);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .88em;
+}
+.answerText pre {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  overflow-x: auto;
+}
+.answerText pre code { padding: 0; background: none; font-size: 13px; white-space: pre; }
+.answerText blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+.answerText hr { margin: 1em 0; border: none; border-top: 1px solid var(--border); }
+.answerText a { color: var(--text); text-decoration-color: var(--accent); text-underline-offset: 2px; }
+.answerText a:hover { color: var(--accent); }
+.answerText .tableWrap { overflow-x: auto; }
+.answerText table { border-collapse: collapse; font-size: 14px; }
+.answerText th,
+.answerText td { padding: 5px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.answerText th { background: var(--bg); font-weight: 600; }
 
 .answerMeta {
   margin: 12px 0 0;
@@ -820,6 +867,8 @@ body {
 /* The monogram face. Hue is set per tile from the host, so a site keeps its
    colour; the lightness is fixed here so both themes stay legible. */
 .tileFace {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   width: 38px; height: 38px;
@@ -833,7 +882,11 @@ body {
 
 /* Covers the coloured monogram square entirely when there is a real icon, so
    the two never show at once. */
+/* Out of flow, over the face. In flow it was a second grid row under the
+   monogram, which pushed the face past 38px and onto the tile's label. */
 .tileIcon {
+  position: absolute;
+  inset: 0;
   width: 100%; height: 100%;
   border-radius: inherit;
   object-fit: cover;
@@ -952,3 +1005,126 @@ body {
   color: var(--accent);
   font-size: 12.5px;
 }
+
+/* ---------- mode note ---------- */
+
+/* Says where a question goes when the chosen mode cannot take it. */
+.modeNote {
+  width: min(795px, 100%);
+  margin: 10px auto 0;
+  padding: 0 21px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.linkButton:hover { color: var(--accent); }
+
+/* ---------- first-run picker ---------- */
+
+.picker {
+  width: min(520px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.picker::backdrop { background: rgb(20 20 22 / .32); }
+
+.pickerForm { padding: 24px 24px 20px; }
+
+.pickerTitle { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+
+.pickerLede,
+.pickerNote { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+
+.pickerNote { margin-top: 14px; font-size: 12.5px; }
+.pickerNote strong { color: var(--text); font-weight: 600; }
+
+.pickerChoices {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: none;
+}
+
+.pickerChoice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.pickerChoice:hover { border-color: var(--accent); }
+.pickerChoice:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.pickerChoice input { grid-row: span 2; margin: 3px 0 0; accent-color: var(--accent); }
+.pickerName { font-size: 14.5px; font-weight: 600; }
+.pickerHint { grid-column: 2; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+.pickerBadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pressed);
+  color: var(--mutedTray);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pickerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pickerActions button {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.pickerActions .primary {
+  border: none;
+  background: var(--accent);
+  color: var(--onAccent);
+  font-weight: 600;
+}
+
+.pickerActions .primary:hover { filter: brightness(1.08); }
+
+.pickerActions .quiet {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pickerActions .quiet:hover { color: var(--text); }
