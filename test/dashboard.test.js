@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { greetingFor, describeMoment, msToNextMinute } from "../extension/src/clock.js";
-import { describeCode, parseForecast, isStale, unitSymbol, CACHE_MS } from "../extension/src/weather.js";
+import { describeCode, parseForecast, isStale, unitSymbol, CACHE_MS, findPlace, fetchWeather, WEATHER_OFFLINE } from "../extension/src/weather.js";
 import {
   normaliseURL,
   hostOf,
@@ -269,4 +269,17 @@ test("the placeholder probe asks about an address that cannot resolve", () => {
   // address has to be one no real favourite could ever be.
   assert.match(NO_SUCH_SITE, /^https:\/\//);
   assert.ok(NO_SUCH_SITE.endsWith(".invalid/"), NO_SUCH_SITE);
+});
+
+test("a weather lookup with no network says so, not \"Failed to fetch\" (QA P2-7)", async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  try {
+    await assert.rejects(findPlace("Leeds"), { message: WEATHER_OFFLINE });
+    await assert.rejects(fetchWeather({ latitude: 1, longitude: 2, name: "x" }), { message: WEATHER_OFFLINE });
+  } finally {
+    globalThis.fetch = real;
+  }
 });

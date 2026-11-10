@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { splitEvents, parseFrame, estimateCost, checkCap } from "../extension/src/answer.js";
+import {
+  splitEvents,
+  parseFrame,
+  estimateCost,
+  checkCap,
+  isChatModel,
+  pickModel,
+  keyProblem,
+  explainFailure,
+  streamAnswer,
+  listModels,
+  checkKey,
+  OFFLINE,
+  PREFERRED_MODELS,
+} from "../extension/src/answer.js";
 import { route, ANSWER, ASK, NAVIGATE, ANSWER_MODE } from "../extension/src/router.js";
 import { dayStamp } from "../extension/src/settings.js";
 
@@ -132,4 +146,119 @@ test("a key does not make javascript: navigable", () => {
   const verdict = route("javascript:alert(1)", { mode: ANSWER_MODE, canAnswer: true });
   assert.equal(verdict.action, ANSWER);
   assert.equal(verdict.url, undefined);
+});
+
+// --- choosing a model, so a saved key needs nothing else (QA P1-2) ----------------
+
+// Roughly what /v1/models returns for a new Platform account.
+const LISTED = [
+  "babbage-002", "chatgpt-4o-latest", "codex-mini-latest", "dall-e-2", "dall-e-3", "davinci-002",
+  "gpt-3.5-turbo-instruct", "gpt-4o-audio-preview", "gpt-4o-mini", "gpt-4o-mini-2024-07-18",
+  "gpt-4o-mini-search-preview", "gpt-4o-mini-transcribe", "gpt-4o-mini-tts", "gpt-4o-realtime-preview",
+  "gpt-5-codex", "gpt-5-pro", "gpt-5.4-mini", "gpt-6-luna", "gpt-image-1", "o4-mini-deep-research",
+  "omni-moderation-latest", "text-embedding-3-small", "tts-1", "whisper-1",
+];
+
+test("isChatModel keeps chat models and drops images, speech, search and the rest", () => {
+  assert.deepEqual(LISTED.filter(isChatModel), [
+    "chatgpt-4o-latest", "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gpt-5.4-mini", "gpt-6-luna",
+  ]);
+});
+
+test("pickModel takes the first preferred model the key can reach", () => {
+  assert.equal(pickModel(LISTED), "gpt-6-luna");
+  assert.equal(pickModel(["gpt-4o-mini", "gpt-5-mini"]), "gpt-5-mini");
+});
+
+test("pickModel falls back to a dated snapshot of a preferred model", () => {
+  assert.equal(pickModel(["gpt-4o-mini-2024-07-18", "dall-e-3"]), "gpt-4o-mini-2024-07-18");
+});
+
+test("pickModel is null when the key reaches no preferred model", () => {
+  assert.equal(pickModel(["dall-e-3", "whisper-1"]), null);
+  assert.equal(pickModel([]), null);
+});
+
+test("every preferred model is itself a chat model", () => {
+  for (const id of PREFERRED_MODELS) assert.ok(isChatModel(id), id);
+});
+
+test("keyProblem catches what is plainly not a key, before any request", () => {
+  assert.match(keyProblem(""), /Paste a key/);
+  assert.match(keyProblem("hello there"), /spaces/);
+  assert.match(keyProblem("pk-abcdefghijklmnopqrstuvwxyz"), /start with “sk-”/);
+  assert.match(keyProblem("sk-short"), /cut short/);
+  assert.equal(keyProblem("  sk-proj-abcdefghijklmnopqrstuvwxyz  "), null);
+});
+
+// --- failures in plain words (QA §3.2, P2-7) --------------------------------------
+
+test("a rejected key says where to get a good one", () => {
+  const text = explainFailure(401, { error: { message: "Incorrect API key provided: sk-...", code: "invalid_api_key" } });
+  assert.match(text, /didn't accept that key/);
+  assert.match(text, /platform\.openai\.com\/api-keys/);
+  assert.doesNotMatch(text, /sk-/);
+});
+
+test("no credit is named as no credit, with where to add it and the free way out", () => {
+  const text = explainFailure(429, { error: { message: "You exceeded your current quota", type: "insufficient_quota", code: "insufficient_quota" } });
+  assert.equal(
+    text,
+    "Your OpenAI account has no credit yet. Add $5+ at platform.openai.com/settings/organization/billing — or keep using ChatGPT hand-off for free.",
+  );
+});
+
+test("a plain rate limit is not mistaken for no credit", () => {
+  assert.match(explainFailure(429, { error: { message: "Rate limit reached", code: "rate_limit_exceeded" } }), /rate-limiting/);
+  assert.match(explainFailure(429, null), /rate-limiting/);
+});
+
+test("a model the key cannot use points at the Model setting", () => {
+  assert.match(explainFailure(404, { error: { code: "model_not_found" } }), /Settings → Model/);
+});
+
+test("server trouble and unknown statuses still say something useful", () => {
+  assert.match(explainFailure(503, null), /OpenAI is having trouble right now \(503\)/);
+  assert.equal(explainFailure(400, { error: { message: "Bad thing" } }), "Bad thing");
+  assert.equal(explainFailure(418, "not json"), "OpenAI returned an error (418).");
+});
+
+async function withFetch(fake, run) {
+  const real = globalThis.fetch;
+  globalThis.fetch = fake;
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+test("a network failure reads as one, not as \"Failed to fetch\"", async () => {
+  const fail = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  await withFetch(fail, async () => {
+    await assert.rejects(streamAnswer({ key: "k", model: "m", prompt: "p" }), { message: OFFLINE });
+    await assert.rejects(listModels("k"), { message: OFFLINE });
+  });
+  assert.equal(OFFLINE, "Couldn't reach OpenAI — check your connection.");
+});
+
+test("an abort is passed through, not reported as a network failure", async () => {
+  const abort = async () => {
+    throw new DOMException("The user aborted a request.", "AbortError");
+  };
+  await withFetch(abort, () => assert.rejects(streamAnswer({ key: "k", model: "m", prompt: "p" }), { name: "AbortError" }));
+});
+
+test("checkKey lists only chat models and picks one", async () => {
+  const fake = async () => new Response(JSON.stringify({ data: LISTED.map((id) => ({ id })) }), { status: 200 });
+  const { models, model } = await withFetch(fake, () => checkKey("sk-test"));
+  assert.ok(!models.includes("dall-e-3"));
+  assert.equal(model, "gpt-6-luna");
+});
+
+test("checkKey throws the explained failure for a bad key", async () => {
+  const fake = async () => new Response(JSON.stringify({ error: { message: "Incorrect API key provided" } }), { status: 401 });
+  await withFetch(fake, () => assert.rejects(checkKey("sk-bad"), /didn't accept that key/));
 });
