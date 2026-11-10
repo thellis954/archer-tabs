@@ -69,9 +69,12 @@ for anything.
   Perplexity. The settings page adds Google, default search engine only, and answer on the page.
 - **Override for one line:** <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> always treats it as a
   question, <kbd>Shift</kbd>+<kbd>Enter</kbd> always treats it as an address.
-- **Answers on the page** (optional): add your own OpenAI API key and replies stream onto the new
-  tab. Pick the model, see token use, set a daily budget, and hit **Continue in ChatGPT** when it
-  gets interesting.
+- **Asks once, on first run,** where questions should go: ChatGPT (preselected), Claude,
+  Perplexity or Answer here. Web searches keep going to Chrome's default engine.
+- **Answers on the page**, free where Chrome has its built-in AI: the model runs on your device and
+  nothing is sent anywhere. Or add your own OpenAI API key; settings walks you through getting one,
+  checks it, and picks a model for you. See token use, set a daily budget, and hit
+  **Continue in ChatGPT** (or wherever you chose) when it gets interesting.
 - **Attach files** to a question: text and code files, `.docx`, `.xlsx`, `.pptx` and PDF text are
   read in the browser. Images go to vision models in on-page answers. A file it can't read still
   attaches, with a note saying why.

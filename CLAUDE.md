@@ -19,7 +19,9 @@ Don't reintroduce OpenAI's marks, wordmark, or the old name into shipped UI — 
 extension/   everything Chrome loads — this is what you point "Load unpacked" at
   src/       classify.js, router.js, conversations.js, history.js, rows.js, answer.js,
              clock.js, weather.js, favourites.js, dashboard.js, library.js, analytics.js,
-             browsing.js, settings.js, modemenu.js, extract.js + the generated TLD list
+             browsing.js, settings.js, modemenu.js, extract.js, pdf.js, builtin.js,
+             markdown.js, onboarding.js + the generated TLD list
+  background.js  the service worker — only records an install for the first-run picker
   options.*  the settings page — API key, model, budget
 web/         the archertabs.app marketing site, deployed to Vercel from this folder
   app.js     wires the two live demos; imports from vendor/
@@ -55,7 +57,7 @@ There is nothing to build or install. To run it:
 
 | Command | What it does |
 |---|---|
-| `npm test` | 242 unit cases across the pure modules. No install needed. |
+| `npm test` | 332 unit cases across the pure modules. No install needed. |
 | `npm run lint` | This repo's own invariants (see `tools/lint.js`) — not a style linter. |
 | `npm run e2e` | Drives a real Chromium with the extension loaded. Needs Playwright. |
 | `npm run shots` | Renders the page to `shots/` — light, dark, narrow, and a filled/hovered state, plus the settings page at both its layouts. **Also rewrites `web/assets/newtab-{light,dark}.png`**, the screenshot the site ships. |
@@ -153,6 +155,19 @@ answered.
 sync by `syncTargets()`. The pills carry four of the seven modes — a mode with no pill presses none
 of them rather than showing a wrong one, which is why the fresh-install default is `google` and not
 `auto`: a page that opens with no pill pressed gives you nothing to read the next Enter off.
+
+**A fresh install asks once where questions go.** `background.js` marks `onboarding: pending` on
+`onInstalled` with reason `install` (an update marks it done, so existing users are never asked), and
+the new tab opens the `#picker` dialog: ChatGPT preselected, Claude, Perplexity, Answer here, or
+"Chrome's default engine for everything". Until it is answered the mode stays `auto`, so nothing is
+routed away from the user's own engine without an explicit choice. The pure rules are
+`src/onboarding.js`. The chosen site is also `fallbackMode` — where "Answer here" hands a question
+off when it has neither a key nor Chrome's built-in AI.
+
+**"Answer here" has two engines.** An OpenAI key wins; otherwise `src/builtin.js` uses Chrome's
+on-device Prompt API (`LanguageModel`), which makes no request of Archer's own. Headless Chromium
+reports it unavailable, so e2e stubs it with `addInitScript`. Answers render through
+`src/markdown.js`, which builds nodes with `textContent` only, so the no-`innerHTML` rule holds.
 
 **A pill that names a place goes to that place.** `google`, `chatgpt`, `claude` and `perplexity` are
 plain `?q=` navigations to a named destination. `auto` and `search` are the two that defer to

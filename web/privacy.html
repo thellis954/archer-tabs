@@ -51,7 +51,7 @@
 
   <header class="docHead">
     <h1>Privacy</h1>
-    <p class="docDate">Last updated 2026-10-28. Applies to the Archer Chrome extension, every version.</p>
+    <p class="docDate">Last updated 2026-11-10. Applies to the Archer Chrome extension, every version.</p>
     <p>
       This page is published at <a href="https://archertabs.app/privacy">archertabs.app/privacy</a>
       (<code>web/privacy.html</code>), which is the policy URL on the Chrome Web Store listing.
@@ -89,6 +89,11 @@
           <tr>
             <td>Your chosen destination (Auto, Default engine, Google, ChatGPT, Claude, Perplexity or Answer here)</td>
             <td>So a new tab opens the way you left it</td>
+            <td>You change it</td>
+          </tr>
+          <tr>
+            <td>Where questions go when Archer can't answer them itself, and whether you have answered the first-run question</td>
+            <td>So the first new tab asks once, and never again</td>
             <td>You change it</td>
           </tr>
           <tr>
@@ -169,6 +174,18 @@
         </dd>
       </div>
       <div>
+        <dt>Nothing, for Chrome's built-in AI</dt>
+        <dd>
+          If your Chrome has its built-in AI model, "Answer here" can use it
+          without a key. The model runs on your device: your prompt and
+          attachments are handed to Chrome's own <code>LanguageModel</code> API
+          and are not sent anywhere by Archer. The first use may make Chrome
+          download the model, which is Chrome's download from Google, not a
+          request carrying your prompt.
+          <a href="https://developer.chrome.com/docs/ai/built-in" rel="noreferrer">Chrome's built-in AI</a>.
+        </dd>
+      </div>
+      <div>
         <dt>Your prompt and your API key, to OpenAI</dt>
         <dd>
           Only if you have entered a key and chosen "Answer here". The request
@@ -200,7 +217,11 @@
 
   <section>
     <h2>Permissions, and what each is for</h2>
-    <p>Archer asks for two permissions when you install it.</p>
+    <p>
+      Archer asks for two permissions when you install it. It also runs a small
+      background script, which does nothing but record, when it is first
+      installed, that the new tab should ask where questions go.
+    </p>
 
     <dl class="docList">
       <div>
